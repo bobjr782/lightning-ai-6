@@ -1,5 +1,12 @@
 name = "lightning-ai-6"
+main = "worker.js"
 compatibility_date = "2026-11-05"
 
 [assets]
 directory = "./public"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lightning-accounts"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
