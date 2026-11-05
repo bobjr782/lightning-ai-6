@@ -1,0 +1,8 @@
+# For local testing with:  npx wrangler pages dev public --kv ARTIFACTS
+# (copy to .dev.vars). In production add these under Settings > Variables and Secrets.
+OPENROUTER_API_KEY=
+GROQ_API_KEY=
+GOOGLE_API_KEY=
+HF_TOKEN=
+TOGETHER_API_KEY=
+RATE_LIMIT_PER_MIN=30
