@@ -130,6 +130,11 @@ async function route(request, env) {
     await env.DB.prepare("INSERT INTO shares(id,owner_id,recipient_id,artifact_json,created_at) VALUES(?,?,?,?,?)").bind(id,user.id,recipient.id,artifact,Math.floor(Date.now()/1000)).run();
     return json({ok:true,shareId:id});
   }
+  if(path==="/api/shares" && request.method==="GET") {
+    if(!user)return json({error:"Sign in required."},401);
+    const rows=await env.DB.prepare("SELECT shares.id, shares.artifact_json, shares.created_at, users.username AS from_username FROM shares JOIN users ON users.id=shares.owner_id WHERE shares.recipient_id=? ORDER BY shares.created_at DESC LIMIT 100").bind(user.id).all();
+    return json({shares:(rows.results||[]).map(row=>{let artifact={};try{artifact=JSON.parse(row.artifact_json)}catch{}return {id:row.id,from:row.from_username,title:artifact.title||"Shared artefact",createdAt:row.created_at};})});
+  }
   if(path.startsWith("/api/share/") && request.method==="GET") {
     if(!user)return json({error:"Sign in required."},401);
     const id=decodeURIComponent(path.slice("/api/share/".length));
