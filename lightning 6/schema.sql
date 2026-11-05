@@ -18,6 +18,7 @@ CREATE INDEX IF NOT EXISTS sessions_expiry_idx ON sessions(expires_at);
 CREATE TABLE IF NOT EXISTS user_data (
   user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   data_json TEXT NOT NULL DEFAULT '{}',
+  object_key TEXT,
   updated_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS shares (
