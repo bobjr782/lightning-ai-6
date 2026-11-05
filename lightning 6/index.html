@@ -235,9 +235,13 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
     el.replaceWith(s);
   });
   // App links always open the current deployed lightning application.
-  document.querySelectorAll("a.app-link").forEach(function (a) {
-    a.setAttribute("href", "https://lightning-ai-5.ray-collier264.workers.dev/");
-  });
+  // App links point to the new Lightning deployment.
+const APP_URL = "https://lightning-ai-6.ray-collier264.workers.dev";
+
+document.querySelectorAll("a.app-link").forEach(function (a) {
+  const path = a.getAttribute("data-path") || "/";
+  a.href = APP_URL + path;
+});
   if ("IntersectionObserver" in window) {
     var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }); }, { threshold: .12 });
     document.querySelectorAll(".reveal").forEach(function (el) { io.observe(el); });
