@@ -2002,12 +2002,18 @@ async function connectOpenRouter() {
     if (!/^https?:$/.test(location.protocol) || !(window.crypto && crypto.subtle)) return showAiBubbleOnScreen("⚠️ OpenRouter sign-in needs this page to run from http://localhost (e.g. VS Code Live Server) or an https site — not a double-clicked file.");
     const ver = b64url(crypto.getRandomValues(new Uint8Array(32))), chal = b64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ver))));
     try { localStorage.setItem("lt_or_verifier", ver); } catch (e) { return showAiBubbleOnScreen("⚠️ Browser storage is blocked, so sign-in can't continue."); }
-    location.href = `https://openrouter.ai/auth?callback_url=${encodeURIComponent(location.origin + (ROUTING ? "/" : location.pathname))}&code_challenge=${chal}&code_challenge_method=S256`;
+    const callback = location.origin + "/";
+    const authUrl = `https://openrouter.ai/auth?callback_url=${encodeURIComponent(callback)}&code_challenge=${chal}&code_challenge_method=S256`;
+    try { window.top.location.assign(authUrl); }
+    catch (e) { showAiBubbleOnScreen("⚠️ Your browser blocked the OpenRouter sign-in redirect. Allow pop-ups/redirects for this site and try again."); }
 }
 async function finishOpenRouter() {
-    const code = new URLSearchParams(location.search).get("code"); if (!code) return;
+    let callbackUrl;
+    try { callbackUrl = new URL(window.top.location.href); } catch (e) { callbackUrl = new URL(location.href); }
+    const code = callbackUrl.searchParams.get("code"); if (!code) return;
     let ver = null; try { ver = localStorage.getItem("lt_or_verifier"); } catch (e) {}
-    history.replaceState(null, "", location.pathname); if (!ver) return;
+    try { window.top.history.replaceState(null, "", callbackUrl.pathname + callbackUrl.hash); } catch (e) { history.replaceState(null, "", location.pathname); }
+    if (!ver) return;
     try {
         const r = await fetch("https://openrouter.ai/api/v1/auth/keys", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code, code_verifier: ver, code_challenge_method: "S256" }) });
         const j = await r.json(); if (!r.ok || !j.key) throw new Error((j.error && j.error.message) || "HTTP " + r.status);
