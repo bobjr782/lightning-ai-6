@@ -6,21 +6,18 @@
 <title>Lightning 6.0</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;font-family:Arial,sans-serif;background:#0b0e14;color:#e8ecf4}
-#bar{height:48px;display:flex;align-items:center;gap:8px;padding:6px 12px;background:#111722;border-bottom:1px solid #293244}
+#bar{display:none}
 #brand{font-weight:700;margin-right:12px;color:#f5b700}
 button{border:1px solid #303b50;background:#1a2331;color:#e8ecf4;border-radius:7px;padding:8px 14px;cursor:pointer}
 button.active,button:hover{background:#f5b700;color:#171300;border-color:#f5b700}
-.view{display:none;width:100%;height:calc(100% - 48px);border:0}
+.view{display:none;width:100%;height:100%;border:0}
 .view.active{display:block}
 #licences{overflow:auto;padding:28px;white-space:pre-wrap;font:14px/1.6 ui-monospace,Consolas,monospace}
-@media(max-width:520px){#bar{gap:4px;padding:5px}#brand{margin-right:2px}button{padding:7px 9px;font-size:12px}}
+
 </style>
 </head>
 <body>
-<header id="bar"><span id="brand">⚡ Lightning 6.0</span>
-<button data-view="app" class="active">App</button>
-<button data-view="about">About</button>
-<button data-view="licences">Licences</button></header>
+
 <iframe id="app" class="view active" title="Lightning app" allow="clipboard-read; clipboard-write; microphone; camera; fullscreen; downloads; autoplay"></iframe>
 <iframe id="about" class="view" title="About Lightning"></iframe>
 <main id="licences" class="view"></main>
@@ -36,19 +33,20 @@ aboutFrame.addEventListener('load',()=>{
   if(!doc) return;
   doc.querySelectorAll('a.app-link').forEach(link=>link.addEventListener('click',event=>{
     event.preventDefault();
-    document.querySelector('[data-view="app"]').click();
+    location.hash='app';
   }));
   doc.querySelectorAll('a[href*="LICENSES.txt"]').forEach(link=>link.addEventListener('click',event=>{
     event.preventDefault();
-    document.querySelector('[data-view="licences"]').click();
+    location.hash='licences';
   }));
 });
 document.getElementById('licences').textContent=licenceText;
-document.querySelectorAll('#bar button').forEach(button=>button.addEventListener('click',()=>{
-  const target=button.dataset.view;
-  document.querySelectorAll('.view').forEach(view=>view.classList.toggle('active',view.id===target));
-  document.querySelectorAll('#bar button').forEach(item=>item.classList.toggle('active',item===button));
-}));
+function showView(){
+  const page=location.hash==='#about'?'about':location.hash==='#licences'?'licences':'app';
+  document.querySelectorAll('.view').forEach(view=>view.classList.toggle('active',view.id===page));
+}
+window.addEventListener('hashchange',showView);
+showView();
 </script>
 </body>
 </html>
