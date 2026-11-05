@@ -22,9 +22,9 @@ function cookie(token, maxAge) {
   return "lightning_session="+encodeURIComponent(token)+"; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age="+maxAge;
 }
 async function body(request) {
-  const len=Number(request.headers.get("content-length")||0);
-  if(len>MAX_DATA_BYTES) throw new Error("Request too large");
-  return await request.json();
+  const raw=await request.text();
+  if(encoder.encode(raw).length>MAX_DATA_BYTES) throw new Error("Request too large");
+  return JSON.parse(raw);
 }
 function sameOrigin(request) {
   const origin=request.headers.get("Origin");
