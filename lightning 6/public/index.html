@@ -30,6 +30,19 @@ const aboutDocument="\u003c!DOCTYPE html>\n\u003chtml lang=\"en\">\n\u003chead>\
 const licenceText="lightning — license and third-party notices\n===========================================\n\nMIT License\n\nCopyright (c) 2026 Ray\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n\n\nThird-party software and services\n---------------------------------\nlightning does not bundle the items below. The browser loads them at runtime\nfrom their own servers, and each keeps its own license and terms.\n\n- Google Fonts: DM Sans, Source Serif 4, JetBrains Mono — SIL Open Font License 1.1\n- pdf.js (PDF reading) — Apache License 2.0\n- mammoth.js (Word .docx reading) — BSD 2-Clause\n- SheetJS Community Edition (Excel reading) — Apache License 2.0\n- JSZip (ZIP / PowerPoint reading) — MIT or GPL-3.0 (dual licensed)\n- Pyodide (in-browser Python) — Mozilla Public License 2.0\n- Google Translate website widget — Google Terms of Service\n\nAI and image services (OpenRouter, Groq, Google Gemini API, Cloudflare Workers AI,\nHugging Face, Together AI, Pollinations) are used under their own terms of service. Content created with\nthem may be subject to the model and provider licenses.\n\nThe pixel-art icons were drawn for this project and are covered by the MIT\nLicense above.\n\nReplace \"Ray\" with your full legal name or organization if you want a\ndifferent copyright holder. This file is not legal advice.\n";
 document.getElementById('app').srcdoc=appDocument;
 document.getElementById('about').srcdoc=aboutDocument;
+const aboutFrame=document.getElementById('about');
+aboutFrame.addEventListener('load',()=>{
+  const doc=aboutFrame.contentDocument;
+  if(!doc) return;
+  doc.querySelectorAll('a.app-link').forEach(link=>link.addEventListener('click',event=>{
+    event.preventDefault();
+    document.querySelector('[data-view="app"]').click();
+  }));
+  doc.querySelectorAll('a[href*="LICENSES.txt"]').forEach(link=>link.addEventListener('click',event=>{
+    event.preventDefault();
+    document.querySelector('[data-view="licences"]').click();
+  }));
+});
 document.getElementById('licences').textContent=licenceText;
 document.querySelectorAll('#bar button').forEach(button=>button.addEventListener('click',()=>{
   const target=button.dataset.view;
