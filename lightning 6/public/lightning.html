@@ -1229,7 +1229,16 @@ function drawGallery() {
         const meta = el("div", "gal-meta"); meta.append(el("b", "", a.title), el("small", "", new Date(a.t).toLocaleString()));
         const acts = el("div", "gal-actions");
         acts.append(
-            btn("Open", open), btn("⛶ Run", () => runFull(a.code, a.title)), btn("Publish", () => publishArt(a)),
+            btn("Open", open), btn("⛶ Run", () => runFull(a.code, a.title)), btn("Share", async () => {
+                const username = prompt("Share this artefact with which Lightning username?");
+                if (!username) return;
+                try {
+                    const response = await fetch("/api/share", { method:"POST", credentials:"same-origin", headers:{"content-type":"application/json"}, body:JSON.stringify({username, artifact:a}) });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.error || "Could not share artefact.");
+                    alert("Shared with " + username + ".");
+                } catch (e) { alert(e.message); }
+            }), btn("Publish", () => publishArt(a)),
             btn("Copy", b => { navigator.clipboard.writeText(a.code); b.textContent = "Copied"; setTimeout(() => b.textContent = "Copy", 1200); }),
             btn("Download", () => download((a.title.replace(/\W+/g, "-") || "artifact") + ".html", a.code, "text/html")),
             btn("Delete", () => { if (confirm(`Delete "${a.title}"?`)) { saved = saved.filter(x => x.id !== a.id); deleted.push(a.id); persistArts(); drawGallery(); } })
