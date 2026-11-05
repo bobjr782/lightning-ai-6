@@ -10,7 +10,3 @@ binding = "ASSETS"
 binding = "DB"
 database_name = "lightning-accounts"
 database_id = "33179c21-d653-4501-b593-fc916bd8bbef"
-
-[[r2_buckets]]
-binding = "FILES"
-bucket_name = "lightning-user-files"
