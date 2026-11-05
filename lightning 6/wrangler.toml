@@ -10,3 +10,7 @@ binding = "ASSETS"
 binding = "DB"
 database_name = "lightning-accounts"
 database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "lightning-user-files"
