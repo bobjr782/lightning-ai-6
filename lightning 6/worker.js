@@ -1,5 +1,5 @@
 const SESSION_DAYS = 30;
-const MAX_DATA_BYTES = 1800000;
+const MAX_DATA_BYTES = 20000000;
 const encoder = new TextEncoder();
 
 function json(data, status = 200, headers = {}) {
@@ -92,16 +92,29 @@ async function route(request, env) {
   if(path==="/api/me" && request.method==="GET") return user?json({user}):json({user:null},401);
   if(path==="/api/data" && request.method==="GET") {
     if(!user)return json({error:"Sign in required."},401);
-    const row=await env.DB.prepare("SELECT data_json,updated_at FROM user_data WHERE user_id=?").bind(user.id).first();
-    let data={}; try{data=JSON.parse(row?.data_json||"{}")}catch{}
+    const row=await env.DB.prepare("SELECT data_json,object_key,updated_at FROM user_data WHERE user_id=?").bind(user.id).first();
+    let data={};
+    try {
+      if(row?.object_key && env.FILES) {
+        const object=await env.FILES.get(row.object_key);
+        if(object) data=JSON.parse(await object.text());
+      } else data=JSON.parse(row?.data_json||"{}");
+    } catch {}
     return json({data,updatedAt:row?.updated_at||null});
   }
   if(path==="/api/data" && request.method==="PUT") {
     if(!user)return json({error:"Sign in required."},401);
     let b;try{b=await body(request)}catch{return json({error:"Invalid or oversized data."},400)}
     const data=JSON.stringify(b.data??{});
-    if(encoder.encode(data).length>MAX_DATA_BYTES)return json({error:"Your saved workspace is too large for this storage limit."},413);
-    await env.DB.prepare("INSERT INTO user_data(user_id,data_json,updated_at) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at").bind(user.id,data,Math.floor(Date.now()/1000)).run();
+    if(encoder.encode(data).length>MAX_DATA_BYTES)return json({error:"Your workspace is too large to save in one sync."},413);
+    const now=Math.floor(Date.now()/1000);
+    if(env.FILES) {
+      const key="users/"+user.id+"/workspace.json";
+      await env.FILES.put(key,data,{httpMetadata:{contentType:"application/json; charset=utf-8"}});
+      await env.DB.prepare("INSERT INTO user_data(user_id,data_json,object_key,updated_at) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET data_json=excluded.data_json,object_key=excluded.object_key,updated_at=excluded.updated_at").bind(user.id,"{}",key,now).run();
+    } else {
+      await env.DB.prepare("INSERT INTO user_data(user_id,data_json,object_key,updated_at) VALUES(?,?,NULL,?) ON CONFLICT(user_id) DO UPDATE SET data_json=excluded.data_json,object_key=NULL,updated_at=excluded.updated_at").bind(user.id,data,now).run();
+    }
     return json({ok:true});
   }
   if(path==="/api/share" && request.method==="POST") {
