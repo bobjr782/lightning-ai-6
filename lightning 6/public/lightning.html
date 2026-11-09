@@ -1407,8 +1407,6 @@ async function enhancePrompt(p) {
         return t ? t.trim().replace(/^["']|["']$/g, "") : null;
     } catch (e) { return null; }
 }
-    return null;
-}
 window.handleImageGeneration = async function (prompt, box) {
     prompt = (prompt || "").trim();
     if (!prompt) return finalizeAiBubble(box, "⚠️ Describe the image you want, e.g. /image a red fox in the snow");
