@@ -250,15 +250,20 @@ async function generateRoute(request,env){
   }
 }
 
+const CHAT_RATE = new Map();
+function chatRateLimit(request) {
+  const ip=request.headers.get("CF-Connecting-IP")||"unknown", now=Date.now(), row=CHAT_RATE.get(ip);
+  if(!row||now-row.start>60000){CHAT_RATE.set(ip,{start:now,count:1});return {ok:true};}
+  if(row.count>=15)return {ok:false,retryAfter:Math.max(1,Math.ceil((60000-(now-row.start))/1000))};
+  row.count++;return {ok:true};
+}
 async function chatRoute(request,env) {
-  if(!env.AI||typeof env.AI.run!=="function") return json({error:{message:"Lightning's no-key AI service is not enabled in Cloudflare."}},503);
-  const user=await userFor(request,env);
-  if(!user) return json({error:{message:"Sign in to start your Lightning free trial."}},401);
+  if(!env.AI||typeof env.AI.run!=="function") return json({error:{message:"Lightning's free AI service is not enabled in Cloudflare. Check the Workers AI binding named AI."}},503);
+  const limit=chatRateLimit(request);
+  if(!limit.ok)return json({error:{message:"Lightning's shared free AI is busy. Wait a minute and try again."}},429,{"retry-after":String(limit.retryAfter)});
   let input;try{input=await body(request);}catch{return json({error:{message:"Invalid chat request."}},400);}
   const messages=Array.isArray(input.messages)?input.messages.slice(-22):[];
   if(!messages.length)return json({error:{message:"Send a message first."}},400);
-  const reserved=await reserveTrialUse(user,env,"text");
-  if(!reserved.ok)return json({error:{message:reserved.error},entitlement:reserved.info},403);
   try {
     const result=await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast",{
       messages:messages.map(m=>({role:["system","user","assistant"].includes(m.role)?m.role:"user",content:typeof m.content==="string"?m.content:JSON.stringify(m.content)})),
@@ -267,12 +272,10 @@ async function chatRoute(request,env) {
     });
     const content=result?.response||result?.choices?.[0]?.message?.content||"";
     if(!content)throw new Error("The chat model returned an empty response.");
-    const usage=await ensureUsage(user,env);
-    return json({choices:[{message:{role:"assistant",content}}],model:"Lightning Free Trial · Llama 3.3",entitlement:entitlement(usage)});
+    return json({choices:[{message:{role:"assistant",content}}],model:"Lightning Free · Llama 3.3"});
   } catch(error) {
-    await refundTrialUse(user,env,"text");
     const detail=String(error?.message||error||"");
-    return json({error:{message:/quota|limit|billing|neuron/i.test(detail)?"Lightning's shared free AI allowance is temporarily unavailable. Try again later.":"Lightning's free AI model is temporarily unavailable."}},502);
+    return json({error:{message:/quota|limit|billing|neuron/i.test(detail)?"Lightning's free AI allowance is temporarily used up. Try again later.":"Lightning's free AI model is temporarily unavailable."}},502);
   }
 }
 
