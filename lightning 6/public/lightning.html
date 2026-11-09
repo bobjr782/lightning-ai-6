@@ -1696,7 +1696,7 @@ try {
 const pages = [];
 let SERVER = { on: false };
 const CHAT_ROUTE = new URLSearchParams(location.search).get("chat");
-const ROUTING = /^https?:$/.test(location.protocol) && (!/\.html?$/i.test(location.pathname) || /^\/chats\/[^/]+\/?$/.test(CHAT_ROUTE || ""));
+const ROUTING = /^https?:$/.test(location.protocol) && (location.pathname === "/lightning.html" || !/\.html?$/i.test(location.pathname) || /^\/chats\/[^/]+\/?$/.test(CHAT_ROUTE || ""));
 const chatId = () => { const b = new Uint8Array(4); (window.crypto || { getRandomValues: a => a.map(() => Math.random() * 256) }).getRandomValues(b); return Array.from(b, x => x.toString(16).padStart(2, "0")).join("-") + "-t" + (Math.floor(Math.random() * 9000) + 1000); };
 const chatPath = () => (curId ? "/chats/" + curId : "/");
 let routing = false, booted = false;
