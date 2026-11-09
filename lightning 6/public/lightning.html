@@ -1619,7 +1619,7 @@ async function askAI(apiText, images, names, force, reuse, tried) {
                 usedModel = m; streaming = true;
                 try { res = await attempt(m, true); }
                 catch (e) { try { res = await attempt(m, false); streaming = false; } catch (e2) { throw new Error("Failed to fetch — couldn't reach " + cfg.name + ". Check your internet/VPN/ad blocker, and run the file with Live Server instead of double-clicking."); } }
-                if (res.ok) { lastGood[cfg.id] = m; break; }
+                if (res.ok) { lastGood[cfg.id] = m; if (trialNoKey) streaming = false; break; }
                 status = res.status;
                 if (status === 401 || status === 403) throw new Error(`${status} — ${cfg.name} rejected the API key. Check it in ⚙️ Model settings.`);
                 if (status === 429) { cool[m] = Date.now() + 60000; retryAfter = Math.min(+res.headers.get("retry-after") || 5, 10); }
