@@ -439,6 +439,10 @@ textarea.field { resize: vertical; }
 .art-err span { flex: 1; }
 
 /* account + auth */
+.trial-account{display:flex;flex-direction:column;gap:7px;padding:10px;margin-bottom:8px;border:1px solid var(--border-color);border-radius:9px;background:var(--surface)}
+.trial-account-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.trial-account-head small{color:var(--accent);font-size:.72rem}
+.trial-account>small{color:var(--text-secondary);line-height:1.4}.trial-account .mini-btn{margin:0;width:100%;padding:7px 9px}.trial-meter{height:4px;border-radius:9px;background:var(--surface-2);overflow:hidden}.trial-meter span{display:block;height:100%;background:var(--accent);transition:width .2s}
+
 .sidebar-footer { display: flex; flex-direction: column; gap: 8px; }
 .acct { display: flex; align-items: center; gap: 8px; text-align: left; }
 .acct .mini-btn { flex: 1; margin: 0; padding: 8px; }
@@ -1616,15 +1620,17 @@ async function askAI(apiText, images, names, force, reuse, tried) {
             ? [{ type: "text", text: apiText || "Describe this image." }, ...images.map(u => ({ type: "image_url", image_url: { url: u } }))]
             : apiText;
         const cfg = getCfg(force), messages = [{ role: "system", content: SYSTEM() }, ...hist, { role: "user", content: withHint(content, apiText) }];
-        if (!cfg.key && !(SERVER.on && SERVER[cfg.id] && cfg.id !== "custom")) { finalizeAiBubble(box, "⚠️ Please sign in first — click “Sign in with OpenRouter” or “Sign in with Groq” in the sidebar."); busy = false; return; }
-        const hdr = { "Content-Type": "application/json", "Authorization": `Bearer ${cfg.key}` };
+        const trialNoKey = !cfg.key && !(SERVER.on && SERVER[cfg.id] && cfg.id !== "custom") && cfg.id !== "custom";
+        if (!lightningAccount && trialNoKey) { finalizeAiBubble(box, "Sign in or create a Lightning account in the sidebar to start your free trial. No API key required."); busy = false; return; }
+        if (cfg.id === "custom" && !cfg.key) { finalizeAiBubble(box, "Add your custom API key in Model settings, or switch to Lightning Free Trial."); busy = false; return; }
+        const hdr = { "Content-Type": "application/json", ...(cfg.key ? { "Authorization": `Bearer ${cfg.key}` } : {}) };
         if (cfg.id === "openrouter") hdr["X-Title"] = "lightning";
         if (cfg.id === "openrouter" && /^https?:/.test(location.origin)) hdr["HTTP-Referer"] = location.origin;
         const hasAlt = ["openrouter", "groq", "google"].some(p => p !== cfg.id && !(tried || []).includes(p) && provAvail(p));
-        const cands = (await candidates(cfg, apiText, images)).slice(0, hasAlt ? 2 : 6);
-        const viaServer = SERVER.on && cfg.id !== "custom";
-        const attempt = (m, s) => fetch(viaServer ? "/api/chat" : cfg.endpoint, { method: "POST", headers: viaServer ? { "Content-Type": "application/json", "x-provider": cfg.id, ...(cfg.key ? { "x-user-key": cfg.key } : {}) } : hdr, body: JSON.stringify({ model: m, temperature: m === CODE_MODEL || currentSelectedMode === "coder" ? 0.2 : 0.7, messages, ...(s ? { stream: true } : {}) }) });
-        let res = null, streaming = true, full = "", usedModel = "", status = 0, retryAfter = 5;
+        const cands = trialNoKey ? ["lightning-free-trial"] : (await candidates(cfg, apiText, images)).slice(0, hasAlt ? 2 : 6);
+        const viaServer = trialNoKey || (SERVER.on && cfg.id !== "custom");
+        const attempt = (m, s) => fetch(viaServer ? "/api/chat" : cfg.endpoint, { method: "POST", headers: viaServer ? { "Content-Type": "application/json", "x-provider": cfg.id, ...(cfg.key ? { "x-user-key": cfg.key } : {}) } : hdr, body: JSON.stringify({ model: m, temperature: m === CODE_MODEL || currentSelectedMode === "coder" ? 0.2 : 0.7, max_tokens: 1800, messages, ...(s && !trialNoKey ? { stream: true } : {}) }) });
+        let res = null, streaming = !trialNoKey, full = "", usedModel = "", status = 0, retryAfter = 5;
         for (let round = 0; round < 2; round++) {
             if (cands.every(m => (cool[m] || 0) > Date.now())) Object.keys(cool).forEach(k => delete cool[k]);
             for (const m of cands) {
@@ -1898,7 +1904,71 @@ function provRow(id, label) {
     r.append(nm); if (!active) r.append(btn("Use", () => useProv(id)));
     r.append(has ? btn("✕", () => disconnect(id)) : btn("My key", signIn)); return r;
 }
-function drawAcct() { acct.innerHTML = ""; acct.append(provRow("openrouter", "OpenRouter"), provRow("groq", "Groq"), provRow("google", "Google")); }
+let lightningAccount=null, lightningEntitlement=null;
+function trialCard() {
+    const wrap=el("div","trial-account");
+    const head=el("div","trial-account-head");
+    head.append(el("b","",lightningAccount ? lightningAccount.username : "Lightning account"));
+    if(lightningEntitlement) head.append(el("small","",lightningEntitlement.trialActive ? "Free trial" : "Trial ended"));
+    wrap.append(head);
+    if(lightningAccount && lightningEntitlement){
+        const e=lightningEntitlement;
+        const line=el("small","",e.trialActive ? `${e.textRemaining} chat messages · ${e.imagesRemaining} images left` : "Sign in to manage your account");
+        wrap.append(line);
+        if(e.trialActive){
+            const bar=el("div","trial-meter"), fill=el("span");
+            fill.style.width=Math.min(100,Math.max(0,e.imagesUsed/e.imageLimit*100))+"%";
+            bar.append(fill);wrap.append(bar);
+        }
+        wrap.append(btn("Sign out",async()=>{await fetch("/api/logout",{method:"POST",credentials:"same-origin"});lightningAccount=null;lightningEntitlement=null;drawAcct();showAiBubbleOnScreen("Signed out of Lightning.");}));
+    } else {
+        wrap.append(btn("Sign in / Create account",openLightningAuth));
+        wrap.append(el("small","auth-note","Start a 7-day trial. No API key required."));
+    }
+    return wrap;
+}
+async function refreshLightningAccount(){
+    try{
+        const r=await fetch("/api/me",{credentials:"same-origin",cache:"no-store"});
+        const j=await r.json();
+        lightningAccount=r.ok?j.user:null;
+        lightningEntitlement=r.ok?j.entitlement:null;
+    }catch(e){lightningAccount=null;lightningEntitlement=null;}
+    drawAcct();
+}
+function openLightningAuth(){
+    const ov=el("div","modal-overlay open"),card=el("div","modal-card");ov.append(card);document.body.append(ov);
+    let mode="login";
+    const render=()=>{
+        card.innerHTML=`<div class="modal-header"><h3>${mode==="login"?"Sign in to Lightning":"Create your Lightning account"}</h3><button class="close-modal-btn" type="button">✕</button></div>
+        <div class="modal-body">
+          <p class="auth-note">${mode==="login"?"Welcome back.":"Get 7 days of Lightning Free Trial: 40 chat messages and 5 image generations. No API key needed."}</p>
+          <input class="field" id="lt-user" autocomplete="username" maxlength="24" placeholder="Username (3–24 letters, numbers or _)">
+          <input class="field" id="lt-pass" type="password" autocomplete="${mode==="login"?"current-password":"new-password"}" placeholder="${mode==="login"?"Password":"Password (at least 10 characters)"}">
+          <div class="auth-err" id="lt-auth-error"></div>
+          <button class="send-btn wide" id="lt-auth-submit" type="button">${mode==="login"?"Sign in":"Create account"}</button>
+          <button class="mini-btn wide" id="lt-auth-switch" type="button">${mode==="login"?"Need an account? Create one":"Already have an account? Sign in"}</button>
+        </div>`;
+        const q=s=>card.querySelector(s);
+        q(".close-modal-btn").onclick=()=>ov.remove();
+        q("#lt-auth-switch").onclick=()=>{mode=mode==="login"?"register":"login";render();};
+        const submit=async()=>{
+            const username=q("#lt-user").value.trim(),password=q("#lt-pass").value,err=q("#lt-auth-error"),button=q("#lt-auth-submit");
+            err.textContent="";button.disabled=true;button.textContent="Please wait…";
+            try{
+                const r=await fetch(mode==="login"?"/api/login":"/api/register",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({username,password})});
+                const j=await r.json();
+                if(!r.ok)throw new Error(j.error||"Account request failed.");
+                ov.remove();await refreshLightningAccount();
+                showAiBubbleOnScreen(mode==="login"?"Welcome back to Lightning.":"Your Lightning free trial has started. No API key required.");
+            }catch(e){err.textContent=e.message;button.disabled=false;button.textContent=mode==="login"?"Sign in":"Create account";}
+        };
+        q("#lt-auth-submit").onclick=submit;
+        q("#lt-pass").onkeydown=e=>{if(e.key==="Enter")submit();};
+    };
+    ov.onclick=e=>{if(e.target===ov)ov.remove();};render();
+}
+function drawAcct() { acct.innerHTML = ""; acct.append(trialCard(),provRow("openrouter", "OpenRouter"),provRow("groq", "Groq"),provRow("google", "Google")); }
 const KEYINFO = { groq: { name: "Groq", prefix: "gsk_", url: "https://console.groq.com/keys", check: "https://api.groq.com/openai/v1/models", cache: () => { groqCache = null; } },
     google: { name: "Google", prefix: "AIza", url: "https://aistudio.google.com/apikey", check: "https://generativelanguage.googleapis.com/v1beta/openai/models", cache: () => { googleCache = null; } } };
 function keyModal(id) {
@@ -2108,7 +2178,7 @@ safe("migrate", () => {
     if (!rd("img_bf", false)) { chats.forEach(c => (c.msgs || []).forEach(m => m.genUrl && addImage(m.prompt || "image", m.genUrl, ""))); wr("img_bf", true); }
 });
 safe("theme", () => { if (localStorage.getItem("lt_theme") !== "dark") document.body.classList.add("light-mode"); });
-safe("account", () => { drawAcct(); drawOr(); });
+safe("account", () => { drawAcct(); drawOr(); refreshLightningAccount(); });
 safe("chats", () => {
     const lastChat = rd("cur", null);
     try { if (lastChat && chats.some(c => c.id === lastChat)) openChat(lastChat); else { showWelcome(); updateTop(); } }
