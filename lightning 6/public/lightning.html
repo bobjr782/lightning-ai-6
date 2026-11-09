@@ -1967,7 +1967,7 @@ function provRow(id, label) {
     const s = rawCfg(), has = !!(s.keys && s.keys[id]), srv = !!(SERVER.on && SERVER[id]), active = getCfg().id === id, signIn = () => (id === "groq" || id === "google" ? keyModal(id) : connectOpenRouter());
     if (!has && !srv) return btn("🔑 Sign in with " + label, signIn);
     const r = el("div", "prov-row" + (active ? " active" : "")), nm = el("div", "grow");
-    nm.append(el("b", "", label), el("small", "", (active ? "In use" : "Available") + " · " + (has ? "your key" : "server key")));
+    nm.append(el("b", "", label), el("small", "", (active ? "In use" : "Available") + " · " + (has ? "your key" : "included key")));
     r.append(nm); if (!active) r.append(btn("Use", () => useProv(id)));
     r.append(has ? btn("✕", () => disconnect(id)) : btn("My key", signIn)); return r;
 }
