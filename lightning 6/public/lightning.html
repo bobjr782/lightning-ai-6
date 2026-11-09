@@ -494,6 +494,8 @@ body.img-mode .img-opts { display: flex; }
 .online-grid { display: grid; grid-template-columns: repeat(auto-fill, 300px); gap: 18px; justify-content: center; }
 .aiBox a { color: var(--accent); word-break: break-all; }
 .art-tools { flex-wrap: wrap; justify-content: flex-end; row-gap: 4px; }
+
+.friends-sidebar-btn{display:flex;align-items:center;gap:11px}.friends-pixel-icon{width:19px;height:19px;flex:0 0 19px;image-rendering:pixelated}
 </style>
 </head>
 <body> 
@@ -1776,7 +1778,6 @@ const openPage = (pg, draw, path) => { closeAll(true); draw(); pg.p.classList.ad
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeAll(); });
 
 
-.friends-sidebar-btn{display:flex;align-items:center;gap:11px}.friends-pixel-icon{width:19px;height:19px;flex:0 0 19px;image-rendering:pixelated}
 /* ---------- Friends and private sharing ---------- */
 const friendsPage=makePage("Friends & sharing",'<button class="mini-btn" data-inbox>Shared with me</button>');
 async function socialRequest(url,body){
