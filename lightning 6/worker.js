@@ -258,24 +258,39 @@ function chatRateLimit(request) {
   row.count++;return {ok:true};
 }
 async function chatRoute(request,env) {
-  if(!env.AI||typeof env.AI.run!=="function") return json({error:{message:"Lightning's free AI service is not enabled in Cloudflare. Check the Workers AI binding named AI."}},503);
   const limit=chatRateLimit(request);
-  if(!limit.ok)return json({error:{message:"Lightning's shared free AI is busy. Wait a minute and try again."}},429,{"retry-after":String(limit.retryAfter)});
+  if(!limit.ok)return json({error:{message:"Lightning is receiving lots of free requests. Wait a moment and try again."}},429,{"retry-after":String(limit.retryAfter)});
   let input;try{input=await body(request);}catch{return json({error:{message:"Invalid chat request."}},400);}
   const messages=Array.isArray(input.messages)?input.messages.slice(-22):[];
   if(!messages.length)return json({error:{message:"Send a message first."}},400);
+  const cleanMessages=messages.map(m=>({role:["system","user","assistant"].includes(m.role)?m.role:"user",content:typeof m.content==="string"?m.content:JSON.stringify(m.content)}));
+  const max_tokens=Math.max(128,Math.min(4096,Number(input.max_tokens)||1800));
+  const temperature=Math.max(0,Math.min(1.5,Number(input.temperature)||0.7));
+  let cloudflareError="";
+  if(env.AI&&typeof env.AI.run==="function") {
+    try {
+      const result=await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast",{messages:cleanMessages,max_tokens,temperature});
+      const content=result?.response||result?.choices?.[0]?.message?.content||"";
+      if(content)return json({choices:[{message:{role:"assistant",content}}],model:"Lightning Free · Llama 3.3"});
+      cloudflareError="Cloudflare returned an empty answer.";
+    } catch(error) { cloudflareError=String(error?.message||error||"Cloudflare AI unavailable."); }
+  } else cloudflareError="Cloudflare Workers AI is not enabled.";
+  // Anonymous emergency fallback. This legacy public endpoint is shared and may throttle;
+  // it is deliberately used only when the primary Cloudflare model is unavailable.
   try {
-    const result=await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast",{
-      messages:messages.map(m=>({role:["system","user","assistant"].includes(m.role)?m.role:"user",content:typeof m.content==="string"?m.content:JSON.stringify(m.content)})),
-      max_tokens:Math.max(128,Math.min(4096,Number(input.max_tokens)||1800)),
-      temperature:Math.max(0,Math.min(1.5,Number(input.temperature)||0.7))
+    const response=await fetch("https://text.pollinations.ai/openai",{
+      method:"POST",
+      headers:{"content-type":"application/json","accept":"application/json"},
+      body:JSON.stringify({model:"openai",messages:cleanMessages,max_tokens,temperature,stream:false})
     });
-    const content=result?.response||result?.choices?.[0]?.message?.content||"";
-    if(!content)throw new Error("The chat model returned an empty response.");
-    return json({choices:[{message:{role:"assistant",content}}],model:"Lightning Free · Llama 3.3"});
+    const raw=await response.text();
+    let data={};try{data=JSON.parse(raw);}catch{}
+    const content=data?.choices?.[0]?.message?.content||data?.choices?.[0]?.text||"";
+    if(response.ok&&content)return json({choices:[{message:{role:"assistant",content}}],model:"Lightning Free · backup"});
+    const why=data?.error?.message||data?.error||raw.slice(0,180)||("HTTP "+response.status);
+    return json({error:{message:"Both free AI routes are busy right now. Try again shortly. ("+String(why).slice(0,140)+")"}},response.status===429?429:503);
   } catch(error) {
-    const detail=String(error?.message||error||"");
-    return json({error:{message:/quota|limit|billing|neuron/i.test(detail)?"Lightning's free AI allowance is temporarily used up. Try again later.":"Lightning's free AI model is temporarily unavailable."}},502);
+    return json({error:{message:"Lightning's free AI services are temporarily unreachable. Please try again shortly."}},503);
   }
 }
 
