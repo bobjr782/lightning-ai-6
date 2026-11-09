@@ -51,6 +51,46 @@ async function authLimit(request, env) {
   return { key, blocked:Number(row?.n||0)>=12, now };
 }
 
+const TRIAL_DAYS = 7;
+const TRIAL_TEXT_LIMIT = 40;
+const TRIAL_IMAGE_LIMIT = 5;
+
+async function ensureUsage(user, env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS feature_usage (
+    user_id TEXT PRIMARY KEY,
+    trial_started_at INTEGER NOT NULL,
+    text_used INTEGER NOT NULL DEFAULT 0,
+    images_used INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL
+  )`).run();
+  const now=Math.floor(Date.now()/1000);
+  await env.DB.prepare("INSERT OR IGNORE INTO feature_usage(user_id,trial_started_at,text_used,images_used,updated_at) VALUES(?,?,0,0,?)").bind(user.id,now,now).run();
+  return await env.DB.prepare("SELECT trial_started_at,text_used,images_used FROM feature_usage WHERE user_id=?").bind(user.id).first();
+}
+function entitlement(row) {
+  const now=Math.floor(Date.now()/1000), expires=row.trial_started_at+TRIAL_DAYS*86400;
+  const active=now<expires;
+  return { plan:active?"free-trial":"trial-ended", trialActive:active, trialExpiresAt:expires,
+    textLimit:TRIAL_TEXT_LIMIT, textUsed:Number(row.text_used||0), textRemaining:Math.max(0,TRIAL_TEXT_LIMIT-Number(row.text_used||0)),
+    imageLimit:TRIAL_IMAGE_LIMIT, imagesUsed:Number(row.images_used||0), imagesRemaining:Math.max(0,TRIAL_IMAGE_LIMIT-Number(row.images_used||0)) };
+}
+async function reserveTrialUse(user,env,kind) {
+  const row=await ensureUsage(user,env), info=entitlement(row);
+  const col=kind==="image"?"images_used":"text_used", limit=kind==="image"?TRIAL_IMAGE_LIMIT:TRIAL_TEXT_LIMIT;
+  if(!info.trialActive) return {ok:false,error:"Your 7-day free trial has ended.",info};
+  const result=await env.DB.prepare(`UPDATE feature_usage SET ${col}=${col}+1,updated_at=? WHERE user_id=? AND ${col}<?`).bind(Math.floor(Date.now()/1000),user.id,limit).run();
+  if(!result.meta?.changes) {
+    const fresh=await ensureUsage(user,env);
+    return {ok:false,error:kind==="image"?"You've used all 5 image generations in your free trial.":"You've used all 40 chat messages in your free trial.",info:entitlement(fresh)};
+  }
+  const fresh=await ensureUsage(user,env);
+  return {ok:true,info:entitlement(fresh)};
+}
+async function refundTrialUse(user,env,kind) {
+  const col=kind==="image"?"images_used":"text_used";
+  await env.DB.prepare(`UPDATE feature_usage SET ${col}=MAX(0,${col}-1),updated_at=? WHERE user_id=?`).bind(Math.floor(Date.now()/1000),user.id).run();
+}
+
 const IMAGE_RATE = new Map();
 function imageRateLimit(request) {
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
@@ -68,6 +108,10 @@ function imageRateLimit(request) {
   return { ok: true };
 }
 async function imageRoute(request, env) {
+  if(!env.DB) return json({error:"Account database is not configured."},503);
+  const account=await userFor(request,env);
+  if(!account) return json({error:"Sign in to a Lightning account to use your free image trial."},401);
+
   if (!env.AI || typeof env.AI.run !== "function") {
     return json({ error: "Image generation is not enabled. Add the Workers AI binding named AI in Cloudflare." }, 503);
   }
@@ -81,6 +125,8 @@ async function imageRoute(request, env) {
   const width = Math.max(256, Math.min(1536, Math.round(Number(input.width || 1024) / 16) * 16));
   const height = Math.max(256, Math.min(1536, Math.round(Number(input.height || 1024) / 16) * 16));
   const seed = Number.isInteger(Number(input.seed)) ? Math.abs(Number(input.seed)) % 2147483647 : Math.floor(Math.random() * 2147483647);
+  const reserved=await reserveTrialUse(account,env,"image");
+  if(!reserved.ok) return json({error:reserved.error,entitlement:reserved.info},403);
   if (input.enhance === true) {
     try {
       const improved = await env.AI.run("@cf/zai-org/glm-4.7-flash", {
@@ -185,12 +231,39 @@ async function generateRoute(request,env){
   }
 }
 
+async function chatRoute(request,env) {
+  if(!env.AI||typeof env.AI.run!=="function") return json({error:{message:"Lightning's no-key AI service is not enabled in Cloudflare."}},503);
+  const user=await userFor(request,env);
+  if(!user) return json({error:{message:"Sign in to start your Lightning free trial."}},401);
+  let input;try{input=await body(request);}catch{return json({error:{message:"Invalid chat request."}},400);}
+  const messages=Array.isArray(input.messages)?input.messages.slice(-22):[];
+  if(!messages.length)return json({error:{message:"Send a message first."}},400);
+  const reserved=await reserveTrialUse(user,env,"text");
+  if(!reserved.ok)return json({error:{message:reserved.error},entitlement:reserved.info},403);
+  try {
+    const result=await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast",{
+      messages:messages.map(m=>({role:["system","user","assistant"].includes(m.role)?m.role:"user",content:typeof m.content==="string"?m.content:JSON.stringify(m.content)})),
+      max_tokens:Math.max(128,Math.min(4096,Number(input.max_tokens)||1800)),
+      temperature:Math.max(0,Math.min(1.5,Number(input.temperature)||0.7))
+    });
+    const content=result?.response||result?.choices?.[0]?.message?.content||"";
+    if(!content)throw new Error("The chat model returned an empty response.");
+    const usage=await ensureUsage(user,env);
+    return json({choices:[{message:{role:"assistant",content}}],model:"Lightning Free Trial · Llama 3.3",entitlement:entitlement(usage)});
+  } catch(error) {
+    await refundTrialUse(user,env,"text");
+    const detail=String(error?.message||error||"");
+    return json({error:{message:/quota|limit|billing|neuron/i.test(detail)?"Lightning's shared free AI allowance is temporarily unavailable. Try again later.":"Lightning's free AI model is temporarily unavailable."}},502);
+  }
+}
+
 async function route(request, env) {
   const url=new URL(request.url), path=url.pathname;
   if(path.startsWith("/api/") && !sameOrigin(request)) return json({error:"Origin not allowed."},403);
   if(path==="/api/health" && request.method==="GET") return json({ok:true,service:"Lightning accounts"});
   if(path==="/api/config" && request.method==="GET") return json({server:null});
   if(path==="/api/image" && request.method==="POST") return imageRoute(request, env);
+  if(path==="/api/chat" && request.method==="POST") return chatRoute(request,env);
   if(path==="/api/generate" && request.method==="POST") return generateRoute(request, env);
   if(!env.DB) return json({error:"Account database is not configured yet."},503);
   if(path==="/api/register" && request.method==="POST") {
@@ -227,7 +300,11 @@ async function route(request, env) {
     return json({ok:true},{headers:{"set-cookie":cookie("",0)}});
   }
   const user=await userFor(request,env);
-  if(path==="/api/me" && request.method==="GET") return user?json({user}):json({user:null},401);
+  if(path==="/api/me" && request.method==="GET") {
+    if(!user)return json({user:null},401);
+    const usage=await ensureUsage(user,env);
+    return json({user,entitlement:entitlement(usage)});
+  }
   if(path==="/api/data" && request.method==="GET") {
     if(!user)return json({error:"Sign in required."},401);
     const row=await env.DB.prepare("SELECT data_json,updated_at FROM user_data WHERE user_id=?").bind(user.id).first();
