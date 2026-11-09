@@ -511,6 +511,7 @@ body.img-mode .img-opts { display: flex; }
                 <button class="sidebar-btn font-bold" onclick="startNewChat()">＋ New chat</button>
                 <button class="sidebar-btn" onclick="openChatsPage()">💬 Chats &amp; tasks</button>
                 <button class="sidebar-btn" onclick="openProjectsPage()">📁 Projects</button>
+                <button class="sidebar-btn" onclick="openFriendsPage()">👥 Friends &amp; sharing</button>
                 <button class="sidebar-btn" onclick="openArtifactsPage()">🧩 Artifacts</button>
                 <button class="sidebar-btn" onclick="openOnlinePage()">🌐 Online artifacts</button>
                 <button class="sidebar-btn" onclick="openImagesPage()">🖼️ Images</button>
@@ -1795,6 +1796,62 @@ function closeAll(silent) { pages.forEach(x => x.classList.remove("open")); page
 const openPage = (pg, draw, path) => { closeAll(true); draw(); pg.p.classList.add("open"); go(path); };
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeAll(); });
 
+/* ---------- Friends and private sharing ---------- */
+const friendsPage=makePage("Friends & sharing",'<button class="mini-btn" data-inbox>Shared with me</button>');
+async function socialRequest(url,body){
+ const r=await fetch(url,{method:body?"POST":"GET",credentials:"same-origin",headers:body?{"content-type":"application/json"}:{},body:body?JSON.stringify(body):undefined});
+ const j=await r.json();if(!r.ok)throw new Error(j.error||"Request failed.");return j;
+}
+function drawSharedCard(item,container){
+ const card=el("div","gal-card"),meta=el("div","gal-meta");
+ meta.append(el("b","",item.title||"Shared creation"),el("small","",`From ${item.from} · ${item.kind==="image"?"Image":"Artifact"}`));
+ card.append(meta,btn("Open",async()=>{
+  try{
+   const j=await socialRequest("/api/share/"+encodeURIComponent(item.id));
+   if(j.artifact?.kind==="image"){
+    const ov=el("div","modal-overlay open"),box=el("div","modal-card"),im=el("img","gal-img");
+    im.src=j.artifact.image;im.style.maxHeight="70vh";im.style.objectFit="contain";
+    box.append(el("div","modal-header"),im,btn("Download",()=>dlUrl(j.artifact.image,j.artifact.title||"shared-image")),btn("Close",()=>ov.remove()));ov.append(box);document.body.append(ov);
+   }else{
+    closeAll(true);showArt(j.artifact);
+   }
+  }catch(e){alert(e.message);}
+ }));
+ container.append(card);
+}
+async function drawSharedInbox(container){
+ container.innerHTML="";
+ try{
+  const j=await socialRequest("/api/shares");
+  if(!j.shares.length){container.append(el("p","art-empty","Nothing has been shared with you yet."));return;}
+  j.shares.forEach(item=>drawSharedCard(item,container));
+ }catch(e){container.append(el("p","art-empty",e.message));}
+}
+async function drawFriends(){
+ const b=friendsPage.body;b.innerHTML="";
+ const form=el("div","row-item"),inp=el("input","field"),add=btn("Send friend request",async()=>{
+  if(!inp.value.trim())return;
+  try{const j=await socialRequest("/api/friends/request",{username:inp.value.trim()});inp.value="";await drawFriends();showAiBubbleOnScreen(j.accepted?"Friend added.":"Friend request sent.");}
+  catch(e){alert(e.message);}
+ });
+ inp.placeholder="Find a friend by Lightning username";form.append(inp,add);b.append(form);
+ try{
+  const data=await socialRequest("/api/friends");
+  b.append(el("h3","","Friend requests"));
+  if(!data.requests.length)b.append(el("p","art-empty","No pending friend requests."));
+  data.requests.forEach(r=>{
+   const row=el("div","row-item");row.append(el("b","grow",r.from),
+    btn("Accept",async()=>{try{await socialRequest("/api/friends/respond",{id:r.id,action:"accept"});drawFriends();}catch(e){alert(e.message);}}),
+    btn("Decline",async()=>{try{await socialRequest("/api/friends/respond",{id:r.id,action:"decline"});drawFriends();}catch(e){alert(e.message);}}));b.append(row);
+  });
+  b.append(el("h3","","Your friends"));
+  if(!data.friends.length)b.append(el("p","art-empty","No friends yet. Send someone a request using their username."));
+  data.friends.forEach(fr=>{const row=el("div","row-item");row.append(el("b","",fr.username),el("small","grow","Lightning friend"));b.append(row);});
+ }catch(e){b.append(el("p","art-empty",e.message));}
+}
+friendsPage.p.querySelector("[data-inbox]").onclick=()=>drawSharedInbox(friendsPage.body);
+window.openFriendsPage=()=>openPage(friendsPage,drawFriends,"/friends");
+
 /* images */
 function addImage(prompt, url, id) { if (!images.some(i => (id && i.id === id) || (url && i.url === url))) { images.unshift({ url: url || "", id: id || "", prompt, t: Date.now() }); wr("images", images); } }
 async function dlUrl(url, prompt) {
@@ -1810,7 +1867,14 @@ function drawImages() {
         const c = el("div", "gal-card"), im = el("img", "gal-img"), m = el("div", "gal-meta"), a = el("div", "gal-actions");
         const src = () => (i.id ? idbGet(i.id) : Promise.resolve(i.url)); src().then(u => { if (u) im.src = u; }); im.loading = "lazy"; im.onclick = () => src().then(openUrl);
         m.append(el("b", "", i.prompt.slice(0, 60)), el("small", "", new Date(i.t).toLocaleString()));
-        a.append(btn("Open", () => src().then(openUrl)), btn("Download", () => src().then(u => dlUrl(u, i.prompt))), btn("Delete", () => { images = images.filter(x => x !== i); wr("images", images); drawImages(); }));
+        a.append(btn("Open", () => src().then(openUrl)), btn("Download", () => src().then(u => dlUrl(u, i.prompt))), btn("Share", async()=>{
+          if(!lightningAccount)return openLightningAuth();
+          const username=prompt("Share this image with which Lightning friend username?");if(!username)return;
+          try{const data=await src();if(!data)throw new Error("Image data is unavailable on this device.");
+            const r=await socialRequest("/api/share",{username,artifact:{kind:"image",title:i.prompt||"Shared image",image:data}});
+            showAiBubbleOnScreen("Image shared with "+username+".");
+          }catch(e){alert(e.message);}
+        }), btn("Delete", () => { images = images.filter(x => x !== i); wr("images", images); drawImages(); }));
         c.append(im, m, a); g.append(c);
     });
     b.append(g);
