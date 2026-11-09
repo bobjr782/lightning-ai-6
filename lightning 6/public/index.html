@@ -33,7 +33,7 @@ document.getElementById("licences").textContent = licenceText;
 function showView(){
   const chatUrl = /^\/chats\/[^/]+\/?$/.test(location.pathname);
   const page = location.hash === '#licences' ? 'licences'
-    : location.hash === '#about' ? 'about'
+    : (location.hash === '#about' || location.hash === '#account') ? 'about'
     : chatUrl ? 'app' : 'about';
   if (chatUrl) {
     const wanted = "/lightning.html?chat=" + encodeURIComponent(location.pathname);
@@ -42,6 +42,9 @@ function showView(){
     appFrame.src = "/lightning.html";
   }
   document.querySelectorAll('.view').forEach(view=>view.classList.toggle('active',view.id===page));
+  if(page==='about' && location.hash==='#account'){
+    try{document.getElementById('about').contentWindow.location.hash='account';}catch(e){}
+  }
 }
 window.addEventListener('hashchange',showView);
 window.addEventListener('popstate',showView);
