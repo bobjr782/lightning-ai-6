@@ -35,3 +35,19 @@ CREATE TABLE IF NOT EXISTS auth_attempts (
   attempted_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS auth_attempts_ip_time_idx ON auth_attempts(ip_hash, attempted_at);
+
+CREATE TABLE IF NOT EXISTS friendships (
+  user_low TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_high TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY(user_low,user_high)
+);
+CREATE TABLE IF NOT EXISTS friend_requests (
+  id TEXT PRIMARY KEY,
+  sender_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  recipient_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at INTEGER NOT NULL,
+  UNIQUE(sender_id,recipient_id)
+);
+CREATE INDEX IF NOT EXISTS friend_requests_recipient_idx ON friend_requests(recipient_id,status,created_at);
