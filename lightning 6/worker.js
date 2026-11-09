@@ -146,6 +146,21 @@ async function generateRoute(request,env){
   const mode=String(input.mode||"text-to-video"),prompt=String(input.prompt||"").trim();
   if(!prompt)return json({error:"Enter a prompt describing the video."},400);
   if(prompt.length>1600)return json({error:"Prompts must be 1,600 characters or fewer."},400);
+  if(mode==="image-to-image"){
+    const data=String(input.imageData||"");
+    if(!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(data))return json({error:"Choose a PNG, JPG or WebP image first."},400);
+    if(data.length>11000000)return json({error:"The selected image is too large. Use an image under 8 MB."},413);
+    try{
+      const result=await env.AI.run("xai/grok-imagine-image",{prompt,image:{url:data},response_format:"url"});
+      const image=result?.result?.image||result?.image;
+      if(typeof image!=="string")return json({error:"The image model did not return an image. Try again."},502);
+      return json({image,model:"Grok Imagine Image",mode});
+    }catch(error){
+      const detail=String(error?.message||error||"");
+      const status=/quota|limit|neuron|billing|payment|credit|paid plan/i.test(detail)?429:502;
+      return json({error:status===429?"Image editing is unavailable because the account's AI allowance or billing limit was reached.":"The image editing model is temporarily unavailable."},status);
+    }
+  }
   if(mode!=="text-to-video"&&mode!=="image-to-video")return json({error:"This generation mode is not connected yet."},400);
   const duration=Math.max(1,Math.min(15,Math.round(Number(input.duration)||5)));
   const resolution=input.resolution==="480p"?"480p":"720p";
