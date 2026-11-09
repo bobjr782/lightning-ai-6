@@ -1432,6 +1432,7 @@ window.handleImageGeneration = async function (prompt, box) {
             });
             const j = await r.json();
             if (!r.ok || !j.image) throw new Error(j.error || "Image service returned HTTP " + r.status);
+            if (j.entitlement) { lightningEntitlement = j.entitlement; drawAcct(); }
             used = j.promptUsed || prompt;
             src = j.image;
             img = new Image();
@@ -1672,6 +1673,7 @@ async function askAI(apiText, images, names, force, reuse, tried) {
             const data = await res.json();
             if (data.error) { const er = new Error(data.error.message || "Model error"); er.rate = data.error.code === 429 || /rate|quota|limit|credits|per-day/i.test(er.message); throw er; }
             full = data.choices?.[0]?.message?.content || "";
+            if (data.entitlement) { lightningEntitlement = data.entitlement; drawAcct(); }
         }
         if (!full.trim()) throw new Error("The model sent an empty reply. Try again.");
         if (/%@GRID/i.test(full)) finalizeAiBubble(box, full);
