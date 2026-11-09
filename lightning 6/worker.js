@@ -163,27 +163,48 @@ async function imageRoute(request, env) {
     }
   }
   try {
-    const form = new FormData();
-    form.append("prompt", prompt);
-    form.append("width", String(width));
-    form.append("height", String(height));
-    form.append("seed", String(seed));
-    form.append("guidance", "4");
-    const encoded = new Response(form);
-    const result = await env.AI.run("@cf/black-forest-labs/flux-2-klein-4b", {
-      multipart: { body: encoded.body, contentType: encoded.headers.get("content-type") }
-    });
-    if (!result || typeof result.image !== "string" || !result.image) {
-      return json({ error: "The image model returned an empty result. Please try again." }, 502);
+    // Primary model: FLUX.1 Schnell. It uses a simple prompt request and is
+    // independent of the multipart FLUX.2 Klein endpoint.
+    try {
+      const fast = await env.AI.run("@cf/black-forest-labs/flux-1-schnell", {
+        prompt,
+        steps: 8
+      });
+      if (typeof fast?.image === "string" && fast.image) {
+        return json({
+          image: "data:image/jpeg;base64," + fast.image,
+          promptUsed: prompt,
+          model: "FLUX.1 Schnell",
+          width: null,
+          height: null,
+          seed
+        });
+      }
+      throw new Error("FLUX.1 Schnell returned no image.");
+    } catch (fastError) {
+      // Automatic fallback to the existing FLUX.2 Klein model.
+      const form = new FormData();
+      form.append("prompt", prompt);
+      form.append("width", String(width));
+      form.append("height", String(height));
+      form.append("seed", String(seed));
+      form.append("guidance", "4");
+      const encoded = new Response(form);
+      const backup = await env.AI.run("@cf/black-forest-labs/flux-2-klein-4b", {
+        multipart: { body: encoded.body, contentType: encoded.headers.get("content-type") }
+      });
+      if (typeof backup?.image !== "string" || !backup.image) {
+        throw new Error("Both FLUX.1 Schnell and FLUX.2 Klein returned no image.");
+      }
+      return json({
+        image: "data:image/png;base64," + backup.image,
+        promptUsed: prompt,
+        model: "FLUX.2 Klein 4B (automatic backup)",
+        width,
+        height,
+        seed
+      });
     }
-    return json({
-      image: "data:image/png;base64," + result.image,
-      promptUsed: prompt,
-      model: "FLUX.2 Klein 4B",
-      width,
-      height,
-      seed
-    });
   } catch (error) {
     const detail = String(error?.message || error || "");
     const status = /quota|limit|neuron|billing|paid plan/i.test(detail) ? 429 : 502;
