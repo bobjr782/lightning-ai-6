@@ -367,10 +367,14 @@ async function route(request, env) {
       await env.DB.prepare("UPDATE friend_requests SET status='accepted' WHERE id=?").bind(reverse.id).run();
       return json({ok:true,accepted:true,username:target.username});
     }
-    const pending=await env.DB.prepare("SELECT id FROM friend_requests WHERE sender_id=? AND recipient_id=? AND status='pending'").bind(user.id,target.id).first();
-    if(pending)return json({ok:true,pending:true,username:target.username});
-    const id=b64(randomBytes(18));
-    await env.DB.prepare("INSERT INTO friend_requests(id,sender_id,recipient_id,status,created_at) VALUES(?,?,?,'pending',?)").bind(id,user.id,target.id,Math.floor(Date.now()/1000)).run();
+    const pending=await env.DB.prepare("SELECT id,status FROM friend_requests WHERE sender_id=? AND recipient_id=?").bind(user.id,target.id).first();
+    if(pending?.status==="pending")return json({ok:true,pending:true,username:target.username});
+    if(pending) {
+      await env.DB.prepare("UPDATE friend_requests SET status='pending',created_at=? WHERE id=?").bind(Math.floor(Date.now()/1000),pending.id).run();
+    } else {
+      const id=b64(randomBytes(18));
+      await env.DB.prepare("INSERT INTO friend_requests(id,sender_id,recipient_id,status,created_at) VALUES(?,?,?,'pending',?)").bind(id,user.id,target.id,Math.floor(Date.now()/1000)).run();
+    }
     return json({ok:true,pending:true,username:target.username});
   }
   if(path==="/api/friends/respond" && request.method==="POST") {
@@ -394,7 +398,7 @@ async function route(request, env) {
     let b;try{b=await body(request)}catch{return json({error:"Invalid request."},400)}
     const target=String(b.username||"").trim().toLowerCase(), artifact=JSON.stringify(b.artifact??{});
     if(!target)return json({error:"Enter the username to share with."},400);
-    if(encoder.encode(artifact).length>500000)return json({error:"That artefact is too large to share."},413);
+    if(encoder.encode(artifact).length>8000000)return json({error:"That creation is too large to share (8 MB maximum)."},413);
     const recipient=await env.DB.prepare("SELECT id FROM users WHERE username_norm=?").bind(target).first();
     if(!recipient)return json({error:"No Lightning account found with that username."},404);
     if(recipient.id===user.id)return json({error:"You cannot share an artefact with yourself."},400);
@@ -409,7 +413,7 @@ async function route(request, env) {
   if(path==="/api/shares" && request.method==="GET") {
     if(!user)return json({error:"Sign in required."},401);
     const rows=await env.DB.prepare("SELECT shares.id, shares.artifact_json, shares.created_at, users.username AS from_username FROM shares JOIN users ON users.id=shares.owner_id WHERE shares.recipient_id=? ORDER BY shares.created_at DESC LIMIT 100").bind(user.id).all();
-    return json({shares:(rows.results||[]).map(row=>{let artifact={};try{artifact=JSON.parse(row.artifact_json)}catch{}return {id:row.id,from:row.from_username,title:artifact.title||"Shared artefact",createdAt:row.created_at};})});
+    return json({shares:(rows.results||[]).map(row=>{let artifact={};try{artifact=JSON.parse(row.artifact_json)}catch{}return {id:row.id,from:row.from_username,title:artifact.title||"Shared creation",kind:artifact.kind==="image"?"image":"artifact",createdAt:row.created_at};})});
   }
   if(path.startsWith("/api/share/") && request.method==="GET") {
     if(!user)return json({error:"Sign in required."},401);
