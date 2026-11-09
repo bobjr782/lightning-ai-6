@@ -130,12 +130,53 @@ async function imageRoute(request, env) {
   }
 }
 
+
+const VIDEO_RATE = new Map();
+function videoRateLimit(request) {
+  const ip=request.headers.get("CF-Connecting-IP")||"unknown", now=Date.now(), row=VIDEO_RATE.get(ip);
+  if(!row||now-row.start>60000){VIDEO_RATE.set(ip,{start:now,count:1});return {ok:true};}
+  if(row.count>=2)return {ok:false,retryAfter:Math.max(1,Math.ceil((60000-(now-row.start))/1000))};
+  row.count++;return {ok:true};
+}
+async function generateRoute(request,env){
+  if(!env.AI||typeof env.AI.run!=="function")return json({error:"Cloudflare Workers AI is not enabled for this deployment."},503);
+  const limit=videoRateLimit(request);
+  if(!limit.ok)return json({error:"Video generation is busy. Wait a minute before trying again.",retryAfter:limit.retryAfter},429,{"retry-after":String(limit.retryAfter)});
+  let input;try{input=await body(request);}catch{return json({error:"Invalid generation request."},400);}
+  const mode=String(input.mode||"text-to-video"),prompt=String(input.prompt||"").trim();
+  if(!prompt)return json({error:"Enter a prompt describing the video."},400);
+  if(prompt.length>1600)return json({error:"Prompts must be 1,600 characters or fewer."},400);
+  if(mode!=="text-to-video"&&mode!=="image-to-video")return json({error:"This generation mode is not connected yet."},400);
+  const duration=Math.max(1,Math.min(15,Math.round(Number(input.duration)||5)));
+  const resolution=input.resolution==="480p"?"480p":"720p";
+  const ratios=["1:1","16:9","9:16","4:3","3:4","3:2","2:3"];
+  const aspect_ratio=ratios.includes(input.aspect_ratio)?input.aspect_ratio:"16:9";
+  const payload={prompt,duration,resolution,aspect_ratio};
+  if(mode==="image-to-video"){
+    const data=String(input.imageData||"");
+    if(!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(data))return json({error:"Choose a PNG, JPG or WebP image first."},400);
+    if(data.length>11000000)return json({error:"The selected image is too large. Use an image under 8 MB."},413);
+    payload.image={url:data};
+  }
+  try{
+    const result=await env.AI.run("xai/grok-imagine-video-1.5-preview",payload);
+    const video=result?.result?.video||result?.video||result?.output?.video;
+    if(typeof video!=="string"||!/^https:\/\//i.test(video))return json({error:"The video model did not return a playable video. Try again."},502);
+    return json({video,model:"Grok Imagine Video 1.5",duration,resolution,aspect_ratio,mode});
+  }catch(error){
+    const detail=String(error?.message||error||"");
+    const status=/quota|limit|neuron|billing|payment|credit|paid plan/i.test(detail)?429:502;
+    return json({error:status===429?"Video generation is unavailable because the account's AI allowance or billing limit was reached. Check Cloudflare AI billing.":"The video model is temporarily unavailable. Please try again later."},status);
+  }
+}
+
 async function route(request, env) {
   const url=new URL(request.url), path=url.pathname;
   if(path.startsWith("/api/") && !sameOrigin(request)) return json({error:"Origin not allowed."},403);
   if(path==="/api/health" && request.method==="GET") return json({ok:true,service:"Lightning accounts"});
   if(path==="/api/config" && request.method==="GET") return json({server:null});
   if(path==="/api/image" && request.method==="POST") return imageRoute(request, env);
+  if(path==="/api/generate" && request.method==="POST") return generateRoute(request, env);
   if(!env.DB) return json({error:"Account database is not configured yet."},503);
   if(path==="/api/register" && request.method==="POST") {
     let b; try{b=await body(request)}catch{return json({error:"Invalid request."},400)}
