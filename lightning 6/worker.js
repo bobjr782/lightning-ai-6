@@ -134,6 +134,7 @@ async function route(request, env) {
   const url=new URL(request.url), path=url.pathname;
   if(path.startsWith("/api/") && !sameOrigin(request)) return json({error:"Origin not allowed."},403);
   if(path==="/api/health" && request.method==="GET") return json({ok:true,service:"Lightning accounts"});
+  if(path==="/api/config" && request.method==="GET") return json({server:null});
   if(path==="/api/image" && request.method==="POST") return imageRoute(request, env);
   if(!env.DB) return json({error:"Account database is not configured yet."},503);
   if(path==="/api/register" && request.method==="POST") {
