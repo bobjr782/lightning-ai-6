@@ -1254,28 +1254,7 @@ function drawGallery() {
 }
 window.openArtifactsPage = () => { closeAll(true); search.value = ""; drawGallery(); page.classList.add("open"); go("/artifacts"); };
 page.querySelector("[data-x]").onclick = closePage;
-page.querySelector("[data-shared]").onclick = async () => {
-    try {
-        const response = await fetch("/api/shares", { credentials:"same-origin" });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Could not load shared artefacts.");
-        grid.innerHTML = "";
-        if (!data.shares.length) { grid.append(el("p", "art-empty", "No artefacts have been shared with you yet.")); return; }
-        data.shares.forEach(item => {
-            const card = el("div", "gal-card"), meta = el("div", "gal-meta");
-            meta.append(el("b", "", item.title), el("small", "", "Shared by " + item.from));
-            card.append(meta, btn("Open", async () => {
-                try {
-                    const result = await fetch("/api/share/" + encodeURIComponent(item.id), { credentials:"same-origin" });
-                    const shared = await result.json();
-                    if (!result.ok) throw new Error(shared.error || "Could not open artefact.");
-                    closePage(); showArt(shared.artifact);
-                } catch (e) { alert(e.message); }
-            }));
-            grid.append(card);
-        });
-    } catch (e) { alert(e.message); }
-};
+page.querySelector("[data-shared]").onclick = () => drawSharedInbox(grid);
 search.oninput = drawGallery;
 document.addEventListener("keydown", e => { if (e.key === "Escape") closePage(); });
 
