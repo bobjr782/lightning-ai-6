@@ -1730,6 +1730,16 @@ const nid = () => Math.random().toString(36).slice(2, 10);
 const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const titleOf = msgs => ((msgs.find(m => m.alignment === "user-align") || {}).text || "New chat").slice(0, 48);
 let chats = rd("chats", []), tasks = rd("tasks", []), projects = rd("projects", []), images = rd("images", []), tab = "chats", cq = "";
+/* Restore older unscoped image galleries without deleting any stored copy. */
+try {
+  const legacyImages=JSON.parse(localStorage.getItem("images")||"null");
+  if(Array.isArray(legacyImages)&&legacyImages.length){
+    const known=new Set(images.map(x=>x.id||x.url).filter(Boolean));
+    for(const item of legacyImages){const key=item&&(item.id||item.url);if(item&&key&&!known.has(key)){images.push(item);known.add(key);}}
+    wr("images",images);
+  }
+} catch(e) { console.warn("Legacy image library could not be read",e); }
+
 const pages = [];
 let SERVER = { on: false };
 const CHAT_ROUTE = new URLSearchParams(location.search).get("chat");
