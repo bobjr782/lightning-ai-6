@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>lightning</title>
+    <meta name="application-name" content="Lightning 7.0">
+    <meta name="description" content="Lightning 7.0 — an AI workspace for chat, coding, live artifacts and FLUX.2 image generation.">
+    <title>Lightning 7.0</title>
 
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%208%208%22%20shape-rendering%3D%22crispEdges%22%3E%3Cpath%20fill%3D%22%23d97757%22%20d%3D%22M4%200h1v1h-1zM5%200h1v1h-1zM6%200h1v1h-1zM3%201h1v1h-1zM4%201h1v1h-1zM5%201h1v1h-1zM2%202h1v1h-1zM3%202h1v1h-1zM4%202h1v1h-1zM1%203h1v1h-1zM2%203h1v1h-1zM3%203h1v1h-1zM4%203h1v1h-1zM5%203h1v1h-1zM6%203h1v1h-1zM3%204h1v1h-1zM4%204h1v1h-1zM5%204h1v1h-1zM2%205h1v1h-1zM3%205h1v1h-1zM4%205h1v1h-1zM1%206h1v1h-1zM2%206h1v1h-1zM1%207h1v1h-1z%22/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -486,6 +488,7 @@ body { top: 0 !important; }
 body.img-mode .img-opts { display: flex; }
 .img-enh { display: flex; gap: 6px; align-items: center; font-size: .85rem; color: var(--text-secondary); }
 .img-model-note { width: 100%; color: var(--text-secondary); font-size: .78rem; letter-spacing: .02em; padding-left: 2px; }
+.version-mark { display:block; color:var(--text-secondary); font: .68rem/1.4 "JetBrains Mono",monospace; letter-spacing:.12em; }
 .gen-note { display: block; margin-top: 6px; color: var(--text-secondary); font-size: .82rem; }
 .online-grid { display: grid; grid-template-columns: repeat(auto-fill, 300px); gap: 18px; justify-content: center; }
 .aiBox a { color: var(--accent); word-break: break-all; }
@@ -519,6 +522,7 @@ body.img-mode .img-opts { display: flex; }
 
             <div class="sidebar-footer">
                 <p>Created by Ray</p>
+                <small class="version-mark">LIGHTNING 7.0</small>
             </div>
         </div>
 
@@ -1441,10 +1445,8 @@ window.handleImageGeneration = async function (prompt, box) {
             if (/free image-generation allowance|daily reset/i.test(String(e.message || e))) {
                 return finalizeAiBubble(box, "⚠️ " + e.message);
             }
-            live(box, "", "Cloudflare image model unavailable. Trying backup image service… " + secs() + "s");
+            return finalizeAiBubble(box, "⚠️ FLUX.2 image generation is temporarily unavailable. Please try again in a minute.");
         }
-        if (!img) return finalizeAiBubble(box, "⚠️ Cloudflare Workers AI image generation failed. Please try again later.");
-        if (!img) return finalizeAiBubble(box, "⚠️ Image generation failed. The image services may be busy or blocked by your network or an ad blocker. Try again in a minute.");
         const id = src.startsWith("data:") ? nid() : "";
         if (id) await idbPut(id, src);
         imageResult(box, prompt, img, src, used); addImage(prompt, id ? "" : src, id);
