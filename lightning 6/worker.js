@@ -51,6 +51,25 @@ async function authLimit(request, env) {
   return { key, blocked:Number(row?.n||0)>=12, now };
 }
 
+async function ensureSocialTables(env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS friendships (
+    user_low TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_high TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY(user_low,user_high)
+  )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS friend_requests (
+    id TEXT PRIMARY KEY,
+    sender_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    recipient_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at INTEGER NOT NULL,
+    UNIQUE(sender_id,recipient_id)
+  )`).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS friend_requests_recipient_idx ON friend_requests(recipient_id,status,created_at)").run();
+}
+function friendPair(a,b){return a<b?[a,b]:[b,a];}
+
 const TRIAL_DAYS = 7;
 const TRIAL_TEXT_LIMIT = 40;
 const TRIAL_IMAGE_LIMIT = 5;
@@ -321,6 +340,55 @@ async function route(request, env) {
     await env.DB.prepare("INSERT INTO user_data(user_id,data_json,object_key,updated_at) VALUES(?,?,NULL,?) ON CONFLICT(user_id) DO UPDATE SET data_json=excluded.data_json,object_key=NULL,updated_at=excluded.updated_at").bind(user.id,data,now).run();
     return json({ok:true});
   }
+  if(path==="/api/friends" && request.method==="GET") {
+    if(!user)return json({error:"Sign in required."},401);
+    await ensureSocialTables(env);
+    const [friends,requests]=await Promise.all([
+      env.DB.prepare("SELECT users.username,users.id FROM friendships JOIN users ON users.id=CASE WHEN friendships.user_low=? THEN friendships.user_high ELSE friendships.user_low END WHERE friendships.user_low=? OR friendships.user_high=? ORDER BY users.username").bind(user.id,user.id,user.id).all(),
+      env.DB.prepare("SELECT friend_requests.id,users.username AS from FROM friend_requests JOIN users ON users.id=friend_requests.sender_id WHERE friend_requests.recipient_id=? AND friend_requests.status='pending' ORDER BY friend_requests.created_at DESC").bind(user.id).all()
+    ]);
+    return json({friends:friends.results||[],requests:requests.results||[]});
+  }
+  if(path==="/api/friends/request" && request.method==="POST") {
+    if(!user)return json({error:"Sign in required."},401);
+    await ensureSocialTables(env);
+    let b;try{b=await body(request)}catch{return json({error:"Invalid request."},400)}
+    const username=String(b.username||"").trim().toLowerCase();
+    if(!username)return json({error:"Enter a username."},400);
+    const target=await env.DB.prepare("SELECT id,username FROM users WHERE username_norm=?").bind(username).first();
+    if(!target)return json({error:"No Lightning account found with that username."},404);
+    if(target.id===user.id)return json({error:"You cannot add yourself."},400);
+    const [low,high]=friendPair(user.id,target.id);
+    const existing=await env.DB.prepare("SELECT 1 AS ok FROM friendships WHERE user_low=? AND user_high=?").bind(low,high).first();
+    if(existing)return json({error:"You are already friends."},409);
+    const reverse=await env.DB.prepare("SELECT id FROM friend_requests WHERE sender_id=? AND recipient_id=? AND status='pending'").bind(target.id,user.id).first();
+    if(reverse){
+      await env.DB.prepare("INSERT OR IGNORE INTO friendships(user_low,user_high,created_at) VALUES(?,?,?)").bind(low,high,Math.floor(Date.now()/1000)).run();
+      await env.DB.prepare("UPDATE friend_requests SET status='accepted' WHERE id=?").bind(reverse.id).run();
+      return json({ok:true,accepted:true,username:target.username});
+    }
+    const pending=await env.DB.prepare("SELECT id FROM friend_requests WHERE sender_id=? AND recipient_id=? AND status='pending'").bind(user.id,target.id).first();
+    if(pending)return json({ok:true,pending:true,username:target.username});
+    const id=b64(randomBytes(18));
+    await env.DB.prepare("INSERT INTO friend_requests(id,sender_id,recipient_id,status,created_at) VALUES(?,?,?,'pending',?)").bind(id,user.id,target.id,Math.floor(Date.now()/1000)).run();
+    return json({ok:true,pending:true,username:target.username});
+  }
+  if(path==="/api/friends/respond" && request.method==="POST") {
+    if(!user)return json({error:"Sign in required."},401);
+    await ensureSocialTables(env);
+    let b;try{b=await body(request)}catch{return json({error:"Invalid request."},400)}
+    const id=String(b.id||""),action=String(b.action||"");
+    const req=await env.DB.prepare("SELECT id,sender_id,recipient_id FROM friend_requests WHERE id=? AND recipient_id=? AND status='pending'").bind(id,user.id).first();
+    if(!req)return json({error:"Friend request not found."},404);
+    if(action==="accept"){
+      const [low,high]=friendPair(req.sender_id,req.recipient_id);
+      await env.DB.prepare("INSERT OR IGNORE INTO friendships(user_low,user_high,created_at) VALUES(?,?,?)").bind(low,high,Math.floor(Date.now()/1000)).run();
+      await env.DB.prepare("UPDATE friend_requests SET status='accepted' WHERE id=?").bind(id).run();
+    }else if(action==="decline"){
+      await env.DB.prepare("UPDATE friend_requests SET status='declined' WHERE id=?").bind(id).run();
+    }else return json({error:"Choose accept or decline."},400);
+    return json({ok:true});
+  }
   if(path==="/api/share" && request.method==="POST") {
     if(!user)return json({error:"Sign in required."},401);
     let b;try{b=await body(request)}catch{return json({error:"Invalid request."},400)}
@@ -330,6 +398,10 @@ async function route(request, env) {
     const recipient=await env.DB.prepare("SELECT id FROM users WHERE username_norm=?").bind(target).first();
     if(!recipient)return json({error:"No Lightning account found with that username."},404);
     if(recipient.id===user.id)return json({error:"You cannot share an artefact with yourself."},400);
+    await ensureSocialTables(env);
+    const [low,high]=friendPair(user.id,recipient.id);
+    const friendship=await env.DB.prepare("SELECT 1 AS ok FROM friendships WHERE user_low=? AND user_high=?").bind(low,high).first();
+    if(!friendship)return json({error:"Add this person as a Lightning friend before sharing."},403);
     const id=b64(randomBytes(18));
     await env.DB.prepare("INSERT INTO shares(id,owner_id,recipient_id,artifact_json,created_at) VALUES(?,?,?,?,?)").bind(id,user.id,recipient.id,artifact,Math.floor(Date.now()/1000)).run();
     return json({ok:true,shareId:id});
