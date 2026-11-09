@@ -493,6 +493,25 @@ body.img-mode .img-opts { display: flex; }
 .online-grid { display: grid; grid-template-columns: repeat(auto-fill, 300px); gap: 18px; justify-content: center; }
 .aiBox a { color: var(--accent); word-break: break-all; }
 .art-tools { flex-wrap: wrap; justify-content: flex-end; row-gap: 4px; }
+
+/* exclusive sidebar dropdowns */
+.side-group{border:1px solid var(--border-color);border-radius:11px;overflow:hidden;margin:3px 0;background:var(--surface);}
+.side-group summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:11px 12px;font-size:.91rem;font-weight:600;color:var(--text-primary);user-select:none;}
+.side-group summary::-webkit-details-marker{display:none;}
+.side-group summary span{color:var(--text-secondary);transition:transform .16s;}
+.side-group[open] summary{color:var(--accent);border-bottom:1px solid var(--border-color);}
+.side-group[open] summary span{transform:rotate(180deg);}
+.side-group-items{padding:4px 6px 7px;display:flex;flex-direction:column;gap:1px;}
+.side-group-items .sidebar-btn{padding:8px 10px;text-align:left;font-size:.87rem;}
+.gen-layout{max-width:760px;margin:0 auto;}
+.gen-card{background:var(--surface);border:1px solid var(--border-color);border-radius:16px;padding:18px;margin-bottom:16px;}
+.gen-card h3{margin:0 0 12px;font-weight:600;}
+.gen-label{display:block;color:var(--text-secondary);font-size:.84rem;margin:10px 0 6px;}
+.gen-preview{display:block;max-width:100%;max-height:300px;border-radius:12px;margin:10px 0;}
+.gen-output{width:100%;border-radius:12px;margin-top:16px;background:#000;}
+.gen-cost{font-size:.83rem;color:var(--text-secondary);line-height:1.5;margin:10px 0;}
+.gen-status{min-height:1.5em;color:var(--text-secondary);font-size:.88rem;margin-top:10px;}
+.gen-muted{color:var(--text-secondary);font-size:.85rem;line-height:1.5;}
 </style>
 </head>
 <body> 
@@ -508,16 +527,23 @@ body.img-mode .img-opts { display: flex; }
             
             <div class="sidebar-content">
                 <button class="sidebar-btn font-bold" onclick="startNewChat()">＋ New chat</button>
-                <button class="sidebar-btn" onclick="openChatsPage()">💬 Chats &amp; tasks</button>
-                <button class="sidebar-btn" onclick="openProjectsPage()">📁 Projects</button>
-                <button class="sidebar-btn" onclick="openArtifactsPage()">🧩 Artifacts</button>
-                <button class="sidebar-btn" onclick="openOnlinePage()">🌐 Online artifacts</button>
-                <button class="sidebar-btn" onclick="openImagesPage()">🖼️ Images</button>
-                <button class="sidebar-btn" onclick="imgMode()">🎨 Image mode</button>
-                <button class="sidebar-btn" onclick="openSettings()">⚙️ Model settings</button>
-                <button class="sidebar-btn" onclick="openPlugins()">🔌 Plugins</button>
-                <button class="sidebar-btn" onclick="toggleTheme()">◐ Light / dark</button>
-                <button class="sidebar-btn" onclick="clearHistory()">🗑 Clear all chats</button>
+                <details class="side-group"><summary>My stuff <span>⌄</span></summary><div class="side-group-items">
+                    <button class="sidebar-btn" onclick="openChatsPage()">Chats &amp; tasks</button>
+                    <button class="sidebar-btn" onclick="openProjectsPage()">Projects</button>
+                    <button class="sidebar-btn" onclick="openArtifactsPage()">Artifacts</button>
+                    <button class="sidebar-btn" onclick="openOnlinePage()">Online artifacts</button>
+                    <button class="sidebar-btn" onclick="openImagesPage()">Images</button>
+                </div></details>
+                <details class="side-group"><summary>Customization <span>⌄</span></summary><div class="side-group-items">
+                    <button class="sidebar-btn" onclick="openSettings()">Model settings</button>
+                    <button class="sidebar-btn" onclick="openPlugins()">Plugins</button>
+                    <button class="sidebar-btn" onclick="imgMode()">Image mode</button>
+                    <button class="sidebar-btn" onclick="toggleTheme()">Light / dark</button>
+                    <button class="sidebar-btn" onclick="clearHistory()">Clear all chats</button>
+                </div></details>
+                <details class="side-group"><summary>Generate <span>⌄</span></summary><div class="side-group-items">
+                    <button class="sidebar-btn" onclick="openGeneratePage()">Creative studio</button>
+                </div></details>
             </div>
 
             <div class="sidebar-footer">
@@ -1801,6 +1827,45 @@ function drawImages() {
 }
 window.openImagesPage = () => openPage(imgPg, drawImages, "/images");
 
+/* Creative studio: image editing and video generation */
+const generatePg = makePage("Generate");
+function drawGenerate(){
+ const b=generatePg.body;
+ b.innerHTML=`<div class="gen-layout"><div class="gen-card">
+ <h3>Creative studio</h3><p class="gen-muted">Make a short video from a prompt or animate a still image. You can also edit an image with a text instruction.</p>
+ <label class="gen-label" for="gen-kind">Generation type</label>
+ <select id="gen-kind" class="field">
+ <option value="image-to-video">Image to video</option><option value="text-to-video">Text to video</option><option value="image-to-image">Image to image</option>
+ <option value="music-to-image" disabled>Music to image — provider not connected</option><option value="image-to-model" disabled>Image to 3D model — provider not connected</option><option value="text-to-model" disabled>Text to 3D model — provider not connected</option></select>
+ <div id="gen-image-wrap"><label class="gen-label" for="gen-file">Starting image</label><input id="gen-file" class="field" type="file" accept="image/png,image/jpeg,image/webp"><img id="gen-source-preview" class="gen-preview" hidden alt="Selected starting image"></div>
+ <label class="gen-label" for="gen-prompt">Prompt</label><textarea id="gen-prompt" class="field" rows="4" maxlength="1600" placeholder="Describe the movement or changes you want..."></textarea>
+ <div id="gen-video-options"><label class="gen-label" for="gen-duration">Video length</label><select id="gen-duration" class="field"><option value="5">5 seconds</option><option value="8">8 seconds</option><option value="10">10 seconds</option><option value="12">12 seconds</option><option value="15">15 seconds</option></select>
+ <label class="gen-label" for="gen-resolution">Resolution</label><select id="gen-resolution" class="field"><option value="480p">480p</option><option value="720p" selected>720p</option></select>
+ <label class="gen-label" for="gen-ratio">Aspect ratio</label><select id="gen-ratio" class="field"><option>16:9</option><option>9:16</option><option>1:1</option><option>4:3</option><option>3:4</option><option>3:2</option><option>2:3</option></select></div>
+ <p id="gen-cost" class="gen-cost"></p><button id="gen-run" class="send-btn wide">Generate</button><div id="gen-status" class="gen-status" role="status"></div>
+ <video id="gen-video" class="gen-output" controls playsinline hidden></video><img id="gen-image-output" class="gen-preview" hidden alt="Edited image result"></div>
+ <p class="gen-muted">Video generation uses Cloudflare's Grok Imagine Video model. It is a paid service; the estimate is shown before you start. Music-to-image and 3D model generation need separate model providers before they can run.</p></div>`;
+ const kind=b.querySelector("#gen-kind"),file=b.querySelector("#gen-file"),preview=b.querySelector("#gen-source-preview"),prompt=b.querySelector("#gen-prompt"),duration=b.querySelector("#gen-duration"),resolution=b.querySelector("#gen-resolution"),cost=b.querySelector("#gen-cost"),status=b.querySelector("#gen-status"),run=b.querySelector("#gen-run"),video=b.querySelector("#gen-video"),imageOut=b.querySelector("#gen-image-output");
+ function refresh(){const k=kind.value,needs=k==="image-to-video"||k==="image-to-image";b.querySelector("#gen-image-wrap").hidden=!needs;b.querySelector("#gen-video-options").hidden=k==="image-to-image";
+ if(k==="image-to-video"||k==="text-to-video"){const rate=resolution.value==="480p"?.08:.14;cost.textContent="Estimated cost: US$"+(rate*Number(duration.value)).toFixed(2)+" for "+duration.value+" seconds at "+resolution.value+".";
+ }else if(k==="image-to-image")cost.textContent="Estimated cost: about US$0.022 per edit (US$0.02 output + US$0.002 input image).";else cost.textContent="This mode is not connected yet.";
+ run.disabled=!(k==="image-to-video"||k==="text-to-video"||k==="image-to-image");run.textContent=k==="image-to-image"?"Edit image":"Generate";}
+ kind.addEventListener("change",refresh);duration.addEventListener("change",refresh);resolution.addEventListener("change",refresh);
+ file.addEventListener("change",()=>{const f=file.files&&file.files[0];preview.hidden=!f;if(f){if(f.size>8*1024*1024){status.textContent="Please choose an image under 8 MB.";file.value="";preview.hidden=true;return;}preview.src=URL.createObjectURL(f);}});
+ run.addEventListener("click",async()=>{const k=kind.value,f=file.files&&file.files[0],text=prompt.value.trim();if(!text){status.textContent="Enter a prompt first.";return;}if((k==="image-to-video"||k==="image-to-image")&&!f){status.textContent="Choose an image first.";return;}
+ if(k==="image-to-video"||k==="text-to-video"){const estimate=(resolution.value==="480p"?.08:.14)*Number(duration.value);if(!confirm("This uses paid video generation. Estimated cost: US$"+estimate.toFixed(2)+". Continue?"))return;}else if(!confirm("This uses paid image editing. Estimated cost: about US$0.022. Continue?"))return;
+ run.disabled=true;video.hidden=true;imageOut.hidden=true;status.textContent="Preparing your request…";
+ try{let imageData="";if(f)imageData=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||""));reader.onerror=()=>reject(new Error("Could not read that image."));reader.readAsDataURL(f);});
+ status.textContent=k==="image-to-image"?"Editing your image…":"Generating your video. This can take a little while…";
+ const response=await fetch("/api/generate",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({mode:k,prompt:text,imageData,duration:Number(duration.value),resolution:resolution.value,aspect_ratio:b.querySelector("#gen-ratio").value})});
+ const data=await response.json();if(!response.ok)throw new Error(data.error||"Generation failed.");
+ if(data.video){video.src=data.video;video.hidden=false;status.textContent="Video ready. Use the player controls to watch it or save it.";}else if(data.image){imageOut.src=data.image;imageOut.hidden=false;status.textContent="Edited image ready.";}else throw new Error("The model returned no output.");
+ }catch(e){status.textContent=e.message||"Generation failed. Try again.";}finally{run.disabled=false;}});
+ refresh();
+}
+window.openGeneratePage=()=>openPage(generatePg,drawGenerate,"/generate");
+
+
 /* chats */
 window.store = function () {
     if (!chat.length) return;
@@ -2000,6 +2065,7 @@ window.openSettings = function () {
     };
 };
 
+document.querySelectorAll(".side-group").forEach(group=>{group.addEventListener("toggle",()=>{if(!group.open)return;document.querySelectorAll(".side-group[open]").forEach(other=>{if(other!==group)other.open=false;});});});
 /* ---------- Artifact helpers + "Sign in with OpenRouter" ---------- */
 function cleanArt(code) { return code.trim().replace(/^```\w*\s*\n/, "").replace(/\n?```\s*$/, "").trim(); }
 function addArt(box, title, code) { const c = artifactCard(title || "Artifact", cleanArt(code)); box.append(c); return +c.dataset.idx; }
