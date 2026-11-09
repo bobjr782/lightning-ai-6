@@ -50,11 +50,92 @@ async function authLimit(request, env) {
   const row=await env.DB.prepare("SELECT COUNT(*) AS n FROM auth_attempts WHERE ip_hash=? AND attempted_at>?").bind(key,now-900).first();
   return { key, blocked:Number(row?.n||0)>=12, now };
 }
+
+const IMAGE_RATE = new Map();
+function imageRateLimit(request) {
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const now = Date.now();
+  const row = IMAGE_RATE.get(ip);
+  if (!row || now - row.start > 60000) {
+    IMAGE_RATE.set(ip, { start: now, count: 1 });
+    if (IMAGE_RATE.size > 2000) {
+      for (const [key, value] of IMAGE_RATE) if (now - value.start > 60000) IMAGE_RATE.delete(key);
+    }
+    return { ok: true };
+  }
+  if (row.count >= 5) return { ok: false, retryAfter: Math.max(1, Math.ceil((60000 - (now - row.start)) / 1000)) };
+  row.count++;
+  return { ok: true };
+}
+async function imageRoute(request, env) {
+  if (!env.AI || typeof env.AI.run !== "function") {
+    return json({ error: "Image generation is not enabled. Add the Workers AI binding named AI in Cloudflare." }, 503);
+  }
+  const limit = imageRateLimit(request);
+  if (!limit.ok) return json({ error: "Too many images requested. Please wait a minute and try again.", retryAfter: limit.retryAfter }, 429, { "retry-after": String(limit.retryAfter) });
+  let input;
+  try { input = await body(request); } catch { return json({ error: "Invalid image request." }, 400); }
+  let prompt = String(input.prompt || "").trim();
+  if (!prompt) return json({ error: "Describe the image you want to create." }, 400);
+  if (prompt.length > 1800) return json({ error: "Image prompts must be 1,800 characters or fewer." }, 400);
+  const width = Math.max(256, Math.min(1536, Math.round(Number(input.width || 1024) / 16) * 16));
+  const height = Math.max(256, Math.min(1536, Math.round(Number(input.height || 1024) / 16) * 16));
+  const seed = Number.isInteger(Number(input.seed)) ? Math.abs(Number(input.seed)) % 2147483647 : Math.floor(Math.random() * 2147483647);
+  if (input.enhance === true) {
+    try {
+      const improved = await env.AI.run("@cf/zai-org/glm-4.7-flash", {
+        messages: [
+          { role: "system", content: "You are an expert visual art director. Rewrite the user's idea as one precise, richly visual image-generation prompt. Preserve the subject and intent. Add concrete composition, camera/lens, lighting, environment, materials, colour palette and atmosphere where appropriate. Avoid contradictory details, text overlays and filler. Return only the improved prompt, under 180 words." },
+          { role: "user", content: prompt }
+        ],
+        max_tokens: 240,
+        temperature: 0.65
+      });
+      const candidate = improved?.response || improved?.choices?.[0]?.message?.content || improved?.output_text || "";
+      if (typeof candidate === "string" && candidate.trim()) prompt = candidate.trim().slice(0, 1800);
+    } catch (error) {
+      // Prompt enhancement is optional; generation continues with the user's original prompt.
+    }
+  }
+  try {
+    const form = new FormData();
+    form.append("prompt", prompt);
+    form.append("width", String(width));
+    form.append("height", String(height));
+    form.append("seed", String(seed));
+    form.append("guidance", "4");
+    const encoded = new Response(form);
+    const result = await env.AI.run("@cf/black-forest-labs/flux-2-klein-4b", {
+      multipart: { body: encoded.body, contentType: encoded.headers.get("content-type") }
+    });
+    if (!result || typeof result.image !== "string" || !result.image) {
+      return json({ error: "The image model returned an empty result. Please try again." }, 502);
+    }
+    return json({
+      image: "data:image/png;base64," + result.image,
+      promptUsed: prompt,
+      model: "FLUX.2 Klein 4B",
+      width,
+      height,
+      seed
+    });
+  } catch (error) {
+    const detail = String(error?.message || error || "");
+    const status = /quota|limit|neuron|billing|paid plan/i.test(detail) ? 429 : 502;
+    return json({
+      error: status === 429
+        ? "The free image-generation allowance may be used up. Try again after the daily reset."
+        : "The image model is temporarily unavailable. Please try again in a moment."
+    }, status);
+  }
+}
+
 async function route(request, env) {
-  if(!env.DB) return json({error:"Account database is not configured yet."},503);
   const url=new URL(request.url), path=url.pathname;
   if(path.startsWith("/api/") && !sameOrigin(request)) return json({error:"Origin not allowed."},403);
   if(path==="/api/health" && request.method==="GET") return json({ok:true,service:"Lightning accounts"});
+  if(path==="/api/image" && request.method==="POST") return imageRoute(request, env);
+  if(!env.DB) return json({error:"Account database is not configured yet."},503);
   if(path==="/api/register" && request.method==="POST") {
     let b; try{b=await body(request)}catch{return json({error:"Invalid request."},400)}
     const username=String(b.username||"").trim(), norm=username.toLowerCase(), password=String(b.password||"");
