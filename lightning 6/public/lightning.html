@@ -3,9 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="application-name" content="Lightning 7.0">
-    <meta name="description" content="Lightning 7.0 — an AI workspace for chat, coding, live artifacts and FLUX.2 image generation.">
-    <title>Lightning 7.0</title>
+    <title>lightning</title>
 
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%208%208%22%20shape-rendering%3D%22crispEdges%22%3E%3Cpath%20fill%3D%22%23d97757%22%20d%3D%22M4%200h1v1h-1zM5%200h1v1h-1zM6%200h1v1h-1zM3%201h1v1h-1zM4%201h1v1h-1zM5%201h1v1h-1zM2%202h1v1h-1zM3%202h1v1h-1zM4%202h1v1h-1zM1%203h1v1h-1zM2%203h1v1h-1zM3%203h1v1h-1zM4%203h1v1h-1zM5%203h1v1h-1zM6%203h1v1h-1zM3%204h1v1h-1zM4%204h1v1h-1zM5%204h1v1h-1zM2%205h1v1h-1zM3%205h1v1h-1zM4%205h1v1h-1zM1%206h1v1h-1zM2%206h1v1h-1zM1%207h1v1h-1z%22/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -488,33 +486,10 @@ body { top: 0 !important; }
 body.img-mode .img-opts { display: flex; }
 .img-enh { display: flex; gap: 6px; align-items: center; font-size: .85rem; color: var(--text-secondary); }
 .img-model-note { width: 100%; color: var(--text-secondary); font-size: .78rem; letter-spacing: .02em; padding-left: 2px; }
-.version-mark { display:block; color:var(--text-secondary); font: .68rem/1.4 "JetBrains Mono",monospace; letter-spacing:.12em; }
 .gen-note { display: block; margin-top: 6px; color: var(--text-secondary); font-size: .82rem; }
 .online-grid { display: grid; grid-template-columns: repeat(auto-fill, 300px); gap: 18px; justify-content: center; }
 .aiBox a { color: var(--accent); word-break: break-all; }
 .art-tools { flex-wrap: wrap; justify-content: flex-end; row-gap: 4px; }
-
-/* exclusive sidebar dropdowns */
-.side-group{border:1px solid var(--border-color);border-radius:11px;overflow:hidden;margin:3px 0;background:var(--surface);}
-.side-group summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:11px 12px;font-size:.91rem;font-weight:600;color:var(--text-primary);user-select:none;}
-.side-group summary::-webkit-details-marker{display:none;}
-.side-group summary span{color:var(--text-secondary);transition:transform .16s;}
-.side-group[open] summary{color:var(--accent);border-bottom:1px solid var(--border-color);}
-.side-group[open] summary span{transform:rotate(180deg);}
-.side-group-items{padding:4px 6px 7px;display:flex;flex-direction:column;gap:1px;}
-.side-group-items .sidebar-btn{padding:8px 10px;text-align:left;font-size:.87rem;}
-.gen-layout{max-width:760px;margin:0 auto;}
-.gen-card{background:var(--surface);border:1px solid var(--border-color);border-radius:16px;padding:18px;margin-bottom:16px;}
-.gen-card h3{margin:0 0 12px;font-weight:600;}
-.gen-label{display:block;color:var(--text-secondary);font-size:.84rem;margin:10px 0 6px;}
-.gen-preview{display:block;max-width:100%;max-height:300px;border-radius:12px;margin:10px 0;}
-.gen-output{width:100%;border-radius:12px;margin-top:16px;background:#000;}
-.gen-cost{font-size:.83rem;color:var(--text-secondary);line-height:1.5;margin:10px 0;}
-.gen-status{min-height:1.5em;color:var(--text-secondary);font-size:.88rem;margin-top:10px;}
-.gen-muted{color:var(--text-secondary);font-size:.85rem;line-height:1.5;}
-
-/* Compact sidebar and inline generation controls */
-.sidebar-content{padding:9px 10px;gap:5px}.side-group{border:1px solid var(--border-color);border-radius:8px;margin:1px 0;background:transparent}.side-group summary{padding:7px 10px;font-size:.84rem;font-weight:600;min-height:18px}.side-group-items{padding:2px 4px 4px;gap:0}.side-group-items .sidebar-btn{padding:6px 8px;font-size:.81rem;border:0;background:transparent;border-radius:5px;min-height:28px}.side-group-items .sidebar-btn:hover{background:var(--surface)}.side-group summary span{font-size:.8rem}.gen-chat-tools{display:flex;gap:6px;flex-wrap:wrap;padding:5px 0 8px;align-items:center}.gen-chat-tools button{border:1px solid var(--border-color);background:var(--surface);color:var(--text-primary);border-radius:7px;padding:6px 9px;font-size:.78rem;cursor:pointer}.gen-chat-tools button.active{border-color:var(--accent);color:var(--accent)}.gen-chat-panel{display:none;border:1px solid var(--border-color);border-radius:10px;padding:10px;margin:0 0 8px;background:var(--surface)}.gen-chat-panel.open{display:block}.gen-chat-panel label{display:block;font-size:.78rem;color:var(--text-secondary);margin:6px 0 4px}.gen-chat-panel input,.gen-chat-panel textarea,.gen-chat-panel select{width:100%;box-sizing:border-box}.gen-chat-panel textarea{min-height:58px;resize:vertical}.gen-chat-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:7px}.gen-chat-actions button{padding:7px 12px;border-radius:7px}.gen-chat-note{font-size:.76rem;color:var(--text-secondary);margin:5px 0}
 </style>
 </head>
 <body> 
@@ -530,29 +505,20 @@ body.img-mode .img-opts { display: flex; }
             
             <div class="sidebar-content">
                 <button class="sidebar-btn font-bold" onclick="startNewChat()">＋ New chat</button>
-                <button class="sidebar-btn" onclick="openImagesPage()">Images</button>
-                <details class="side-group"><summary>My stuff <span>⌄</span></summary><div class="side-group-items">
-                    <button class="sidebar-btn" onclick="openChatsPage()">Chats &amp; tasks</button>
-                    <button class="sidebar-btn" onclick="openProjectsPage()">Projects</button>
-                    <button class="sidebar-btn" onclick="openArtifactsPage()">Artifacts</button>
-                    <button class="sidebar-btn" onclick="openOnlinePage()">Online artifacts</button>
-                    <button class="sidebar-btn" onclick="openImagesPage()">Images</button>
-                </div></details>
-                <details class="side-group"><summary>Customization <span>⌄</span></summary><div class="side-group-items">
-                    <button class="sidebar-btn" onclick="openSettings()">Model settings</button>
-                    <button class="sidebar-btn" onclick="openPlugins()">Plugins</button>
-                    <button class="sidebar-btn" onclick="imgMode()">Image mode</button>
-                    <button class="sidebar-btn" onclick="toggleTheme()">Light / dark</button>
-                    <button class="sidebar-btn" onclick="clearHistory()">Clear all chats</button>
-                </div></details>
-                <details class="side-group"><summary>Generate <span>⌄</span></summary><div class="side-group-items">
-                    <button class="sidebar-btn" onclick="openGeneratePage()">Creative studio</button>
-                </div></details>
+                <button class="sidebar-btn" onclick="openChatsPage()">💬 Chats &amp; tasks</button>
+                <button class="sidebar-btn" onclick="openProjectsPage()">📁 Projects</button>
+                <button class="sidebar-btn" onclick="openArtifactsPage()">🧩 Artifacts</button>
+                <button class="sidebar-btn" onclick="openOnlinePage()">🌐 Online artifacts</button>
+                <button class="sidebar-btn" onclick="openImagesPage()">🖼️ Images</button>
+                <button class="sidebar-btn" onclick="imgMode()">🎨 Image mode</button>
+                <button class="sidebar-btn" onclick="openSettings()">⚙️ Model settings</button>
+                <button class="sidebar-btn" onclick="openPlugins()">🔌 Plugins</button>
+                <button class="sidebar-btn" onclick="toggleTheme()">◐ Light / dark</button>
+                <button class="sidebar-btn" onclick="clearHistory()">🗑 Clear all chats</button>
             </div>
 
             <div class="sidebar-footer">
                 <p>Created by Ray</p>
-                <small class="version-mark">LIGHTNING 7.0</small>
             </div>
         </div>
 
@@ -573,8 +539,6 @@ body.img-mode .img-opts { display: flex; }
                 
                 <!-- Dynamic Attachment Notification Pill Box -->
                 <div id="file-badge-container" class="file-badge-row"></div>
-<div class="gen-chat-tools"><button type="button" data-gen-mode="image-to-video">Image → Video</button><button type="button" data-gen-mode="text-to-video">Text → Video</button><button type="button" data-gen-mode="image-to-image">Image → Image</button><button type="button" data-gen-mode="music-to-image">Music → Image</button><button type="button" data-gen-mode="image-to-model">Image → 3D</button><button type="button" data-gen-mode="text-to-model">Text → 3D</button></div>
-<div id="gen-chat-panel" class="gen-chat-panel"><div id="gen-chat-title" style="font-weight:600;font-size:.88rem"></div><label id="gen-chat-file-label" for="gen-chat-file">Starting image</label><input id="gen-chat-file" type="file" accept="image/png,image/jpeg,image/webp"><label for="gen-chat-prompt">Prompt</label><textarea id="gen-chat-prompt" maxlength="1600" placeholder="Describe what you want to create..."></textarea><div id="gen-chat-video-options"><label for="gen-chat-duration">Duration</label><select id="gen-chat-duration"><option value="5">5 seconds</option><option value="8">8 seconds</option><option value="10">10 seconds</option><option value="12">12 seconds</option><option value="15">15 seconds</option></select><label for="gen-chat-resolution">Resolution</label><select id="gen-chat-resolution"><option value="480p">480p</option><option value="720p" selected>720p</option></select><label for="gen-chat-ratio">Aspect ratio</label><select id="gen-chat-ratio"><option>16:9</option><option>9:16</option><option>1:1</option><option>4:3</option><option>3:4</option><option>3:2</option><option>2:3</option></select></div><p id="gen-chat-cost" class="gen-chat-note"></p><div class="gen-chat-actions"><button type="button" class="send-btn" id="gen-chat-run">Generate</button><button type="button" class="mini-btn" id="gen-chat-close">Close</button><span id="gen-chat-status" class="gen-chat-note" role="status"></span></div></div>
 
                 <div class="input-container"> 
                     <!-- Updated file input accept filter attribute to handle images and text -->
@@ -1477,8 +1441,10 @@ window.handleImageGeneration = async function (prompt, box) {
             if (/free image-generation allowance|daily reset/i.test(String(e.message || e))) {
                 return finalizeAiBubble(box, "⚠️ " + e.message);
             }
-            return finalizeAiBubble(box, "⚠️ FLUX.2 image generation is temporarily unavailable. Please try again in a minute.");
+            live(box, "", "Cloudflare image model unavailable. Trying backup image service… " + secs() + "s");
         }
+        if (!img) return finalizeAiBubble(box, "⚠️ Cloudflare Workers AI image generation failed. Please try again later.");
+        if (!img) return finalizeAiBubble(box, "⚠️ Image generation failed. The image services may be busy or blocked by your network or an ad blocker. Try again in a minute.");
         const id = src.startsWith("data:") ? nid() : "";
         if (id) await idbPut(id, src);
         imageResult(box, prompt, img, src, used); addImage(prompt, id ? "" : src, id);
@@ -1730,16 +1696,6 @@ const nid = () => Math.random().toString(36).slice(2, 10);
 const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const titleOf = msgs => ((msgs.find(m => m.alignment === "user-align") || {}).text || "New chat").slice(0, 48);
 let chats = rd("chats", []), tasks = rd("tasks", []), projects = rd("projects", []), images = rd("images", []), tab = "chats", cq = "";
-/* Restore older unscoped image galleries without deleting any stored copy. */
-try {
-  const legacyImages=JSON.parse(localStorage.getItem("images")||"null");
-  if(Array.isArray(legacyImages)&&legacyImages.length){
-    const known=new Set(images.map(x=>x.id||x.url).filter(Boolean));
-    for(const item of legacyImages){const key=item&&(item.id||item.url);if(item&&key&&!known.has(key)){images.push(item);known.add(key);}}
-    wr("images",images);
-  }
-} catch(e) { console.warn("Legacy image library could not be read",e); }
-
 const pages = [];
 let SERVER = { on: false };
 const CHAT_ROUTE = new URLSearchParams(location.search).get("chat");
@@ -1843,20 +1799,204 @@ function drawImages() {
 }
 window.openImagesPage = () => openPage(imgPg, drawImages, "/images");
 
-/* Chat composer generation controls */
-let activeChatGenMode="";
-function initChatGenerator(){
- const panel=document.getElementById("gen-chat-panel");if(!panel||panel.dataset.ready)return;panel.dataset.ready="1";
- const buttons=[...document.querySelectorAll("[data-gen-mode]")],title=document.getElementById("gen-chat-title"),fileLabel=document.getElementById("gen-chat-file-label"),file=document.getElementById("gen-chat-file"),prompt=document.getElementById("gen-chat-prompt"),videoOpts=document.getElementById("gen-chat-video-options"),cost=document.getElementById("gen-chat-cost"),status=document.getElementById("gen-chat-status"),run=document.getElementById("gen-chat-run");
- const names={"image-to-video":"Image → Video","text-to-video":"Text → Video","image-to-image":"Image → Image","music-to-image":"Music → Image","image-to-model":"Image → 3D model","text-to-model":"Text → 3D model"};
- function refresh(){const m=activeChatGenMode,needs=["image-to-video","image-to-image","music-to-image","image-to-model"].includes(m);title.textContent=names[m]||"Generate";fileLabel.hidden=!needs;file.hidden=!needs;videoOpts.hidden=["image-to-image","music-to-image","image-to-model","text-to-model"].includes(m);if(m==="image-to-video"||m==="text-to-video"){const n=+document.getElementById("gen-chat-duration").value,rate=document.getElementById("gen-chat-resolution").value==="480p"?.08:.14;cost.textContent="Estimated cost: US$"+(n*rate).toFixed(2)+" for "+n+" seconds.";}else if(m==="image-to-image")cost.textContent="Paid image editing; estimated US$0.022 per edit.";else cost.textContent="This mode needs a model provider and is not connected yet.";run.disabled=!["image-to-video","text-to-video","image-to-image"].includes(m);run.textContent=m==="image-to-image"?"Edit image":"Generate";}
- buttons.forEach(btn=>btn.addEventListener("click",()=>{activeChatGenMode=btn.dataset.genMode;buttons.forEach(x=>x.classList.toggle("active",x===btn));panel.classList.add("open");status.textContent="";refresh();if(["music-to-image","image-to-model","text-to-model"].includes(activeChatGenMode))status.textContent="This mode is listed but needs its model provider before it can run.";prompt.focus();}));
- ["gen-chat-duration","gen-chat-resolution"].forEach(id=>document.getElementById(id).addEventListener("change",refresh));
- document.getElementById("gen-chat-close").addEventListener("click",()=>{panel.classList.remove("open");buttons.forEach(x=>x.classList.remove("active"));});
- run.addEventListener("click",async()=>{const m=activeChatGenMode,f=file.files&&file.files[0],p=prompt.value.trim();if(!p){status.textContent="Enter a prompt first.";return;}if(["image-to-video","image-to-image"].includes(m)&&!f){status.textContent="Choose an image first.";return;}if(f&&f.size>8*1024*1024){status.textContent="Choose an image under 8 MB.";return;}if(m==="image-to-video"||m==="text-to-video"){const n=+document.getElementById("gen-chat-duration").value,rate=document.getElementById("gen-chat-resolution").value==="480p"?.08:.14;if(!confirm("Paid video generation. Estimated cost: US$"+(n*rate).toFixed(2)+". Continue?"))return;}else if(!confirm("Paid image editing. Estimated cost: about US$0.022. Continue?"))return;run.disabled=true;status.textContent="Preparing…";try{let imageData="";if(f)imageData=await new Promise((resolve,reject)=>{const rd=new FileReader();rd.onload=()=>resolve(String(rd.result||""));rd.onerror=()=>reject(new Error("Could not read image."));rd.readAsDataURL(f);});status.textContent="Generating…";const res=await fetch("/api/generate",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({mode:m,prompt:p,imageData,duration:+document.getElementById("gen-chat-duration").value,resolution:document.getElementById("gen-chat-resolution").value,aspect_ratio:document.getElementById("gen-chat-ratio").value})});const data=await res.json();if(!res.ok)throw new Error(data.error||"Generation failed.");const row=document.createElement("div"),wrap=document.createElement("div"),box=document.createElement("div");row.className="message-row ai-align";wrap.className="bubble-wrapper";box.className="aiBox";if(data.video){const v=document.createElement("video");v.controls=true;v.playsInline=true;v.src=data.video;v.style.cssText="max-width:min(100%,720px);border-radius:12px";box.append("Generated video",document.createElement("br"),v);}else if(data.image){const im=document.createElement("img");im.src=data.image;im.alt="Edited image";im.style.cssText="max-width:min(100%,520px);border-radius:12px";box.append("Edited image",document.createElement("br"),im);addImage(p,data.image,"");}else throw new Error("No output returned.");wrap.append(box);row.append(wrap);document.querySelector(".messages-container").append(row);scrollToLatestMessage();status.textContent="Done — result added to chat.";}catch(e){status.textContent=e.message||"Generation failed.";}finally{run.disabled=false;}});
+/* chats */
+window.store = function () {
+    if (!chat.length) return;
+    let c = chats.find(x => x.id === curId);
+    if (!c) { curId = chatId(); c = { id: curId, title: "New chat", t: Date.now(), project: curProject, msgs: chat }; chats.unshift(c); go("/chats/" + curId, true); }
+    c.msgs = chat; c.t = Date.now(); if (c.title === "New chat") c.title = titleOf(chat);
+    wr("chats", chats); wr("cur", curId); updateTop();
+};
+function renderChat() { $(".messages-container").innerHTML = ""; if (chat.length) renderMsgs(); else showWelcome(); updateTop(); }
+function newChat() { curId = null; chat = []; clearAttachedFile(); renderChat(); closeAll(); }
+window.startNewChat = () => { curProject = null; newChat(); };
+function openChat(id) { const c = chats.find(x => x.id === id); if (!c) return; curId = id; curProject = c.project; chat = c.msgs; wr("cur", id); renderChat(); closeAll(); }
+window.clearHistory = () => { if (confirm("Delete ALL chats? This can't be undone.")) { chats = []; wr("chats", chats); wr("cur", null); startNewChat(); } };
+function updateTop() {
+    let s = $(".proj-badge"); if (!s) { s = el("span", "proj-badge"); $(".top-menu-bar .toggle-btn").after(s); }
+    const c = chats.find(x => x.id === curId), p = projects.find(x => x.id === (c ? c.project : curProject)); s.textContent = p ? "📁 " + p.name : "";
 }
-window.openGeneratePage=()=>{initChatGenerator();document.getElementById("gen-chat-panel")?.classList.add("open");};
-initChatGenerator();
+function sysExtra() {
+    const c = chats.find(x => x.id === curId), p = c && projects.find(x => x.id === c.project);
+    return (p && p.instr ? `\nProject "${p.name}" instructions (follow them): ${p.instr}` : "") + (user ? `\nThe user's name is ${user.name}.` : "");
+}
+function greeting() {
+    const h = new Date().getHours(), part = h < 5 ? "Good evening" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+    return user ? `${part}, ${esc(user.name.split(" ")[0])}` : "How can I help you today?";
+}
+const chatPg = makePage("Chats &amp; tasks");
+function chatList(box) {
+    box.innerHTML = ""; const q = cq.toLowerCase(), list = chats.filter(c => c.title.toLowerCase().includes(q));
+    if (!list.length) return box.append(el("p", "art-empty", "No chats yet."));
+    list.forEach(c => {
+        const r = el("div", "row-item"), g = el("div", "grow"), pj = projects.find(p => p.id === c.project), sel = el("select", "select");
+        g.append(el("b", "", c.title), el("small", "", new Date(c.t).toLocaleString() + (pj ? " · 📁 " + pj.name : "")));
+        sel.append(new Option("No project", "")); projects.forEach(p => sel.append(new Option(p.name, p.id))); sel.value = c.project || "";
+        sel.onchange = () => { c.project = sel.value || null; wr("chats", chats); chatList(box); };
+        r.append(g, sel, btn("Open", () => openChat(c.id)), btn("Delete", () => { if (confirm("Delete this chat?")) { chats = chats.filter(x => x !== c); wr("chats", chats); if (curId === c.id) newChat(); chatList(box); } }));
+        box.append(r);
+    });
+}
+function drawChats() {
+    const b = chatPg.body; b.innerHTML = ""; const tabs = el("div", "tabs");
+    ["chats", "tasks"].forEach(t => { const x = el("button", "tab" + (tab === t ? " on" : ""), t === "chats" ? "💬 Chats" : "✅ Tasks"); x.onclick = () => { tab = t; drawChats(); }; tabs.append(x); });
+    b.append(tabs);
+    if (tab === "chats") {
+        const s = el("input", "field"), box = el("div"); s.placeholder = "Search chats…"; s.value = cq; s.oninput = () => { cq = s.value; chatList(box); };
+        b.append(s, box); chatList(box);
+    } else {
+        const inp = el("input", "field"); inp.placeholder = "Add a task and press Enter…";
+        inp.onkeydown = e => { if (e.key === "Enter" && inp.value.trim()) { tasks.unshift({ id: nid(), text: inp.value.trim(), done: false }); wr("tasks", tasks); drawChats(); } };
+        b.append(inp);
+        tasks.forEach(t => {
+            const r = el("div", "row-item"), cb = el("input"), g = el("div", "grow", t.text); cb.type = "checkbox"; cb.checked = t.done;
+            cb.onchange = () => { t.done = cb.checked; wr("tasks", tasks); drawChats(); }; if (t.done) g.style.textDecoration = "line-through";
+            r.append(cb, g, btn("✕", () => { tasks = tasks.filter(x => x !== t); wr("tasks", tasks); drawChats(); })); b.append(r);
+        });
+        if (!tasks.length) b.append(el("p", "art-empty", "No tasks yet."));
+        inp.focus();
+    }
+}
+window.openChatsPage = () => openPage(chatPg, drawChats, "/chats");
+
+/* projects */
+const projPg = makePage("Projects");
+function drawProjects() {
+    const b = projPg.body; b.innerHTML = "";
+    const f = el("div", "row-item col"), n = el("input", "field"), i = el("textarea", "field"); n.placeholder = "Project name"; i.placeholder = "Instructions the AI should follow in this project (optional)"; i.rows = 2;
+    f.append(n, i, btn("＋ Create project", () => { if (!n.value.trim()) return; projects.unshift({ id: nid(), name: n.value.trim(), instr: i.value.trim(), t: Date.now() }); wr("projects", projects); drawProjects(); })); b.append(f);
+    if (!projects.length) b.append(el("p", "art-empty", "Projects group related chats and give the AI standing instructions."));
+    projects.forEach(p => {
+        const cs = chats.filter(c => c.project === p.id), r = el("div", "row-item col"), top = el("div", "row-top"), g = el("div", "grow");
+        g.append(el("b", "", "📁 " + p.name), el("small", "", (p.instr || "No instructions").slice(0, 120) + ` · ${cs.length} chat${cs.length === 1 ? "" : "s"}`));
+        top.append(g, btn("New chat here", () => { curProject = p.id; newChat(); }), btn("Delete", () => { if (confirm(`Delete project "${p.name}"? Its chats are kept.`)) { chats.forEach(c => { if (c.project === p.id) c.project = null; }); projects = projects.filter(x => x !== p); wr("projects", projects); wr("chats", chats); drawProjects(); } }));
+        r.append(top); cs.forEach(c => { const a = el("div", "proj-chat", "💬 " + c.title); a.onclick = () => openChat(c.id); r.append(a); }); b.append(r);
+    });
+}
+window.openProjectsPage = () => openPage(projPg, drawProjects, "/projects");
+
+/* providers: sign in with OpenRouter or Groq, choose which one to use */
+const acct = el("div", "acct"); $(".sidebar-footer").prepend(acct);
+function saveCfg(s) { try { localStorage.setItem("lt_cfg", JSON.stringify(s)); } catch (e) {} }
+function useProv(id) { const s = rawCfg(); s.provider = id; saveCfg(s); Object.keys(cool).forEach(k => delete cool[k]); drawAcct(); fillModels(); showAiBubbleOnScreen("Now using " + PRESETS[id].name.split(" (")[0] + "."); }
+function disconnect(id) { const s = rawCfg(); s.keys = { ...s.keys, [id]: "" }; if (s.provider === id) s.provider = "openrouter"; if (id === "groq") groqCache = null; if (id === "google") googleCache = null; saveCfg(s); drawAcct(); fillModels(); }
+function provRow(id, label) {
+    const s = rawCfg(), has = !!(s.keys && s.keys[id]), srv = !!(SERVER.on && SERVER[id]), active = getCfg().id === id, signIn = () => (id === "groq" || id === "google" ? keyModal(id) : connectOpenRouter());
+    if (!has && !srv) return btn("🔑 Sign in with " + label, signIn);
+    const r = el("div", "prov-row" + (active ? " active" : "")), nm = el("div", "grow");
+    nm.append(el("b", "", label), el("small", "", (active ? "In use" : "Available") + " · " + (has ? "your key" : "server key")));
+    r.append(nm); if (!active) r.append(btn("Use", () => useProv(id)));
+    r.append(has ? btn("✕", () => disconnect(id)) : btn("My key", signIn)); return r;
+}
+function drawAcct() { acct.innerHTML = ""; acct.append(provRow("openrouter", "OpenRouter"), provRow("groq", "Groq"), provRow("google", "Google")); }
+const KEYINFO = { groq: { name: "Groq", prefix: "gsk_", url: "https://console.groq.com/keys", check: "https://api.groq.com/openai/v1/models", cache: () => { groqCache = null; } },
+    google: { name: "Google", prefix: "AIza", url: "https://aistudio.google.com/apikey", check: "https://generativelanguage.googleapis.com/v1beta/openai/models", cache: () => { googleCache = null; } } };
+function keyModal(id) {
+    const k = KEYINFO[id], ov = el("div", "modal-overlay open"), card = el("div", "modal-card"); ov.append(card); document.body.append(ov);
+    const close = () => ov.remove(); ov.onclick = e => { if (e.target === ov) close(); };
+    card.innerHTML = `<div class="modal-header"><h3>Sign in with ${k.name}</h3><button class="close-modal-btn">✕</button></div>
+    <div class="modal-body"><small class="auth-note">${k.name} doesn't offer a one-click sign-in for apps, so it takes two quick steps: open the ${k.name} page, sign in and create a free API key, then paste it here.</small>
+    <button class="send-btn wide" id="g-open" type="button">Open ${k.name} key page</button>
+    <input class="field" id="g-key" type="password" placeholder="Paste your key (starts with ${k.prefix})"><div class="auth-err"></div>
+    <button class="send-btn wide" id="g-go" type="button">Connect</button><small class="auth-note">Your key is stored only in this browser.</small></div>`;
+    const g = s => card.querySelector(s), err = g(".auth-err");
+    g(".close-modal-btn").onclick = close; g("#g-open").onclick = () => window.open(k.url, "_blank", "noopener");
+    const go = async () => {
+        const key = g("#g-key").value.trim(); err.textContent = "";
+        if (!key.startsWith(k.prefix)) return (err.textContent = `${k.name} keys start with ${k.prefix}.`);
+        err.textContent = "Checking…";
+        try {
+            const r = await fetch(k.check, { headers: { Authorization: "Bearer " + key } });
+            if (!r.ok) throw new Error(r.status === 401 || r.status === 400 || r.status === 403 ? `${k.name} rejected that key.` : `${k.name} returned HTTP ${r.status}`);
+            const s = rawCfg(); s.keys = { ...s.keys, [id]: key }; s.provider = id; saveCfg(s); k.cache();
+            close(); drawAcct(); fillModels(); showAiBubbleOnScreen(`✅ Connected to ${k.name} — now using ${k.name}.`);
+        } catch (e) { err.textContent = e.message === "Failed to fetch" ? `Couldn't reach ${k.name}. Check your internet or ad blocker.` : e.message; }
+    };
+    g("#g-go").onclick = go; g("#g-key").onkeydown = e => { if (e.key === "Enter") go(); };
+}
+const groqModal = () => keyModal("groq");
+window.toggleTheme = () => { document.body.classList.toggle("light-mode"); localStorage.setItem("lt_theme", document.body.classList.contains("light-mode") ? "light" : "dark"); };
+
+/* ---------- Providers, model rotation, settings ---------- */
+const PRESETS = {
+    openrouter: { name: "OpenRouter (free models, auto-rotate)", endpoint: AI_API_ENDPOINT, model: "", note: "Free models share small quotas, so 429s are common. Lightning now rotates through the live list of free models automatically." },
+    groq: { name: "Groq (fast, free key)", endpoint: "https://api.groq.com/openai/v1/chat/completions", model: "llama-3.3-70b-versatile", fallback: ["llama-3.1-8b-instant"], vision: "meta-llama/llama-4-scout-17b-16e-instruct", note: "Get a free key at console.groq.com/keys. Much faster, with far higher free limits than OpenRouter's free models." },
+    google: { name: "Google Gemini (free key)", endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", model: "gemini-2.5-flash", fallback: ["gemini-2.5-flash-lite", "gemini-3.5-flash"], vision: "gemini-2.5-flash", note: "Free key at aistudio.google.com/apikey. Great as a backup: when OpenRouter or Groq is rate-limited, lightning switches to Gemini automatically." },
+    custom: { name: "Custom (OpenAI-compatible)", endpoint: "", model: "", note: "Any OpenAI-compatible chat completions URL, e.g. https://api.cerebras.ai/v1/chat/completions. A model name is required." }
+};
+const provAvail = p => (rawCfg().keys || {})[p] || (SERVER.on && SERVER[p]);
+const rawCfg = () => { try { return JSON.parse(localStorage.getItem("lt_cfg") || "{}"); } catch (e) { return {}; } };
+function getCfg(force) {
+    const s = rawCfg(), keys = s.keys || {};
+    let id = PRESETS[force] ? force : PRESETS[s.provider] ? s.provider : "openrouter";
+    const has = k => keys[k] || (SERVER.on && SERVER[k] && k !== "custom");
+    if (!has(id) && !force) { const alt = ["openrouter", "groq", "google", "custom"].find(k => has(k)); if (alt) id = alt; }
+    const p = PRESETS[id];
+    return { id, p, name: p.name.split(" (")[0], endpoint: id === "custom" ? (s.endpoint || "") : p.endpoint, key: (s.keys && s.keys[id]) || "", model: (s.models && s.models[id]) || p.model };
+}
+const cool = {}, lastGood = {}, sleep = ms => new Promise(r => setTimeout(r, ms)), short = m => m.split("/").pop().replace(":free", "");
+let freeList = null;
+async function freeModels() {
+    if (freeList) return freeList;
+    try {
+        const j = await (await fetch("https://openrouter.ai/api/v1/models")).json();
+        const score = id => { const k = ["llama-3.3-70b", "gpt-oss", "gemini", "deepseek", "qwen", "mistral", "llama"].findIndex(w => id.includes(w)); return k < 0 ? 99 : k; };
+        freeList = j.data.filter(m => /:free$/.test(m.id) && /->text$/.test((m.architecture && m.architecture.modality) || "text->text"))
+            .map(m => ({ id: m.id, vision: /image/.test((m.architecture && m.architecture.modality) || "") })).sort((a, b) => score(a.id) - score(b.id));
+    } catch (e) { freeList = ["meta-llama/llama-3.3-70b-instruct:free", "google/gemini-2.0-flash-exp:free", "deepseek/deepseek-chat-v3-0324:free", "mistralai/mistral-small-3.1-24b-instruct:free"].map(id => ({ id, vision: false })); }
+    return freeList;
+}
+let googleCache = null;
+async function googleModels(key) {
+    const def = [PRESETS.google.model, ...PRESETS.google.fallback];
+    if (!key && !(SERVER.on && SERVER.google)) return def;
+    if (googleCache && googleCache.key === key) return googleCache.list;
+    try {
+        const r = key ? await fetch("https://generativelanguage.googleapis.com/v1beta/openai/models", { headers: { Authorization: "Bearer " + key } }) : await fetch("/api/chat?models=google", { headers: { "x-provider": "google" } }), j = await r.json();
+        const pref = ["2.5-flash", "3.5-flash", "flash-lite", "3-flash", "2.5-pro"], score = id => { const k = pref.findIndex(w => id.includes(w)); return k < 0 ? 99 : k; };
+        const list = (j.data || []).map(m => String(m.id).replace(/^models\//, "")).filter(id => /^gemini/.test(id) && !/embed|image|tts|live|audio|vision|robotics|learnlm|exp|thinking|preview/i.test(id)).sort((a, b) => score(a) - score(b) || a.localeCompare(b));
+        googleCache = { key, list: list.length ? list : def };
+    } catch (e) { googleCache = { key, list: def }; }
+    return googleCache.list;
+}
+let groqCache = null;
+async function groqModels(key) {
+    const def = [PRESETS.groq.model, ...PRESETS.groq.fallback];
+    if (!key && !(SERVER.on && SERVER.groq)) return def;
+    if (groqCache && groqCache.key === key) return groqCache.list;
+    try {
+        const r = key ? await fetch("https://api.groq.com/openai/v1/models", { headers: { Authorization: "Bearer " + key } }) : await fetch("/api/chat?models=groq", { headers: { "x-provider": "groq" } }), j = await r.json();
+        const pref = ["llama-3.3-70b", "gpt-oss-120b", "llama-3.1-8b", "gpt-oss-20b", "qwen3", "llama-4", "kimi"], score = id => { const k = pref.findIndex(w => id.includes(w)); return k < 0 ? 99 : k; };
+        const list = (j.data || []).map(m => m.id).filter(id => !/whisper|tts|guard|playai|orpheus|safeguard|allam|compound|embed/i.test(id)).sort((a, b) => score(a) - score(b) || a.localeCompare(b));
+        groqCache = { key, list: list.length ? list : def };
+    } catch (e) { groqCache = { key, list: def }; }
+    return groqCache.list;
+}
+async function candidates(cfg, text, images) {
+    if (cfg.id === "google") return [...new Set([cfg.model, ...cfg.p.fallback, ...(await googleModels(cfg.key)).slice(0, 2)])].filter(Boolean);
+    if (cfg.id === "groq") { if (images.length) return [cfg.p.vision]; const live = await groqModels(cfg.key), pick = currentSelectedMode === "coder" && !(rawCfg().models || {}).groq ? live.filter(m => /qwen3|gpt-oss-120b/.test(m)).slice(0, 1) : []; return [...new Set([...pick, cfg.model, ...cfg.p.fallback, ...live.slice(0, 3)])].filter(Boolean); }
+    if (cfg.id === "custom") { if (!cfg.endpoint || !cfg.model) throw new Error("Set the endpoint and model in ⚙️ Model settings."); return [cfg.model]; }
+    const free = (await freeModels()).filter(m => !images.length || m.vision).map(m => m.id);
+    return [...new Set([cfg.model, pickModel(text, images), lastGood.openrouter, GROQ_MODEL, ...free].filter(Boolean))].slice(0, 6);
+}
+window.openSettings = function () {
+    const c = getCfg(), ov = el("div", "modal-overlay open"), card = el("div", "modal-card"); ov.append(card); document.body.append(ov);
+    const close = () => ov.remove(); ov.onclick = e => { if (e.target === ov) close(); };
+    card.innerHTML = `<div class="modal-header"><h3>Model settings</h3><button class="close-modal-btn">✕</button></div>
+    <div class="modal-body"><select class="field" id="s-prov">${Object.entries(PRESETS).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join("")}</select>
+    <input class="field" id="s-endpoint" placeholder="Endpoint URL (…/chat/completions)"><input class="field" id="s-key" type="password" placeholder="API key"><input class="field" id="s-model" placeholder="Model (blank = automatic)">
+    <button class="send-btn wide" id="s-or" type="button">🔑 Sign in with OpenRouter</button><small class="auth-note" id="s-note"></small><button class="send-btn wide" id="s-save">Save</button></div>`;
+    const g = s => card.querySelector(s), prov = g("#s-prov");
+    const fill = id => { const s = rawCfg(), p = PRESETS[id]; g("#s-endpoint").hidden = id !== "custom"; g("#s-endpoint").value = s.endpoint || ""; g("#s-key").hidden = false; g("#s-key").value = (s.keys && s.keys[id]) || ""; g("#s-key").placeholder = "API key"; g("#s-model").value = (s.models && s.models[id]) || ""; g("#s-model").placeholder = p.model ? `Model (default: ${p.model})` : "Model (blank = automatic)"; g("#s-note").textContent = p.note; g("#s-or").hidden = id !== "openrouter"; };
+    prov.value = c.id; fill(c.id); prov.onchange = () => fill(prov.value); g("#s-or").onclick = () => { close(); connectOpenRouter(); };
+    g(".close-modal-btn").onclick = close;
+    g("#s-save").onclick = () => {
+        const s = rawCfg(), id = prov.value; s.provider = id; s.keys = { ...s.keys, [id]: g("#s-key").value.trim() }; s.models = { ...s.models, [id]: g("#s-model").value.trim() };
+        if (id === "custom") s.endpoint = g("#s-endpoint").value.trim();
+        try { localStorage.setItem("lt_cfg", JSON.stringify(s)); } catch (e) {}
+        Object.keys(cool).forEach(k => delete cool[k]); drawOr(); fillModels(); close(); showAiBubbleOnScreen("✅ Now using " + PRESETS[id].name.split(" (")[0] + ".");
+    };
+};
 
 /* ---------- Artifact helpers + "Sign in with OpenRouter" ---------- */
 function cleanArt(code) { return code.trim().replace(/^```\w*\s*\n/, "").replace(/\n?```\s*$/, "").trim(); }
