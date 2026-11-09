@@ -511,7 +511,6 @@ body.img-mode .img-opts { display: flex; }
                 <button class="sidebar-btn font-bold" onclick="startNewChat()">＋ New chat</button>
                 <button class="sidebar-btn" onclick="openChatsPage()">💬 Chats &amp; tasks</button>
                 <button class="sidebar-btn" onclick="openProjectsPage()">📁 Projects</button>
-                <button class="sidebar-btn friends-sidebar-btn" onclick="openFriendsPage()"><svg class="friends-pixel-icon" viewBox="0 0 16 16" aria-hidden="true" shape-rendering="crispEdges"><path fill="currentColor" d="M5 1h4v1h2v2h1v3h-1v1h-2v1h3v1h2v2h1v2H1v-2h1v-2h2V9h3V8H5V7H4V4h1V1zm7 2h2v1h1v3h-1v1h-2V7h1V5h-1V3z"/></svg><span>Friends &amp; sharing</span></button>
                 <button class="sidebar-btn" onclick="openArtifactsPage()">🧩 Artifacts</button>
                 <button class="sidebar-btn" onclick="openOnlinePage()">🌐 Online artifacts</button>
                 <button class="sidebar-btn" onclick="openImagesPage()">🖼️ Images</button>
@@ -1707,6 +1706,7 @@ function route(boot) {
     if (!ROUTING) return; routing = true;
     try {
         const p = (boot ? START : location.pathname).replace(/\/+$/, "") || "/", m = p.match(/^\/chats\/([^/]+)$/);
+        if (boot && new URLSearchParams(location.search).get("open") === "friends") { openFriendsPage(); return; }
         if (m) { if (chats.some(c => c.id === m[1])) openChat(m[1]); else { newChat(); history.replaceState(null, "", "/"); showAiBubbleOnScreen("That chat isn't saved in this browser."); } }
         else if (p === "/chats") openChatsPage(); else if (p === "/projects") openProjectsPage(); else if (p === "/artifacts") openArtifactsPage(); else if (p === "/images") openImagesPage(); else if (p === "/online") openOnlinePage();
         else if (p === "/") { if (boot) { routing = false; go(chatPath(), true); } else newChat(); }
