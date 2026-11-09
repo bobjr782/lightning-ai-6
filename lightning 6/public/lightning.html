@@ -1819,6 +1819,25 @@ function drawSharedCard(item,container){
  }));
  container.append(card);
 }
+async function compactImageForShare(source){
+ return new Promise((resolve,reject)=>{
+  const img=new Image();
+  img.onload=()=>{
+   try{
+    const canvas=document.createElement("canvas"),maxSide=900,scale=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight));
+    canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+    const ctx=canvas.getContext("2d");ctx.drawImage(img,0,0,canvas.width,canvas.height);
+    let quality=.78,data=canvas.toDataURL("image/webp",quality);
+    while(data.length>62000&&quality>.28){quality-=.08;data=canvas.toDataURL("image/webp",quality);}
+    if(data.length>62000){canvas.width=Math.max(1,Math.round(canvas.width*.78));canvas.height=Math.max(1,Math.round(canvas.height*.78));ctx.drawImage(img,0,0,canvas.width,canvas.height);data=canvas.toDataURL("image/webp",.3);}
+    if(data.length>62000)return reject(new Error("This image is too detailed to share through Lightning's current storage limit."));
+    resolve(data);
+   }catch(e){reject(e);}
+  };
+  img.onerror=()=>reject(new Error("Could not load this image for sharing."));
+  img.src=source;
+ });
+}
 async function drawSharedInbox(container){
  container.innerHTML="";
  try{
@@ -1871,7 +1890,7 @@ function drawImages() {
           if(!lightningAccount)return openLightningAuth();
           const username=prompt("Share this image with which Lightning friend username?");if(!username)return;
           try{const data=await src();if(!data)throw new Error("Image data is unavailable on this device.");
-            const r=await socialRequest("/api/share",{username,artifact:{kind:"image",title:i.prompt||"Shared image",image:data}});
+            const compact=await compactImageForShare(data);const r=await socialRequest("/api/share",{username,artifact:{kind:"image",title:i.prompt||"Shared image",image:compact}});
             showAiBubbleOnScreen("Image shared with "+username+".");
           }catch(e){alert(e.message);}
         }), btn("Delete", () => { images = images.filter(x => x !== i); wr("images", images); drawImages(); }));
