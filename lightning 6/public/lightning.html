@@ -485,6 +485,7 @@ body { top: 0 !important; }
 .img-opts { display: none; gap: 8px; align-items: center; flex-wrap: wrap; max-width: 820px; width: 100%; margin: 0 auto 8px; box-sizing: border-box; }
 body.img-mode .img-opts { display: flex; }
 .img-enh { display: flex; gap: 6px; align-items: center; font-size: .85rem; color: var(--text-secondary); }
+.img-model-note { width: 100%; color: var(--text-secondary); font-size: .78rem; letter-spacing: .02em; padding-left: 2px; }
 .gen-note { display: block; margin-top: 6px; color: var(--text-secondary); font-size: .82rem; }
 .online-grid { display: grid; grid-template-columns: repeat(auto-fill, 300px); gap: 18px; justify-content: center; }
 .aiBox a { color: var(--accent); word-break: break-all; }
@@ -1374,7 +1375,8 @@ const IMG_STYLES = { none: "", photo: ", photorealistic, natural lighting, 35mm 
 const IMG_LABELS = { none: "No style", photo: "Photo", anime: "Anime", pixel: "Pixel art", render3d: "3D render", watercolor: "Watercolor", cinematic: "Cinematic", vector: "Vector" };
 const IMG_SIZES = { square: [1024, 1024], portrait: [768, 1024], landscape: [1024, 768], wide: [1024, 576] };
 const imgBar = el("div", "img-opts");
-imgBar.innerHTML = `<select id="img-style" class="select" translate="no">${Object.keys(IMG_STYLES).map(k => `<option value="${k}">${IMG_LABELS[k]}</option>`).join("")}</select><select id="img-size" class="select"><option value="square">Square</option><option value="portrait">Portrait</option><option value="landscape">Landscape</option><option value="wide">Wide 16:9</option></select><label class="img-enh"><input type="checkbox" id="img-enh"> Improve my prompt with AI</label>`;
+imgBar.innerHTML = `<select id="img-style" class="select" translate="no">${Object.keys(IMG_STYLES).map(k => `<option value="${k}">${IMG_LABELS[k]}</option>`).join("")}</select><select id="img-size" class="select"><option value="square">Square</option><option value="portrait">Portrait</option><option value="landscape">Landscape</option><option value="wide">Wide 16:9</option></select><label class="img-enh"><input type="checkbox" id="img-enh"> Improve my prompt with AI (no key)</label>`;
+imgBar.insertAdjacentHTML("beforeend", "<span class=\"img-model-note\">FLUX.2 · Cloudflare AI · no API key</span>");
 $(".input-deck-wrapper").prepend(imgBar);
 
 const idbOpen = () => new Promise((res, rej) => { const r = indexedDB.open("lightning", 1); r.onupgradeneeded = () => r.result.createObjectStore("imgs"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
@@ -1405,14 +1407,6 @@ async function enhancePrompt(p) {
         return t ? t.trim().replace(/^["']|["']$/g, "") : null;
     } catch (e) { return null; }
 }
-async function directImage(prompt, w, h, seed, box, secs) {
-    const p = encodeURIComponent(prompt), q = `seed=${seed}&width=${w}&height=${h}&nologo=true`;
-    const urls = [`https://image.pollinations.ai/prompt/${p}?${q}&model=flux`, `https://image.pollinations.ai/prompt/${p}?${q}`];
-    for (let i = 0; i < urls.length; i++) {
-        const im = await new Promise(res => { const x = new Image(), to = setTimeout(() => { x.onload = x.onerror = null; res(null); }, 45000); x.onload = () => { clearTimeout(to); res(x); }; x.onerror = () => { clearTimeout(to); res(null); }; x.src = urls[i]; });
-        if (im) return { img: im, url: urls[i] };
-        live(box, "", `Image server ${i + 1} failed, trying another… ${secs()}s`);
-    }
     return null;
 }
 window.handleImageGeneration = async function (prompt, box) {
@@ -1424,17 +1418,34 @@ window.handleImageGeneration = async function (prompt, box) {
     const tick = setInterval(() => live(box, "", `${label} ${secs()}s`), 1000);
     try {
         let used = prompt;
-        if (o.enhance) { label = "Improving your prompt…"; used = (await enhancePrompt(prompt)) || prompt; label = "Generating image…"; }
-        const full = used + (IMG_STYLES[o.style] || "");
+        const full = prompt + (IMG_STYLES[o.style] || "");
         let img = null, src = "";
-        if (SERVER.on) {
-            try {
-                const r = await fetch("/api/image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: full, width: w, height: h, seed }) }), j = await r.json();
-                if (!r.ok || !j.image) throw new Error((j.error && j.error.message) || "HTTP " + r.status);
-                src = j.image; img = new Image(); await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = src; });
-            } catch (e) { console.warn("server image failed:", e); img = null; src = ""; }
+        try {
+            label = o.enhance ? "Improving your prompt and generating…" : "Generating with FLUX.2…";
+            live(box, "", label + " " + secs() + "s");
+            const r = await fetch("/api/image", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt: full, width: w, height: h, seed, enhance: o.enhance })
+            });
+            const j = await r.json();
+            if (!r.ok || !j.image) throw new Error(j.error || "Image service returned HTTP " + r.status);
+            used = j.promptUsed || prompt;
+            src = j.image;
+            img = new Image();
+            await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = src; });
+        } catch (e) {
+            console.warn("Cloudflare image generation failed:", e);
+            img = null; src = "";
+            if (/not enabled|binding named AI/i.test(String(e.message || e))) {
+                return finalizeAiBubble(box, "⚠️ The image model is not connected yet. In Cloudflare, enable Workers AI and add the AI binding. Then redeploy.");
+            }
+            if (/free image-generation allowance|daily reset/i.test(String(e.message || e))) {
+                return finalizeAiBubble(box, "⚠️ " + e.message);
+            }
+            live(box, "", "Cloudflare image model unavailable. Trying backup image service… " + secs() + "s");
         }
-        if (!img) { const d = await directImage(full, w, h, seed, box, secs); if (d) { img = d.img; src = d.url; } }
+        if (!img) return finalizeAiBubble(box, "⚠️ Cloudflare Workers AI image generation failed. Please try again later.");
         if (!img) return finalizeAiBubble(box, "⚠️ Image generation failed. The image services may be busy or blocked by your network or an ad blocker. Try again in a minute.");
         const id = src.startsWith("data:") ? nid() : "";
         if (id) await idbPut(id, src);
