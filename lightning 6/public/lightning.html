@@ -1603,13 +1603,12 @@ async function askAI(apiText, images, names, force, reuse, tried) {
             : apiText;
         const cfg = getCfg(force), messages = [{ role: "system", content: SYSTEM() }, ...hist, { role: "user", content: withHint(content, apiText) }];
         const trialNoKey = !cfg.key && !(SERVER.on && SERVER[cfg.id] && cfg.id !== "custom") && cfg.id !== "custom";
-        if (!lightningAccount && trialNoKey) { finalizeAiBubble(box, "Sign in or create a Lightning account in the sidebar to start your free trial. No API key required."); busy = false; return; }
         if (cfg.id === "custom" && !cfg.key) { finalizeAiBubble(box, "Add your custom API key in Model settings, or switch to Lightning Free Trial."); busy = false; return; }
         const hdr = { "Content-Type": "application/json", ...(cfg.key ? { "Authorization": `Bearer ${cfg.key}` } : {}) };
         if (cfg.id === "openrouter") hdr["X-Title"] = "lightning";
         if (cfg.id === "openrouter" && /^https?:/.test(location.origin)) hdr["HTTP-Referer"] = location.origin;
         const hasAlt = ["openrouter", "groq", "google"].some(p => p !== cfg.id && !(tried || []).includes(p) && provAvail(p));
-        const cands = trialNoKey ? ["lightning-free-trial"] : (await candidates(cfg, apiText, images)).slice(0, hasAlt ? 2 : 6);
+        const cands = trialNoKey ? ["lightning-free"] : (await candidates(cfg, apiText, images)).slice(0, hasAlt ? 2 : 6);
         const viaServer = trialNoKey || (SERVER.on && cfg.id !== "custom");
         const attempt = (m, s) => fetch(viaServer ? "/api/chat" : cfg.endpoint, { method: "POST", headers: viaServer ? { "Content-Type": "application/json", "x-provider": cfg.id, ...(cfg.key ? { "x-user-key": cfg.key } : {}) } : hdr, body: JSON.stringify({ model: m, temperature: m === CODE_MODEL || currentSelectedMode === "coder" ? 0.2 : 0.7, max_tokens: 1800, messages, ...(s && !trialNoKey ? { stream: true } : {}) }) });
         let res = null, streaming = !trialNoKey, full = "", usedModel = "", status = 0, retryAfter = 5;
@@ -2066,6 +2065,7 @@ window.toggleTheme = () => { document.body.classList.toggle("light-mode"); local
 
 /* ---------- Providers, model rotation, settings ---------- */
 const PRESETS = {
+    lightning: { name: "Lightning Free (automatic, no API key)", endpoint: "/api/chat", model: "lightning-free", note: "Connects automatically through Lightning's Cloudflare AI service. No account, API key or provider sign-in required. Usage is subject to Cloudflare's free allowance." },
     openrouter: { name: "OpenRouter (free models, auto-rotate)", endpoint: AI_API_ENDPOINT, model: "", note: "Free models share small quotas, so 429s are common. Lightning now rotates through the live list of free models automatically." },
     groq: { name: "Groq (fast, free key)", endpoint: "https://api.groq.com/openai/v1/chat/completions", model: "llama-3.3-70b-versatile", fallback: ["llama-3.1-8b-instant"], vision: "meta-llama/llama-4-scout-17b-16e-instruct", note: "Get a free key at console.groq.com/keys. Much faster, with far higher free limits than OpenRouter's free models." },
     google: { name: "Google Gemini (free key)", endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", model: "gemini-2.5-flash", fallback: ["gemini-2.5-flash-lite", "gemini-3.5-flash"], vision: "gemini-2.5-flash", note: "Free key at aistudio.google.com/apikey. Great as a backup: when OpenRouter or Groq is rate-limited, lightning switches to Gemini automatically." },
@@ -2075,9 +2075,9 @@ const provAvail = p => (rawCfg().keys || {})[p] || (SERVER.on && SERVER[p]);
 const rawCfg = () => { try { return JSON.parse(localStorage.getItem("lt_cfg") || "{}"); } catch (e) { return {}; } };
 function getCfg(force) {
     const s = rawCfg(), keys = s.keys || {};
-    let id = PRESETS[force] ? force : PRESETS[s.provider] ? s.provider : "openrouter";
+    let id = PRESETS[force] ? force : PRESETS[s.provider] ? s.provider : "lightning";
     const has = k => keys[k] || (SERVER.on && SERVER[k] && k !== "custom");
-    if (!has(id) && !force) { const alt = ["openrouter", "groq", "google", "custom"].find(k => has(k)); if (alt) id = alt; }
+    if (!has(id) && !force) { const alt = ["openrouter", "groq", "google", "custom"].find(k => has(k)); id = alt || "lightning"; }
     const p = PRESETS[id];
     return { id, p, name: p.name.split(" (")[0], endpoint: id === "custom" ? (s.endpoint || "") : p.endpoint, key: (s.keys && s.keys[id]) || "", model: (s.models && s.models[id]) || p.model };
 }
@@ -2134,7 +2134,7 @@ window.openSettings = function () {
     <input class="field" id="s-endpoint" placeholder="Endpoint URL (…/chat/completions)"><input class="field" id="s-key" type="password" placeholder="API key"><input class="field" id="s-model" placeholder="Model (blank = automatic)">
     <button class="send-btn wide" id="s-or" type="button">🔑 Sign in with OpenRouter</button><small class="auth-note" id="s-note"></small><button class="send-btn wide" id="s-save">Save</button></div>`;
     const g = s => card.querySelector(s), prov = g("#s-prov");
-    const fill = id => { const s = rawCfg(), p = PRESETS[id]; g("#s-endpoint").hidden = id !== "custom"; g("#s-endpoint").value = s.endpoint || ""; g("#s-key").hidden = false; g("#s-key").value = (s.keys && s.keys[id]) || ""; g("#s-key").placeholder = "API key"; g("#s-model").value = (s.models && s.models[id]) || ""; g("#s-model").placeholder = p.model ? `Model (default: ${p.model})` : "Model (blank = automatic)"; g("#s-note").textContent = p.note; g("#s-or").hidden = id !== "openrouter"; };
+    const fill = id => { const s = rawCfg(), p = PRESETS[id]; g("#s-endpoint").hidden = id !== "custom"; g("#s-endpoint").value = s.endpoint || ""; g("#s-key").hidden = id === "lightning"; g("#s-key").value = (s.keys && s.keys[id]) || ""; g("#s-key").placeholder = "API key"; g("#s-model").hidden = id === "lightning"; g("#s-model").value = (s.models && s.models[id]) || ""; g("#s-model").placeholder = p.model ? `Model (default: ${p.model})` : "Model (blank = automatic)"; g("#s-note").textContent = p.note; g("#s-or").hidden = id !== "openrouter"; };
     prov.value = c.id; fill(c.id); prov.onchange = () => fill(prov.value); g("#s-or").onclick = () => { close(); connectOpenRouter(); };
     g(".close-modal-btn").onclick = close;
     g("#s-save").onclick = () => {
@@ -2313,6 +2313,7 @@ safe("icons", () => { pixelate(document.body); pxObs.observe(document.body, { ch
 async function fillModels() {
     const sel = $("#model-pick"), cur = getCfg(), s = rawCfg(); sel.innerHTML = "";
     const grp = (label, opts) => { const g = document.createElement("optgroup"); g.label = label; opts.forEach(([v, t]) => g.append(new Option(t, v))); sel.append(g); };
+    grp("Lightning (free, no key)", [["lightning|lightning-free", "Auto-connect — no API key"]]);
     grp("OpenRouter (free)", [["openrouter|", "Auto — rotate free"], ["openrouter|" + CODE_MODEL, "Qwen3 Coder"], ...(await freeModels()).slice(0, 30).filter(m => m.id !== CODE_MODEL).map(m => ["openrouter|" + m.id, short(m.id)])]);
     grp("Groq (fast)", (await groqModels((s.keys && s.keys.groq) || "")).map(m => ["groq|" + m, m]));
     grp("Google Gemini", (await googleModels((s.keys && s.keys.google) || "")).slice(0, 8).map(m => ["google|" + m, m]));
