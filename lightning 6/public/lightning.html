@@ -1251,12 +1251,11 @@ function drawGallery() {
         const acts = el("div", "gal-actions");
         acts.append(
             btn("Open", open), btn("⛶ Run", () => runFull(a.code, a.title)), btn("Share", async () => {
-                const username = prompt("Share this artefact with which Lightning username?");
+                if (!lightningAccount) { openLightningAuth(); return; }
+                const username = prompt("Share this artifact with which Lightning friend username?");
                 if (!username) return;
                 try {
-                    const response = await fetch("/api/share", { method:"POST", credentials:"same-origin", headers:{"content-type":"application/json"}, body:JSON.stringify({username, artifact:a}) });
-                    const result = await response.json();
-                    if (!response.ok) throw new Error(result.error || "Could not share artefact.");
+                    await socialRequest("/api/share", { username, artifact: { kind:"artifact", title:a.title, code:a.code, t:a.t || Date.now() } });
                     alert("Shared with " + username + ".");
                 } catch (e) { alert(e.message); }
             }), btn("Publish", () => publishArt(a)),
@@ -2204,46 +2203,57 @@ function linkBubble(label, url) {
     const a = el("a", "", url); a.href = url; a.target = "_blank"; a.rel = "noopener"; b.append(a); scrollToLatestMessage();
 }
 async function publishArt(a) {
-    if (!(SERVER.on && SERVER.publish)) return showAiBubbleOnScreen("⚠️ Publishing works on the online (Netlify) version of lightning, not in a local file.");
+    if (!lightningAccount) { openLightningAuth(); return showAiBubbleOnScreen("Sign in to your Lightning account to publish artifacts."); }
     const key = a.id || hash(a.title + (a.orig || a.code)), pubs = rd("published", {});
-    let prev = pubs[key];
-    const send = async p => { const r = await fetch("/api/publish", { method: p ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: a.title, code: a.code, id: p && p.id, token: p && p.token }) }); return [r, await r.json()]; };
+    let prev = pubs[key] || null;
+    const send = async p => {
+        const r = await fetch("/api/artifacts", { method: p ? "PUT" : "POST", credentials:"same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title:a.title, code:a.code, id:p && p.id }) });
+        let j={}; try { j=await r.json(); } catch {}
+        return [r,j];
+    };
     try {
-        let [r, j] = await send(prev);
-        if (prev && r.status === 404) { prev = null; [r, j] = await send(null); }
-        if (!r.ok) throw new Error((j.error && j.error.message) || "HTTP " + r.status);
-        pubs[key] = { id: j.id, token: j.token || prev.token }; wr("published", pubs);
-        const url = location.origin + "/a/" + j.id; try { await navigator.clipboard.writeText(url); } catch (e) {}
-        linkBubble(prev ? "Updated" : "Published", url);
-    } catch (e) { showAiBubbleOnScreen("⚠️ Couldn't publish: " + e.message); }
+        let [r,j] = await send(prev);
+        if (prev && r.status === 404) { prev=null; [r,j] = await send(null); }
+        if (!r.ok) throw new Error(j.error || "HTTP " + r.status);
+        pubs[key] = { id:j.id }; wr("published",pubs);
+        const url = j.url || (location.origin + "/a/" + j.id);
+        try { await navigator.clipboard.writeText(url); } catch {}
+        linkBubble(prev ? "Updated" : "Published",url);
+    } catch(e) { showAiBubbleOnScreen("⚠️ Couldn't publish: " + e.message); }
 }
 const onPg = makePage("Online artifacts");
 async function drawOnline() {
-    const b = onPg.body; b.innerHTML = "";
-    if (!(SERVER.on && SERVER.publish)) return b.append(el("p", "art-empty", "Online artifacts are available on the deployed (Netlify) version of lightning."));
-    b.append(el("p", "art-empty", "Loading…"));
-    let list = [];
-    try { list = (await (await fetch("/api/artifacts", { cache: "no-store" })).json()).items || []; } catch (e) { b.innerHTML = ""; return b.append(el("p", "art-empty", "Couldn't load online artifacts.")); }
-    b.innerHTML = ""; if (!list.length) return b.append(el("p", "art-empty", "Nothing published yet. Open an artifact and press “Publish artifact”."));
-    const pubs = rd("published", {}), mine = id => Object.entries(pubs).find(([, v]) => v.id === id), g = el("div", "online-grid");
-    list.forEach(i => {
-        const c = el("div", "gal-card"), th = el("div", "gal-thumb"), f = el("iframe"), m = el("div", "gal-meta"), acts = el("div", "gal-actions"), url = location.origin + "/a/" + i.id;
-        f.sandbox = ""; f.loading = "lazy"; f.tabIndex = -1; f.src = "/a/" + i.id; th.append(f); th.onclick = () => window.open(url, "_blank");
-        m.append(el("b", "", i.title), el("small", "", new Date(i.t).toLocaleString() + (mine(i.id) ? " · yours" : "")));
-        acts.append(btn("Open", () => window.open(url, "_blank")),
-            btn("Copy link", bt => { navigator.clipboard.writeText(url); bt.textContent = "Copied"; setTimeout(() => bt.textContent = "Copy link", 1200); }),
-            btn("Save", async bt => { try { const j = await (await fetch("/api/artifacts?id=" + i.id)).json(); saveArt(j.title, j.code); bt.textContent = "Saved"; } catch (e) { bt.textContent = "Failed"; } }));
-        const own = mine(i.id);
-        if (own) acts.append(btn("Delete", async () => {
-            if (!confirm(`Delete "${i.title}" from the web?`)) return;
-            const r = await fetch(`/api/artifacts?id=${i.id}&token=${own[1].token}`, { method: "DELETE" });
-            if (r.ok) { delete pubs[own[0]]; wr("published", pubs); drawOnline(); }
+    const b=onPg.body; b.innerHTML="";
+    b.append(el("p","art-empty","Public creations shared by Lightning users. Sign in to publish your own."));
+    const loading=el("p","art-empty","Loading online artifacts…"); b.append(loading);
+    let list=[];
+    try {
+        const response=await fetch("/api/artifacts",{cache:"no-store",credentials:"same-origin"});
+        const data=await response.json();
+        if(!response.ok)throw new Error(data.error||"Could not load online artifacts.");
+        list=data.items||[];
+    } catch(e) { loading.textContent=e.message; return; }
+    b.innerHTML="";
+    const intro=el("p","art-empty","Public creations shared by Lightning users. Sign in to publish your own."); b.append(intro);
+    if(!list.length)return b.append(el("p","art-empty","Nothing published yet. Open an artifact and press “Publish artifact”."));
+    const pubs=rd("published",{}),mine=id=>Object.entries(pubs).find(([,v])=>v.id===id),g=el("div","online-grid");
+    list.forEach(i=>{
+        const c=el("div","gal-card"),th=el("div","gal-thumb"),f=el("iframe"),m=el("div","gal-meta"),acts=el("div","gal-actions"),url=location.origin+"/a/"+i.id;
+        f.sandbox="allow-scripts allow-forms allow-modals";f.loading="lazy";f.tabIndex=-1;f.title=i.title;f.src="/a/"+encodeURIComponent(i.id);th.append(f);th.onclick=()=>window.open(url,"_blank","noopener");
+        m.append(el("b","",i.title),el("small","",new Date(i.t*1000).toLocaleString()+(i.owner||mine(i.id)?" · yours":"")));
+        acts.append(btn("Open",()=>window.open(url,"_blank","noopener")),
+            btn("Copy link",bt=>{navigator.clipboard.writeText(url);bt.textContent="Copied";setTimeout(()=>bt.textContent="Copy link",1200);}),
+            btn("Save",async bt=>{try{const response=await fetch("/api/artifacts?id="+encodeURIComponent(i.id),{cache:"no-store"});const j=await response.json();if(!response.ok)throw new Error(j.error||"Could not save artifact.");saveArt(j.title,j.code);bt.textContent="Saved";}catch(e){bt.textContent="Failed";alert(e.message);}}));
+        if(i.owner||mine(i.id))acts.append(btn("Delete",async()=>{
+            if(!confirm(`Delete "${i.title}" from Online artifacts?`))return;
+            try{const response=await fetch("/api/artifacts?id="+encodeURIComponent(i.id),{method:"DELETE",credentials:"same-origin"});const j=await response.json();if(!response.ok)throw new Error(j.error||"Could not delete artifact.");const own=mine(i.id);if(own)delete pubs[own[0]];wr("published",pubs);drawOnline();}
+            catch(e){alert(e.message);}
         }));
-        c.append(th, m, acts); g.append(c);
+        c.append(th,m,acts);g.append(c);
     });
     b.append(g);
 }
-window.openOnlinePage = () => openPage(onPg, drawOnline, "/online");
+window.openOnlinePage = () => openPage(onPg,drawOnline,"/online");
 
 /* ---------- Re-render any saved chat with the new renderer ---------- */
 function startupError(label, e) {
