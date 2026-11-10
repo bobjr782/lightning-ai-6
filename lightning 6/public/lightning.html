@@ -512,6 +512,64 @@ body.img-mode .img-opts { display: flex; }
 #lightning-cookie-prank .cookie-secret-close { position:absolute; right:0; top:0; width:34px; height:34px; opacity:0; cursor:default; }
 @keyframes cookiePopIn { from { opacity:.3; transform:scale(.94); } to { opacity:1; transform:scale(1); } }
 
+
+/* Sidebar spacing and readable chat history */
+.sidebar-content {
+    gap: 9px !important;
+    padding: 10px 12px 14px !important;
+}
+.sidebar-content > .sidebar-btn {
+    flex: 0 0 auto !important;
+    min-height: 46px;
+    box-sizing: border-box;
+    padding: 12px 15px !important;
+    font-size: 1rem !important;
+    line-height: 1.3;
+}
+.sidebar-content > .sidebar-btn.font-bold {
+    min-height: 50px;
+    margin-bottom: 2px;
+}
+.sidebar-chat-heading {
+    flex: 0 0 auto;
+    margin-top: 8px;
+    padding: 12px 10px 5px !important;
+    border-top: 1px solid var(--border-color);
+    font-size: .78rem !important;
+    letter-spacing: .07em;
+}
+.sidebar-chat-list {
+    display: flex !important;
+    flex: 0 0 auto !important;
+    flex-direction: column !important;
+    align-items: stretch;
+    gap: 6px !important;
+    min-height: 0;
+    max-height: 38vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 3px 2px 8px;
+}
+.sidebar-chat-item {
+    display: flex !important;
+    flex: 0 0 auto !important;
+    align-items: center;
+    width: 100%;
+    min-height: 42px;
+    box-sizing: border-box;
+    padding: 10px 12px !important;
+    line-height: 1.35;
+    font-size: .92rem !important;
+    border-radius: 9px !important;
+}
+.sidebar-chat-item.active {
+    border-color: var(--accent) !important;
+}
+@media (max-width: 600px) {
+    .sidebar-chat-list { max-height: 32vh; }
+    .sidebar-content > .sidebar-btn { min-height: 48px; }
+}
+
 </style>
 </head>
 <body> 
