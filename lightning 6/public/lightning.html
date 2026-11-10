@@ -2019,10 +2019,11 @@ function makeProfileAvatar(profile,size=38){
 }
 function compactProfileImage(source){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{try{const c=document.createElement("canvas");c.width=256;c.height=256;const ctx=c.getContext("2d"),side=Math.min(img.naturalWidth,img.naturalHeight),sx=(img.naturalWidth-side)/2,sy=(img.naturalHeight-side)/2;ctx.drawImage(img,sx,sy,side,side,0,0,256,256);let q=.78,data=c.toDataURL("image/webp",q);while(data.length>95000&&q>.3){q-=.08;data=c.toDataURL("image/webp",q);}if(data.length>100000)throw new Error("That picture is too large. Try a smaller image.");resolve(data);}catch(e){reject(e);}};img.onerror=()=>reject(new Error("Could not read that image."));img.src=source;});}
 function openProfileEditor(){
-    if(!lightningAccount)return openLightningAuth();
     const ov=el("div","modal-overlay open"),card=el("div","modal-card"),body=el("div","modal-body"),head=el("div","modal-header");
     head.append(el("h3","","Account settings"),btn("✕",()=>ov.remove()));
-    body.append(trialCard(),el("h3","","AI providers"),provRow("openrouter","OpenRouter"),provRow("groq","Groq"),provRow("google","Google"),el("h3","","Profile picture"));
+    body.append(trialCard(),el("h3","","AI providers"),provRow("openrouter","OpenRouter"),provRow("groq","Groq"),provRow("google","Google"));
+    if(!lightningAccount){body.append(el("p","auth-note","Sign in to Lightning to edit your profile picture and friend key."));card.append(head,body);ov.append(card);ov.onclick=e=>{if(e.target===ov)ov.remove();};document.body.append(ov);return;}
+    body.append(el("h3","","Profile picture"));
     let chosen=lightningAccount.avatar||null;
     const preview=el("div","profile-tools"),keyInfo=el("div","grow");
     keyInfo.append(el("b","","@"+lightningAccount.username),el("small","profile-key","Friend key: "+lightningAccount.friendCode));
@@ -2338,7 +2339,7 @@ safe("theme", () => { if (localStorage.getItem("lt_theme") !== "dark") document.
 safe("account", () => { drawAcct(); drawOr(); refreshLightningAccount(); });
 safe("chats", () => {
     const lastChat = rd("cur", null);
-    try { if (lastChat && chats.some(c => c.id === lastChat)) openChat(lastChat); else { showWelcome(); updateTop(); } }
+    try { if (lastChat && chats.some(c => c.id === lastChat)) openChat(lastChat); else { showWelcome(); updateTop(); renderSidebarChats(); } }
     catch (e) { startupError("saved chat", e); chat = []; curId = null; showWelcome(); }
 });
 safe("server", () => {
