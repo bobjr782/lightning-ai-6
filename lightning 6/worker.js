@@ -12,7 +12,7 @@ function unb64(s) { s=s.replace(/-/g,"+").replace(/_/g,"/"); while(s.length%4)s+
 async function sha(value) { return b64(new Uint8Array(await crypto.subtle.digest("SHA-256", typeof value==="string"?encoder.encode(value):value))); }
 async function passwordHash(password, salt) {
   const key = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name:"PBKDF2", salt:unb64(salt), iterations:310000, hash:"SHA-256" }, key, 256);
+  const bits = await crypto.subtle.deriveBits({ name:"PBKDF2", salt:unb64(salt), iterations:100000, hash:"SHA-256" }, key, 256);
   return b64(new Uint8Array(bits));
 }
 function cookieValue(request, name) {
