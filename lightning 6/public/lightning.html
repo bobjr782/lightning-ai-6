@@ -2389,7 +2389,6 @@ finishOpenRouter().catch(e => startupError("openrouter", e));
   const host = document.getElementById('lightning-cookie-prank');
   if (!host || sessionStorage.getItem('lt_cookie_prank_seen')) return;
   let count = 0, closed = false;
-  const MAX = 120;
   const MAX = 150;
   const closePrank = () => {
     closed = true;
