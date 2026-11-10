@@ -2298,7 +2298,7 @@ function trialCard() {
         }
         wrap.append(btn("Sign out",async()=>{await fetch("/api/logout",{method:"POST",credentials:"same-origin"});lightningAccount=null;lightningEntitlement=null;drawAcct();showAiBubbleOnScreen("Signed out of Lightning.");}));
     }else{
-        wrap.append(el("div","trial-account-head",el("b","","Not signed in")));
+        const head=el("div","trial-account-head");head.append(el("b","","Not signed in"));wrap.append(head);
         wrap.append(el("small","auth-note","Sign in to save your profile and share artifacts with friends."));
         wrap.append(btn("Sign in / Create account",()=>openLightningAuth()));
     }
