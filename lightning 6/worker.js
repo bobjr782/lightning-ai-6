@@ -330,23 +330,8 @@ async function chatRoute(request,env) {
       cloudflareError="Cloudflare returned an empty answer.";
     } catch(error) { cloudflareError=String(error?.message||error||"Cloudflare AI unavailable."); }
   } else cloudflareError="Cloudflare Workers AI is not enabled.";
-  // Anonymous emergency fallback. This legacy public endpoint is shared and may throttle;
-  // it is deliberately used only when the primary Cloudflare model is unavailable.
-  try {
-    const response=await fetch("https://text.pollinations.ai/openai",{
-      method:"POST",
-      headers:{"content-type":"application/json","accept":"application/json"},
-      body:JSON.stringify({model:"openai",messages:cleanMessages,max_tokens,temperature,stream:false})
-    });
-    const raw=await response.text();
-    let data={};try{data=JSON.parse(raw);}catch{}
-    const content=data?.choices?.[0]?.message?.content||data?.choices?.[0]?.text||"";
-    if(response.ok&&content)return json({choices:[{message:{role:"assistant",content}}],model:"Lightning Free · backup"});
-    const why=data?.error?.message||data?.error||raw.slice(0,180)||("HTTP "+response.status);
-    return json({error:{message:"Both free AI routes are busy right now. Try again shortly. ("+String(why).slice(0,140)+")"}},response.status===429?429:503);
-  } catch(error) {
-    return json({error:{message:"Lightning's free AI services are temporarily unreachable. Please try again shortly."}},503);
-  }
+  // No external text fallback: Lightning chat uses Cloudflare AI only.
+  return json({error:{message:"Lightning chat is temporarily unavailable because its Cloudflare AI model could not respond. Please try again shortly."}},503);
 }
 
 async function route(request, env) {
