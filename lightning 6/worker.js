@@ -378,6 +378,18 @@ async function route(request, env) {
   const url=new URL(request.url), path=url.pathname;
   if(path.startsWith("/api/") && !sameOrigin(request)) return json({error:"Origin not allowed."},403);
   if(path==="/api/health" && request.method==="GET") return json({ok:true,service:"Lightning accounts"});
+  if(path==="/api/health/db" && request.method==="GET") {
+    if(!env.DB) return json({ok:false,stage:"binding",error:"D1 binding DB is missing."},503);
+    try {
+      await env.DB.prepare("SELECT 1 AS ok").first();
+      await ensureAccountTables(env);
+      const tables=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('users','sessions','auth_attempts','user_data','shares') ORDER BY name").all();
+      return json({ok:true,stage:"ready",tables:(tables.results||[]).map(row=>row.name)});
+    } catch(error) {
+      console.error("Lightning D1 diagnostic failed:",error?.stack||error);
+      return json({ok:false,stage:"database",error:String(error?.message||error||"Unknown D1 error")},500);
+    }
+  }
   if(path==="/api/config" && request.method==="GET") return json({server:null});
   if(path==="/api/image" && request.method==="POST") return imageRoute(request, env);
   if(path==="/api/chat" && request.method==="POST") return chatRoute(request,env);
