@@ -1,33 +1,28 @@
-lightning — license and third-party notices
-===========================================
+LIGHTNING 6.0 — COPYRIGHT AND THIRD-PARTY NOTICES
+=====================================================
 
-MIT License
+Copyright (c) 2026 Ray. All rights reserved.
 
-Copyright (c) 2026 Ray
+PROPRIETARY PROJECT NOTICE
+--------------------------
+The original Lightning 6.0 source code, interface, original artwork, branding,
+design, and project materials are proprietary.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+You may not copy, reproduce, redistribute, republish, sell, sublicense, or
+create derivative versions of the original Lightning project or its original
+materials without prior written permission from the copyright holder.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+Viewing or using the hosted website does not grant permission to copy or
+redistribute the original project source, design, branding, or artwork.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+This notice does not override the separate licences that apply to third-party
+software, fonts, libraries, APIs, models, or services. Those components remain
+under their respective owners' terms and licences, listed below.
 
-
-Third-party software and services
+THIRD-PARTY SOFTWARE AND SERVICES
 ---------------------------------
-lightning does not bundle the items below. The browser loads them at runtime
-from their own servers, and each keeps its own license and terms.
+Lightning does not bundle the items below. The browser loads them at runtime
+from their own servers, and each keeps its own licence and terms.
 
 - Google Fonts: DM Sans, Source Serif 4, JetBrains Mono — SIL Open Font License 1.1
 - pdf.js (PDF reading) — Apache License 2.0
@@ -38,11 +33,11 @@ from their own servers, and each keeps its own license and terms.
 - Google Translate website widget — Google Terms of Service
 
 AI and image services (OpenRouter, Groq, Google Gemini API, Cloudflare Workers AI,
-Hugging Face, Together AI, Pollinations) are used under their own terms of service. Content created with
-them may be subject to the model and provider licenses.
+Hugging Face, Together AI, Pollinations) are used under their own terms of service.
+Content created with them may be subject to the model and provider licences.
 
-The pixel-art icons were drawn for this project and are covered by the MIT
-License above.
+The pixel-art icons were drawn for this project and are covered by the
+proprietary project notice above.
 
-Replace "Ray" with your full legal name or organization if you want a
-different copyright holder. This file is not legal advice.
+For permission requests, contact the project owner through the project's
+official contact channel.
