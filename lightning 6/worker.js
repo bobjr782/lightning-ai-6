@@ -163,48 +163,82 @@ async function imageRoute(request, env) {
     }
   }
   try {
-    // Primary model: FLUX.1 Schnell. It uses a simple prompt request and is
-    // independent of the multipart FLUX.2 Klein endpoint.
+    // High-quality primary: FLUX.2 [dev]. Unlike Schnell/Klein, this
+    // uses a full 25-step inference pass and respects the requested dimensions.
+    // Cloudflare documents this model as its high-fidelity FLUX.2 option.
     try {
-      const fast = await env.AI.run("@cf/black-forest-labs/flux-1-schnell", {
-        prompt,
-        steps: 8
-      });
-      if (typeof fast?.image === "string" && fast.image) {
-        return json({
-          image: "data:image/jpeg;base64," + fast.image,
-          promptUsed: prompt,
-          model: "FLUX.1 Schnell",
-          width: null,
-          height: null,
-          seed
-        });
-      }
-      throw new Error("FLUX.1 Schnell returned no image.");
-    } catch (fastError) {
-      // Automatic fallback to the existing FLUX.2 Klein model.
       const form = new FormData();
       form.append("prompt", prompt);
       form.append("width", String(width));
       form.append("height", String(height));
       form.append("seed", String(seed));
+      form.append("steps", "25");
       form.append("guidance", "4");
       const encoded = new Response(form);
-      const backup = await env.AI.run("@cf/black-forest-labs/flux-2-klein-4b", {
+      const result = await env.AI.run("@cf/black-forest-labs/flux-2-dev", {
         multipart: { body: encoded.body, contentType: encoded.headers.get("content-type") }
       });
-      if (typeof backup?.image !== "string" || !backup.image) {
-        throw new Error("Both FLUX.1 Schnell and FLUX.2 Klein returned no image.");
+      if (typeof result?.image !== "string" || !result.image) {
+        throw new Error("FLUX.2 Dev returned no image.");
       }
       return json({
-        image: "data:image/png;base64," + backup.image,
+        image: "data:image/png;base64," + result.image,
         promptUsed: prompt,
-        model: "FLUX.2 Klein 4B (automatic backup)",
+        model: "FLUX.2 Dev · 25 steps",
         width,
         height,
         seed
       });
+    } catch (qualityError) {
+      // Lower-cost fallback if FLUX.2 Dev is unavailable.
+      try {
+        const form = new FormData();
+        form.append("prompt", prompt);
+        form.append("width", String(width));
+        form.append("height", String(height));
+        form.append("seed", String(seed));
+        form.append("guidance", "4");
+        const encoded = new Response(form);
+        const backup = await env.AI.run("@cf/black-forest-labs/flux-2-klein-9b", {
+          multipart: { body: encoded.body, contentType: encoded.headers.get("content-type") }
+        });
+        if (typeof backup?.image !== "string" || !backup.image) {
+          throw new Error("FLUX.2 Klein 9B returned no image.");
+        }
+        return json({
+          image: "data:image/png;base64," + backup.image,
+          promptUsed: prompt,
+          model: "FLUX.2 Klein 9B (backup)",
+          width,
+          height,
+          seed
+        });
+      } catch (backupError) {
+        // Last-resort compatibility fallback.
+        const form = new FormData();
+        form.append("prompt", prompt);
+        form.append("width", String(width));
+        form.append("height", String(height));
+        form.append("seed", String(seed));
+        form.append("guidance", "4");
+        const encoded = new Response(form);
+        const last = await env.AI.run("@cf/black-forest-labs/flux-2-klein-4b", {
+          multipart: { body: encoded.body, contentType: encoded.headers.get("content-type") }
+        });
+        if (typeof last?.image !== "string" || !last.image) {
+          throw new Error("All FLUX image models failed.");
+        }
+        return json({
+          image: "data:image/png;base64," + last.image,
+          promptUsed: prompt,
+          model: "FLUX.2 Klein 4B (last-resort backup)",
+          width,
+          height,
+          seed
+        });
+      }
     }
+
   } catch (error) {
     const detail = String(error?.message || error || "");
     const status = /quota|limit|neuron|billing|paid plan/i.test(detail) ? 429 : 502;
