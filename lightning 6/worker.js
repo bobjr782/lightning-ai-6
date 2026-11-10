@@ -500,6 +500,20 @@ async function route(request, env) {
     await env.DB.prepare("INSERT INTO user_data(user_id,data_json,object_key,updated_at) VALUES(?,?,NULL,?) ON CONFLICT(user_id) DO UPDATE SET data_json=excluded.data_json,object_key=NULL,updated_at=excluded.updated_at").bind(user.id,data,now).run();
     return json({ok:true});
   }
+  if(path==="/api/users" && request.method==="GET") {
+    if(!user)return json({error:"Sign in required."},401);
+    await ensureSocialTables(env);
+    await ensureProfile(user,env);
+    const q=String(url.searchParams.get("q")||"").trim().slice(0,40);
+    const rows=await env.DB.prepare(`SELECT users.id,users.username,
+      user_profiles.avatar_data AS avatar,
+      EXISTS(SELECT 1 FROM friendships WHERE (friendships.user_low=? AND friendships.user_high=users.id) OR (friendships.user_high=? AND friendships.user_low=users.id)) AS isFriend,
+      EXISTS(SELECT 1 FROM friend_requests WHERE friend_requests.sender_id=? AND friend_requests.recipient_id=users.id AND friend_requests.status='pending') AS requestSent
+      FROM users LEFT JOIN user_profiles ON user_profiles.user_id=users.id
+      WHERE users.id<>? AND (?='' OR instr(lower(users.username),lower(?))>0)
+      ORDER BY users.username COLLATE NOCASE LIMIT 50`).bind(user.id,user.id,user.id,user.id,q,q).all();
+    return json({users:(rows.results||[]).map(u=>({username:u.username,avatar:u.avatar||null,isFriend:!!u.isFriend,requestSent:!!u.requestSent}))});
+  }
   if(path==="/api/friends" && request.method==="GET") {
     if(!user)return json({error:"Sign in required."},401);
     await ensureSocialTables(env);
