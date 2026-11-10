@@ -397,7 +397,7 @@ async function route(request, env) {
     try { await env.DB.prepare("INSERT INTO users(id,username,username_norm,salt,password_hash,created_at) VALUES(?,?,?,?,?,?)").bind(id,username,norm,salt,hash,now).run(); }
     catch(error) { await env.DB.prepare("INSERT INTO auth_attempts(ip_hash,attempted_at) VALUES(?,?)").bind(limit.key,limit.now).run(); return json({error:env.ENVIRONMENT==="development"?String(error):"Could not create the account. Please try again."},500); }
     const user={id,username}, token=await newSession(user,env);
-    return json({ok:true,user},{status:201,headers:{ "set-cookie":cookie(token,SESSION_DAYS*86400) }});
+    return json({ok:true,user},201,{ "set-cookie":cookie(token,SESSION_DAYS*86400) });
   }
   if(path==="/api/login" && request.method==="POST") {
     let b; try{b=await body(request)}catch{return json({error:"Invalid request."},400)}
@@ -412,12 +412,12 @@ async function route(request, env) {
     }
     await env.DB.prepare("DELETE FROM auth_attempts WHERE ip_hash=?").bind(limit.key).run();
     const token=await newSession(row,env);
-    return json({ok:true,user:{id:row.id,username:row.username}},{headers:{"set-cookie":cookie(token,SESSION_DAYS*86400)}});
+    return json({ok:true,user:{id:row.id,username:row.username}},200,{"set-cookie":cookie(token,SESSION_DAYS*86400)});
   }
   if(path==="/api/logout" && request.method==="POST") {
     const token=cookieValue(request,"lightning_session");
     if(token) await env.DB.prepare("DELETE FROM sessions WHERE token_hash=?").bind(await sha(token)).run();
-    return json({ok:true},{headers:{"set-cookie":cookie("",0)}});
+    return json({ok:true},200,{"set-cookie":cookie("",0)});
   }
   const user=await userFor(request,env);
   if(path==="/api/me" && request.method==="GET") {
@@ -560,7 +560,7 @@ async function route(request, env) {
     }
     const id=b64(randomBytes(12));
     await env.DB.prepare("INSERT INTO published_artifacts(id,owner_id,title,code,created_at,updated_at) VALUES(?,?,?,?,?,?)").bind(id,user.id,title,code,now,now).run();
-    return json({ok:true,id,url:new URL("/a/"+encodeURIComponent(id),request.url).toString()},{status:201});
+    return json({ok:true,id,url:new URL("/a/"+encodeURIComponent(id),request.url).toString()},201);
   }
   if(path==="/api/artifacts" && request.method==="DELETE") {
     if(!user)return json({error:"Sign in to delete your published artifact."},401);
