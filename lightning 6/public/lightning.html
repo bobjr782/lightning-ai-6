@@ -1881,7 +1881,7 @@ function drawImages() {
         const src = () => (i.id ? idbGet(i.id) : Promise.resolve(i.url)); src().then(u => { if (u) im.src = u; }); im.loading = "lazy"; im.onclick = () => src().then(openUrl);
         m.append(el("b", "", i.prompt.slice(0, 60)), el("small", "", new Date(i.t).toLocaleString()));
         a.append(btn("Open", () => src().then(openUrl)), btn("Download", () => src().then(u => dlUrl(u, i.prompt))), btn("Share", async()=>{
-          if(!lightningAccount){window.location.href="/#account";return;}
+          if(!lightningAccount){openLightningAuth();return;}
           const username=prompt("Share this image with which Lightning friend username?");if(!username)return;
           try{const data=await src();if(!data)throw new Error("Image data is unavailable on this device.");
             const compact=await compactImageForShare(data);const r=await socialRequest("/api/share",{username,artifact:{kind:"image",title:i.prompt||"Shared image",image:compact}});
