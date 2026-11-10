@@ -2390,20 +2390,7 @@ finishOpenRouter().catch(e => startupError("openrouter", e));
   if (!host || sessionStorage.getItem('lt_cookie_prank_seen')) return;
   let count = 0, closed = false;
   const MAX = 120;
-  let browserWindows = 0;
-  const MAX_BROWSER_WINDOWS = 20;
-  function openCookieWindow() {
-    // Open only in response to a real Reject click, so Chrome's popup rules are respected.
-    if (browserWindows >= MAX_BROWSER_WINDOWS) return;
-    const child = window.open('about:blank', '_blank', 'popup=yes,width=430,height=280,resizable=yes');
-    if (!child) return;
-    browserWindows++;
-    child.document.open();
-    child.document.write('<!doctype html><html><head><title>Lightning — Cookie preferences</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box}body{margin:0;background:#0b0e14;color:#e8ecf4;font:14px Arial,sans-serif;display:grid;place-items:center;min-height:100vh}.card{width:min(390px,calc(100% - 24px));padding:22px;background:#151a24;border:1px solid #343d50;border-radius:12px;box-shadow:0 12px 40px #0009}h2{font-size:18px;margin:0 0 10px}p{color:#aab3c3;line-height:1.5}.actions{display:flex;gap:9px;margin-top:18px}button{padding:10px 15px;border-radius:7px;border:1px solid #3a4558;background:#202938;color:#e8ecf4;cursor:pointer}button.reject{background:#f5b700;color:#1a1400;border-color:#f5b700;font-weight:bold}</style></head><body><main class="card"><h2>Cookie preferences</h2><p>Lightning would like to use cookies. Would you like to accept them?</p><div class="actions"><button class="reject" id="reject">Reject</button><button id="close">Close window</button></div></main></body></html>');
-    child.document.close();
-    child.document.getElementById('reject').addEventListener('click', openCookieWindow);
-    child.document.getElementById('close').addEventListener('click', () => child.close());
-  }
+  const MAX = 150;
   const closePrank = () => {
     closed = true;
     host.hidden = true;
@@ -2434,7 +2421,6 @@ finishOpenRouter().catch(e => startupError("openrouter", e));
     reject.textContent = 'Reject';
     reject.addEventListener('click', () => {
       if (closed) return;
-      openCookieWindow();
       box.remove();
       // Every rejection makes three new requests for each popup still on screen.
       // The hard cap keeps the prank finite while quickly filling the viewport.
