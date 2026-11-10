@@ -464,6 +464,7 @@ textarea.field { resize: vertical; }
 .logo-bolt .px { width: 24px; height: 24px; vertical-align: -5px; }
 .art-icon .px { width: 32px; height: 32px; }
 .avatar .px { width: 16px; height: 16px; }
+.profile-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;border:1px solid var(--border-color);background:var(--surface-2);flex:0 0 auto;image-rendering:pixelated}.profile-key{font-family:ui-monospace,monospace;letter-spacing:.12em;font-weight:700}.profile-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.profile-tools .mini-btn{margin:0}
 .message-row.ai-align::before { content: ""; flex: 0 0 28px; width: 28px; height: 28px; border-radius: 0; background: var(--accent); -webkit-mask: var(--px-bolt) center / 24px 24px no-repeat; mask: var(--px-bolt) center / 24px 24px no-repeat; margin-right: 12px; font-size: 0; }
 #model-pick { max-width: 150px; text-overflow: ellipsis; }
 .acct { flex-direction: column; align-items: stretch; gap: 8px; }
@@ -1252,7 +1253,7 @@ function drawGallery() {
         acts.append(
             btn("Open", open), btn("⛶ Run", () => runFull(a.code, a.title)), btn("Share", async () => {
                 if (!lightningAccount) { openLightningAuth(); return; }
-                const username = prompt("Share this artifact with which Lightning friend username?");
+                const username = prompt("Enter your friend's 5-character Lightning key or username:");
                 if (!username) return;
                 try {
                     await socialRequest("/api/share", { username, artifact: { kind:"artifact", title:a.title, code:a.code, t:a.t || Date.now() } });
@@ -1844,22 +1845,22 @@ async function drawFriends(){
  const b=friendsPage.body;b.innerHTML="";
  const form=el("div","row-item"),inp=el("input","field"),add=btn("Send friend request",async()=>{
   if(!inp.value.trim())return;
-  try{const j=await socialRequest("/api/friends/request",{username:inp.value.trim()});inp.value="";await drawFriends();showAiBubbleOnScreen(j.accepted?"Friend added.":"Friend request sent.");}
+  try{const j=await socialRequest("/api/friends/request",{key:inp.value.trim()});inp.value="";await drawFriends();showAiBubbleOnScreen(j.accepted?"Friend added.":"Friend request sent.");}
   catch(e){alert(e.message);}
  });
- inp.placeholder="Find a friend by Lightning username";form.append(inp,add);b.append(form);
+ inp.placeholder="Enter a 5-character friend key or username";form.append(inp,add);b.append(form);
  try{
   const data=await socialRequest("/api/friends");
   b.append(el("h3","","Friend requests"));
   if(!data.requests.length)b.append(el("p","art-empty","No pending friend requests."));
   data.requests.forEach(r=>{
-   const row=el("div","row-item");row.append(el("b","grow",r.from),
+   const row=el("div","row-item");row.append(makeProfileAvatar({username:r.from,friendCode:r.friendCode,avatar:r.avatar},30),el("b","grow",r.from+(r.friendCode?" · "+r.friendCode:"")),
     btn("Accept",async()=>{try{await socialRequest("/api/friends/respond",{id:r.id,action:"accept"});drawFriends();}catch(e){alert(e.message);}}),
     btn("Decline",async()=>{try{await socialRequest("/api/friends/respond",{id:r.id,action:"decline"});drawFriends();}catch(e){alert(e.message);}}));b.append(row);
   });
   b.append(el("h3","","Your friends"));
-  if(!data.friends.length)b.append(el("p","art-empty","No friends yet. Send someone a request using their username."));
-  data.friends.forEach(fr=>{const row=el("div","row-item");row.append(el("b","",fr.username),el("small","grow","Lightning friend"));b.append(row);});
+  if(!data.friends.length)b.append(el("p","art-empty","No friends yet. Send someone a request using their friend key or username."));
+  data.friends.forEach(fr=>{const row=el("div","row-item");row.append(makeProfileAvatar({username:fr.username,friendCode:fr.friendCode,avatar:fr.avatar},30),el("b","",fr.username),el("small","grow",fr.friendCode||"Lightning friend"));b.append(row);});
  }catch(e){b.append(el("p","art-empty",e.message));}
 }
 friendsPage.p.querySelector("[data-inbox]").onclick=()=>drawSharedInbox(friendsPage.body);
@@ -1882,7 +1883,7 @@ function drawImages() {
         m.append(el("b", "", i.prompt.slice(0, 60)), el("small", "", new Date(i.t).toLocaleString()));
         a.append(btn("Open", () => src().then(openUrl)), btn("Download", () => src().then(u => dlUrl(u, i.prompt))), btn("Share", async()=>{
           if(!lightningAccount){openLightningAuth();return;}
-          const username=prompt("Share this image with which Lightning friend username?");if(!username)return;
+          const username=prompt("Enter your friend's 5-character Lightning key or username:");if(!username)return;
           try{const data=await src();if(!data)throw new Error("Image data is unavailable on this device.");
             const compact=await compactImageForShare(data);const r=await socialRequest("/api/share",{username,artifact:{kind:"image",title:i.prompt||"Shared image",image:compact}});
             showAiBubbleOnScreen("Image shared with "+username+".");
@@ -1984,6 +1985,35 @@ function provRow(id, label) {
     r.append(has ? btn("✕", () => disconnect(id)) : btn("My key", signIn)); return r;
 }
 let lightningAccount=null, lightningEntitlement=null;
+function makeProfileAvatar(profile,size=38){
+    if(profile?.avatar){const img=document.createElement("img");img.className="profile-avatar";img.style.width=size+"px";img.style.height=size+"px";img.src=profile.avatar;img.alt="Profile picture";return img;}
+    const canvas=document.createElement("canvas");canvas.width=5;canvas.height=5;canvas.className="profile-avatar";canvas.style.width=size+"px";canvas.style.height=size+"px";
+    const ctx=canvas.getContext("2d"),code=String(profile?.friendCode||profile?.username||"LIGHT");let hash=2166136261;
+    for(let i=0;i<code.length;i++){hash^=code.charCodeAt(i);hash=Math.imul(hash,16777619);}
+    const palettes=["#2f80ed","#8250df","#1a7f37","#bf8700","#cf4b4b","#0969da","#6639ba","#0f766e"],color=palettes[(hash>>>0)%palettes.length];
+    ctx.fillStyle="#e6edf3";ctx.fillRect(0,0,5,5);
+    for(let y=0;y<5;y++)for(let x=0;x<3;x++){hash^=hash<<13;hash^=hash>>>17;hash^=hash<<5;if((hash>>>0)&1){ctx.fillStyle=color;ctx.fillRect(x,y,1,1);ctx.fillRect(4-x,y,1,1);}}
+    canvas.title="Automatic Lightning pixel avatar";return canvas;
+}
+function compactProfileImage(source){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{try{const c=document.createElement("canvas");c.width=256;c.height=256;const ctx=c.getContext("2d"),side=Math.min(img.naturalWidth,img.naturalHeight),sx=(img.naturalWidth-side)/2,sy=(img.naturalHeight-side)/2;ctx.drawImage(img,sx,sy,side,side,0,0,256,256);let q=.78,data=c.toDataURL("image/webp",q);while(data.length>95000&&q>.3){q-=.08;data=c.toDataURL("image/webp",q);}if(data.length>100000)throw new Error("That picture is too large. Try a smaller image.");resolve(data);}catch(e){reject(e);}};img.onerror=()=>reject(new Error("Could not read that image."));img.src=source;});}
+function openProfileEditor(){
+    if(!lightningAccount)return openLightningAuth();
+    const ov=el("div","modal-overlay open"),card=el("div","modal-card"),body=el("div","modal-body"),head=el("div","modal-header");
+    head.append(el("h3","","Your Lightning profile"),btn("✕",()=>ov.remove()));
+    let chosen=lightningAccount.avatar||null;
+    const preview=el("div","profile-tools"),keyInfo=el("div","grow");
+    keyInfo.append(el("b","","@"+lightningAccount.username),el("small","profile-key","Friend key: "+lightningAccount.friendCode));
+    const copy=btn("Copy key",async()=>{try{await navigator.clipboard.writeText(lightningAccount.friendCode);showAiBubbleOnScreen("Friend key copied.");}catch(_){prompt("Your Lightning friend key",lightningAccount.friendCode);}});
+    const paint=()=>preview.replaceChildren(makeProfileAvatar({...lightningAccount,avatar:chosen},64),keyInfo,copy);paint();
+    const note=el("small","auth-note","Choose a picture, generate one with FLUX, or leave it blank for your automatic GitHub-style pixel avatar. FLUX uses one image from your trial allowance.");
+    const file=el("input","field");file.type="file";file.accept="image/png,image/jpeg,image/webp";
+    file.onchange=async()=>{const f=file.files?.[0];if(!f)return;try{const src=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f);});chosen=await compactProfileImage(src);paint();}catch(e){alert(e.message);}};
+    const promptInput=el("input","field");promptInput.placeholder="Describe your profile picture for FLUX…";promptInput.value="A crisp, friendly pixel-art lightning bolt emblem, centered, bold simple shapes, dark background";
+    const generate=btn("Generate with FLUX",async()=>{if(!promptInput.value.trim())return;generate.disabled=true;generate.textContent="Generating…";try{const r=await fetch("/api/image",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({prompt:promptInput.value.trim(),width:512,height:512})});const j=await r.json();if(!r.ok)throw new Error(j.error||"FLUX could not generate your picture.");chosen=await compactProfileImage(j.image);paint();showAiBubbleOnScreen("Profile picture generated with "+(j.model||"FLUX")+".");}catch(e){alert(e.message);}finally{generate.disabled=false;generate.textContent="Generate with FLUX";}});
+    const reset=btn("Use pixel avatar",()=>{chosen=null;paint();});
+    const save=btn("Save profile picture",async()=>{save.disabled=true;save.textContent="Saving…";try{const r=await fetch("/api/profile",{method:"PUT",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({avatar:chosen})});const j=await r.json();if(!r.ok)throw new Error(j.error||"Could not save profile.");ov.remove();await refreshLightningAccount();showAiBubbleOnScreen("Lightning profile saved.");}catch(e){alert(e.message);}finally{save.disabled=false;save.textContent="Save profile picture";}});
+    body.append(preview,note,file,promptInput,generate,reset,save);card.append(head,body);ov.append(card);ov.onclick=e=>{if(e.target===ov)ov.remove();};document.body.append(ov);
+}
 function trialCard() {
     const wrap=el("div","trial-account");
     const head=el("div","trial-account-head");
@@ -1993,7 +2023,11 @@ function trialCard() {
     if(lightningAccount && lightningEntitlement){
         const e=lightningEntitlement;
         const line=el("small","",e.trialActive ? `${e.textRemaining} chat messages · ${e.imagesRemaining} images left` : "Sign in to manage your account");
-        wrap.append(line);
+        wrap.append(makeProfileAvatar(lightningAccount,38),line);
+        const keyLine=el("small","profile-key","Friend key: "+(lightningAccount.friendCode||"Creating…"));
+        const keyActions=el("div","profile-tools");
+        keyActions.append(keyLine,btn("Copy",async()=>{try{await navigator.clipboard.writeText(lightningAccount.friendCode);showAiBubbleOnScreen("Friend key copied.");}catch(_){prompt("Your Lightning friend key",lightningAccount.friendCode);}}),btn("Edit profile",openProfileEditor));
+        wrap.append(keyActions);
         if(e.trialActive){
             const bar=el("div","trial-meter"), fill=el("span");
             fill.style.width=Math.min(100,Math.max(0,e.imagesUsed/e.imageLimit*100))+"%";
