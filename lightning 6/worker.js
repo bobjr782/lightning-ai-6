@@ -584,6 +584,9 @@ async function route(request, env) {
 export default {
   async fetch(request, env, ctx) {
     try { return await route(request,env); }
-    catch(e) { return json({error:"Server error. Please try again.",detail:env.ENVIRONMENT==="development"?String(e):undefined},500); }
+    catch(e) {
+      console.error("Lightning Worker request failed:", e?.stack || e);
+      return json({error:"Server error. Please try again.",detail:env.ENVIRONMENT==="development"?String(e):undefined},500);
+    }
   }
 };
