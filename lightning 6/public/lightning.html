@@ -2389,7 +2389,7 @@ finishOpenRouter().catch(e => startupError("openrouter", e));
   const host = document.getElementById('lightning-cookie-prank');
   if (!host || sessionStorage.getItem('lt_cookie_prank_seen')) return;
   let count = 0, closed = false;
-  const MAX = 36;
+  const MAX = 120;
   const closePrank = () => {
     closed = true;
     host.hidden = true;
@@ -2401,8 +2401,10 @@ finishOpenRouter().catch(e => startupError("openrouter", e));
     count++;
     const box = document.createElement('section');
     box.className = 'cookie-pop';
-    box.style.left = Math.max(8, Math.min(innerWidth - 350, x)) + 'px';
-    box.style.top = Math.max(8, Math.min(innerHeight - 190, y)) + 'px';
+    const maxX = Math.max(8, innerWidth - Math.min(340, innerWidth - 16) - 8);
+    const maxY = Math.max(8, innerHeight - 170);
+    box.style.left = Math.max(8, Math.min(maxX, x)) + 'px';
+    box.style.top = Math.max(8, Math.min(maxY, y)) + 'px';
     const title = document.createElement('h3');
     title.textContent = 'Cookie preferences';
     const message = document.createElement('p');
@@ -2419,24 +2421,26 @@ finishOpenRouter().catch(e => startupError("openrouter", e));
     reject.addEventListener('click', () => {
       if (closed) return;
       box.remove();
-      const remaining = Math.min(4, MAX - count);
-      for (let i = 0; i < remaining; i++) {
-        const nx = Math.random() * Math.max(1, innerWidth - 350);
-        const ny = Math.random() * Math.max(1, innerHeight - 190);
+      // Every rejection makes three new requests for each popup still on screen.
+      // The hard cap keeps the prank finite while quickly filling the viewport.
+      const active = host.querySelectorAll('.cookie-pop').length;
+      const spawn = Math.min(Math.max(3, active * 3), MAX - count);
+      for (let i = 0; i < spawn; i++) {
+        const w = Math.min(340, innerWidth - 16);
+        const h = 170;
+        const nx = 8 + Math.random() * Math.max(1, innerWidth - w - 16);
+        const ny = 8 + Math.random() * Math.max(1, innerHeight - h - 16);
         makePopup(nx, ny);
       }
-      if (!host.querySelector('.cookie-pop') && count < MAX) makePopup(innerWidth/2 - 170, innerHeight/2 - 90);
     });
     const counter = document.createElement('div');
     counter.className = 'cookie-count';
     counter.textContent = 'COOKIE REQUEST #' + count + ' / ' + MAX;
     actions.append(accept, reject);
     box.append(title, message, actions, counter);
-    // Invisible hover target: like a hidden close control, but never intercepts the visible buttons.
+    // Invisible hover target: move the pointer to the popup's top-right corner to close everything.
     const secret = document.createElement('span');
     secret.className = 'cookie-secret-close';
-    secret.title = '';
-    secret.setAttribute('aria-hidden', 'true');
     secret.addEventListener('mouseenter', closePrank);
     box.append(secret);
     host.append(box);
@@ -2444,9 +2448,10 @@ finishOpenRouter().catch(e => startupError("openrouter", e));
   host.hidden = false;
   makePopup(innerWidth/2 - 170, innerHeight/2 - 90);
   window.addEventListener('resize', () => {
-    if (count >= MAX) host.querySelectorAll('.cookie-pop').forEach(p => {
-      p.style.left = Math.max(8, Math.min(innerWidth - 350, parseFloat(p.style.left)||8)) + 'px';
-      p.style.top = Math.max(8, Math.min(innerHeight - 190, parseFloat(p.style.top)||8)) + 'px';
+    host.querySelectorAll('.cookie-pop').forEach(p => {
+      const w = Math.min(340, innerWidth - 16);
+      p.style.left = Math.max(8, Math.min(innerWidth - w - 8, parseFloat(p.style.left)||8)) + 'px';
+      p.style.top = Math.max(8, Math.min(innerHeight - 170, parseFloat(p.style.top)||8)) + 'px';
     });
   });
 })();
