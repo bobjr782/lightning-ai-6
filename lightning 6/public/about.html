@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<base target="_top">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://lightning-ai-6.ray-collier264.workers.dev/">
+<title>Lightning AI 7 — About the Free AI Workspace</title>
+<meta name="description" content="Lightning AI 7 is a free AI workspace with AI chat, FLUX image generation, live app building, artifacts and projects.">
+<meta property="og:title" content="Lightning AI 7 — Free AI Chat and FLUX Image Generator">
+<meta property="og:description" content="Chat with AI, generate images with FLUX, and build live apps in Lightning AI 7.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23d97757' d='M4 0h1v1h-1zM5 0h1v1h-1zM6 0h1v1h-1zM3 1h1v1h-1zM4 1h1v1h-1zM5 1h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM1 3h1v1h-1zM2 3h1v1h-1zM3 3h1v1h-1zM4 3h1v1h-1zM5 3h1v1h-1zM6 3h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM5 4h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1zM4 5h1v1h-1zM1 6h1v1h-1zM2 6h1v1h-1zM1 7h1v1h-1z'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#faf9f5; --bg2:#f2efe6; --ink:#1f1e1d; --mute:#6f6e68; --line:#e4e0d4; --accent:#c96442; --card:#ffffff; }
+@media (prefers-color-scheme: dark) { :root { --bg:#1d1c1a; --bg2:#262522; --ink:#f4f2ea; --mute:#a5a298; --line:#3a3834; --accent:#e08463; --card:#262522; } }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 17px/1.65 'DM Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 28px; }
+.serif { font-family: 'Source Serif 4', Georgia, serif; font-weight: 400; letter-spacing: -.02em; }
+.px { width: 24px; height: 24px; fill: currentColor; shape-rendering: crispEdges; vertical-align: middle; }
+
+/* nav */
+nav { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+nav .wrap { display: flex; align-items: center; gap: 28px; height: 64px; }
+.brand { display: flex; align-items: center; gap: 8px; font: 600 1.3rem 'Source Serif 4', serif; text-decoration: none; color: var(--ink); }
+.brand .px { color: var(--accent); width: 26px; height: 26px; }
+nav .links { display: flex; gap: 26px; margin-left: 12px; font-size: .95rem; }
+nav .links a { text-decoration: none; color: var(--mute); transition: color .15s; }
+nav .links a:hover { color: var(--ink); }
+.btn { display: inline-flex; align-items: center; gap: 8px; background: var(--ink); color: var(--bg); border-radius: 999px; padding: 11px 22px; font-weight: 600; font-size: .95rem; text-decoration: none; border: 1px solid var(--ink); transition: transform .15s, opacity .15s; }
+.btn:hover { transform: translateY(-1px); opacity: .9; }
+.btn.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+.btn.ghost:hover { border-color: var(--ink); }
+nav .btn { margin-left: auto; padding: 9px 18px; }
+
+/* hero */
+.hero { padding: 110px 0 90px; }
+.eyebrow { color: var(--accent); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; font-size: .8rem; margin-bottom: 22px; }
+.hero h1 { font-size: clamp(2.8rem, 7vw, 5.6rem); line-height: 1.03; margin: 0 0 30px; max-width: 14ch; }
+.hero p { font-size: 1.3rem; color: var(--mute); max-width: 40ch; margin: 0 0 38px; }
+.hero .cta { display: flex; gap: 12px; flex-wrap: wrap; }
+
+section { padding: 90px 0; border-top: 1px solid var(--line); }
+h2 { font-size: clamp(2rem, 4vw, 3rem); line-height: 1.1; margin: 0 0 18px; }
+.lead { color: var(--mute); font-size: 1.15rem; max-width: 56ch; margin: 0 0 48px; }
+.mission { font-size: clamp(1.7rem, 3.4vw, 2.6rem); line-height: 1.3; max-width: 28em; margin: 0; }
+.mission em { color: var(--accent); font-style: normal; }
+
+/* feature grid */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
+.card { background: var(--bg); padding: 34px 30px 36px; display: flex; flex-direction: column; gap: 10px; transition: background .2s; }
+.card:hover { background: var(--bg2); }
+.card .px { color: var(--accent); width: 32px; height: 32px; margin-bottom: 14px; }
+.card h3 { margin: 0; font: 500 1.45rem 'Source Serif 4', serif; letter-spacing: -.01em; }
+.card p { margin: 0; color: var(--mute); font-size: .98rem; }
+.card a { margin-top: auto; padding-top: 16px; font-weight: 600; font-size: .92rem; text-decoration: none; color: var(--ink); }
+.card a:hover { color: var(--accent); }
+
+/* providers */
+.flow { display: flex; align-items: stretch; gap: 14px; flex-wrap: wrap; margin-top: 8px; }
+.node { flex: 1 1 220px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
+.node b { display: block; font: 500 1.25rem 'Source Serif 4', serif; margin-bottom: 4px; }
+.node span { color: var(--mute); font-size: .92rem; }
+.arrow { align-self: center; color: var(--mute); font-size: 1.6rem; }
+.note { margin-top: 26px; color: var(--mute); max-width: 62ch; }
+
+/* stats */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 30px; }
+.stat b { display: block; font: 400 clamp(2.6rem, 5vw, 4rem)/1 'Source Serif 4', serif; letter-spacing: -.03em; }
+.stat span { color: var(--mute); font-size: .95rem; }
+
+/* principles */
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 44px; }
+.cols h3 { font: 500 1.5rem 'Source Serif 4', serif; margin: 0 0 10px; }
+.cols p { color: var(--mute); margin: 0; }
+
+/* faq */
+details { border-top: 1px solid var(--line); padding: 22px 0; }
+details:last-of-type { border-bottom: 1px solid var(--line); }
+summary { cursor: pointer; font: 500 1.35rem 'Source Serif 4', serif; list-style: none; display: flex; justify-content: space-between; gap: 20px; }
+summary::-webkit-details-marker { display: none; }
+summary::after { content: "+"; color: var(--accent); font-family: 'DM Sans'; font-size: 1.6rem; line-height: 1; transition: transform .2s; }
+details[open] summary::after { transform: rotate(45deg); }
+details p { color: var(--mute); max-width: 62ch; margin: 14px 0 0; }
+
+/* footer */
+footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: var(--bg2); }
+.fcols { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 40px; }
+.fcols h4 { margin: 0 0 14px; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); }
+.fcols a { display: block; text-decoration: none; color: var(--ink); padding: 4px 0; font-size: .95rem; }
+.fcols a:hover { color: var(--accent); }
+.fcols p { color: var(--mute); font-size: .92rem; max-width: 34ch; margin: 10px 0 0; }
+.legal { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--line); color: var(--mute); font-size: .85rem; display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+
+.reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s ease; }
+.reveal.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } html { scroll-behavior: auto; } }
+
+.account-section{padding:72px 0;background:var(--bg2)}
+.account-panel{max-width:680px;margin:0 auto;padding:34px;border:1px solid var(--line);border-radius:16px;background:var(--card);box-shadow:0 14px 42px rgba(0,0,0,.06)}
+.account-panel h2{font-size:clamp(30px,5vw,46px);line-height:1.12;margin:12px 0}
+.account-panel .lead{margin:0 0 22px}
+.account-status{padding:12px 14px;border-radius:9px;background:var(--bg2);margin:0 0 18px;font-size:14px}
+.account-form{display:grid;gap:9px}
+.account-form label{font-size:13px;font-weight:700;margin-top:5px}
+.account-form input{width:100%;padding:13px 14px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+.account-form .btn,.account-actions .btn{cursor:pointer;min-height:44px}
+.account-error{color:#c34235;font-size:13px;min-height:18px}
+.account-actions{display:flex;gap:10px;flex-wrap:wrap}
+.account-footnote{font-size:12px;color:var(--mute);margin:18px 0 0}
+.account-form[hidden],.account-actions[hidden]{display:none}
+@media (max-width: 760px) { nav .links { display: none; } .hero { padding: 70px 0 60px; } section { padding: 64px 0; } .fcols { grid-template-columns: 1fr 1fr; } .arrow { display: none; } }
+#account[hidden]{display:none!important}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#top"><i data-px="bolt"></i> lightning</a>
+    <div class="links"><a href="#features">Features</a><a href="#providers">Models</a><a href="#privacy">Privacy</a><a href="#faq">FAQ</a><a href="#account">Account</a></div>
+    <a class="btn app-link" href="https://lightning-ai-6.ray-collier264.workers.dev/">Open lightning</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="eyebrow">About lightning</div>
+    <h1 class="serif">Lightning AI 7. A faster way to build with AI.</h1>
+    <p>lightning is a free AI workspace. Chat, turn ideas into running apps, generate images, and let it switch AI providers for you when one gets busy.</p>
+    <div class="cta"><a class="btn app-link" href="https://lightning-ai-6.ray-collier264.workers.dev/">Start a chat</a><a class="btn ghost" href="#features">See what it does</a></div>
+  </div>
+</header>
+
+
+<section id="account" class="account-section" hidden>
+  <div class="wrap reveal">
+    <div class="account-panel">
+      <div class="eyebrow">Your Lightning identity</div>
+      <h2 class="serif">One account. Your creations. Your friends.</h2>
+      <p class="lead">Sign in or create a free Lightning account to add friends and privately share images and artifacts.</p>
+      <div id="about-account-status" class="account-status" aria-live="polite">Sign in or create an account to connect with friends and share privately.</div>
+      <div id="about-auth-choices" class="account-actions">
+        <button class="btn" id="about-show-login" type="button">Sign in</button>
+        <button class="btn ghost" id="about-show-register" type="button">Create an account</button>
+      </div>
+      <form id="about-auth-form" class="account-form" hidden>
+        <label for="about-username">Username</label>
+        <input id="about-username" name="username" autocomplete="username" minlength="3" maxlength="24" placeholder="Your username" required>
+        <label for="about-password">Password</label>
+        <input id="about-password" name="password" type="password" autocomplete="current-password" minlength="10" placeholder="Your password" required>
+        <div id="about-auth-error" class="account-error" role="alert"></div>
+        <button class="btn" id="about-auth-submit" type="submit">Sign in</button>
+        <button class="btn ghost" id="about-auth-switch" type="button">Create an account</button>
+      </form>
+      <div id="about-account-actions" class="account-actions" hidden>
+        <a class="btn app-link" href="/lightning.html">Open Lightning</a>
+          <a class="btn ghost" href="/#friends" target="_top">Friends &amp; sharing</a>
+        <button class="btn ghost" id="about-signout" type="button">Sign out</button>
+      </div>
+      <p class="account-footnote">Your account is used for private friend connections and sharing. Your saved local gallery is not erased by signing in.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap reveal">
+    <p class="mission serif">Great AI tools shouldn’t depend on one company, one quota or one account. We’re building a workspace that is <em>fast</em>, <em>private</em> and <em>yours</em>: it runs in your browser, keeps your chats on your device, and works with the models you choose.</p>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <h2 class="serif reveal">Everything in one place</h2>
+    <p class="lead reveal">Six tools that work together, from a quick question to a finished, shareable app.</p>
+    <div class="grid reveal">
+      <div class="card"><i data-px="chat"></i><h3>Chat</h3><p>Fast streaming answers, file uploads (PDF, Word, Excel, PowerPoint, ZIP, code), voice-free and sign-up-free.</p><a class="app-link" href="https://lightning-ai-5.ray-collier264.workers.dev/">Start chatting →</a></div>
+      <div class="card"><i data-px="box"></i><h3>Artifacts</h3><p>Ask for a game, page or tool and it runs live beside the chat. Edit the code, watch the console, go full screen, publish a link.</p><a class="app-link" data-path="/artifacts" href="https://lightning-ai-5.ray-collier264.workers.dev/">Open artifacts →</a></div>
+      <div class="card"><i data-px="wrench"></i><h3>Coder mode</h3><p>A stricter engineering mode with a coding model, complete files, and one-click “Fix with AI” when something breaks.</p><a class="app-link" href="https://lightning-ai-5.ray-collier264.workers.dev/">Try coder mode →</a></div>
+      <div class="card"><i data-px="sparkle"></i><h3>Images</h3><p>Pick a style and size, let AI sharpen your prompt, and keep every picture in a personal gallery.</p><a class="app-link" data-path="/images" href="https://lightning-ai-5.ray-collier264.workers.dev/">Open images →</a></div>
+      <div class="card"><i data-px="folder"></i><h3>Projects</h3><p>Group chats and give the AI standing instructions for each project, plus a simple task list.</p><a class="app-link" data-path="/projects" href="https://lightning-ai-5.ray-collier264.workers.dev/">Open projects →</a></div>
+      <div class="card"><i data-px="globe"></i><h3>Online artifacts</h3><p>Publish what you build to a public page anyone can open, and browse what others have shared.</p><a class="app-link" data-path="/online" href="https://lightning-ai-5.ray-collier264.workers.dev/">Browse online →</a></div>
+    </div>
+  </div>
+</section>
+
+<section id="providers">
+  <div class="wrap">
+    <h2 class="serif reveal">Bring your own AI</h2>
+    <p class="lead reveal">lightning isn’t tied to one model. Connect the providers you like and it handles the rest.</p>
+    <div class="flow reveal">
+      <div class="node"><b>OpenRouter</b><span>Many free and paid models, one key.</span></div><div class="arrow">→</div>
+      <div class="node"><b>Groq</b><span>Very fast responses on a free key.</span></div><div class="arrow">→</div>
+      <div class="node"><b>Google Gemini</b><span>A dependable backup with a free tier.</span></div>
+    </div>
+    <p class="note reveal">If a provider says “rate limited”, lightning moves to the next one automatically, so a busy model doesn’t end your conversation. Free tiers have their own limits, which are set by each provider.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="stats reveal">
+      <div class="stat"><b>3</b><span>AI providers, with automatic fallback</span></div>
+      <div class="stat"><b>20</b><span>languages for instant page translation</span></div>
+      <div class="stat"><b>7</b><span>image styles, 4 sizes</span></div>
+      <div class="stat"><b>0</b><span>accounts required to start</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="privacy">
+  <div class="wrap">
+    <h2 class="serif reveal">Private by design</h2>
+    <p class="lead reveal">Your work stays with you unless you decide to share it.</p>
+    <div class="cols reveal">
+      <div><h3>Stored on your device</h3><p>Chats, projects, images and artifacts are saved in your own browser. We don’t keep a copy on a server.</p></div>
+      <div><h3>Keys stay protected</h3><p>Keys you paste are kept in your browser. Keys the site owner adds live in server settings and are never sent to your page.</p></div>
+      <div><h3>Sharing is opt-in</h3><p>Nothing is public until you press “Publish artifact”. Published pages run in a locked-down sandbox, and you can delete yours any time.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2 class="serif reveal">Our approach</h2>
+    <p class="lead reveal">Three ideas shape every decision.</p>
+    <div class="cols reveal">
+      <div><h3>Fast</h3><p>Streaming replies, instant previews and no sign-up wall. You should be typing within seconds.</p></div>
+      <div><h3>Open</h3><p>lightning is released under the MIT license. Read it, fork it, run your own copy.</p></div>
+      <div><h3>Yours</h3><p>Choose your models, keep your data and take your work anywhere with downloads and links.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2 class="serif reveal">Questions</h2>
+    <div class="reveal" style="margin-top:36px">
+      <details><summary>Is lightning free?</summary><p>lightning itself is free and open source. The AI models it connects to have their own free tiers and limits, and some models cost money. You choose which to use.</p></details>
+      <details><summary>Which AI models does it use?</summary><p>Whatever you connect: models from OpenRouter, Groq and Google Gemini, or any OpenAI-compatible service. Coder mode prefers a coding-focused model.</p></details>
+      <details><summary>Where are my chats stored?</summary><p>In your browser’s local storage on this device. Clearing your browser data removes them, so download anything you want to keep.</p></details>
+      <details><summary>What happens when a model is rate limited?</summary><p>lightning tries other models, then switches to the next connected provider, and tells you what it’s doing.</p></details>
+      <details><summary>Can I share what I build?</summary><p>Yes. Open an artifact and press “Publish artifact” to get a public link. You can also download it as a file.</p></details>
+      <details><summary>Is lightning affiliated with OpenAI or another AI company?</summary><p>No. lightning is an independent project. Model names belong to their respective owners.</p></details>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="fcols">
+      <div><a class="brand" href="#top"><i data-px="bolt"></i> lightning</a><p>A fast, free AI workspace. Created by Ray.</p></div>
+      <div><h4>Product</h4><a class="app-link" href="https://lightning-ai-5.ray-collier264.workers.dev/">Chat</a><a class="app-link" data-path="/artifacts" href="https://lightning-ai-5.ray-collier264.workers.dev/">Artifacts</a><a class="app-link" data-path="/images" href="https://lightning-ai-5.ray-collier264.workers.dev/">Images</a><a class="app-link" data-path="/projects" href="https://lightning-ai-5.ray-collier264.workers.dev/">Projects</a></div>
+      <div><h4>Explore</h4><a class="app-link" data-path="/online" href="https://lightning-ai-5.ray-collier264.workers.dev/">Online artifacts</a><a href="#providers">Models</a><a href="#privacy">Privacy</a><a href="#faq">FAQ</a></div>
+      <div><h4>Legal</h4><a href="https://lightning-ai-5.ray-collier264.workers.dev/LICENSES.txt">License &amp; notices</a></div>
+    </div>
+    <div class="legal"><span>© 2026 lightning. Released under the MIT License.</span><span>Not affiliated with any AI model provider.</span></div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var ICONS = {
+    bolt: ["....###.", "...###..", "..###...", ".######.", "...###..", "..###...", ".##.....", ".#......"],
+    chat: ["########", "########", "########", "########", "########", "..###...", "..##....", "..#....."],
+    box: ["########", "#......#", "#..##..#", "#.####.#", "#.####.#", "#..##..#", "#......#", "########"],
+    wrench: [".##..##.", ".##.###.", "..####..", "...##...", "..##....", ".##.....", "##......", "#......."],
+    sparkle: ["...##...", "...##...", "########", ".######.", "..####..", ".##..##.", ".#....#.", "........"],
+    folder: ["###.....", "########", "#......#", "#......#", "#......#", "#......#", "########", "........"],
+    globe: ["..####..", ".#.##.#.", "#..##..#", "########", "########", "#..##..#", ".#.##.#.", "..####.."]
+  };
+  var ns = "http://www.w3.org/2000/svg";
+  document.querySelectorAll("i[data-px]").forEach(function (el) {
+    var rows = ICONS[el.getAttribute("data-px")], d = "";
+    rows.forEach(function (r, y) { for (var x = 0; x < 8; x++) if (r[x] === "#") d += "M" + x + " " + y + "h1v1h-1z"; });
+    var s = document.createElementNS(ns, "svg"), p = document.createElementNS(ns, "path");
+    s.setAttribute("viewBox", "0 0 8 8"); s.setAttribute("class", "px"); s.setAttribute("aria-hidden", "true"); p.setAttribute("d", d); s.appendChild(p);
+    el.replaceWith(s);
+  });
+  // App links always open the current deployed lightning application.
+  // App links point to the new Lightning deployment.
+const APP_URL = "https://lightning-ai-6.ray-collier264.workers.dev";
+
+document.querySelectorAll("a.app-link").forEach(function (a) {
+  const path = a.getAttribute("data-path");
+  a.href = APP_URL + (path ? path : "/#chat");
+});
+
+  // Lightning account controls live on this About page.
+  var accountSection=document.getElementById("account");
+  var accountNav=document.querySelector('.links a[href="#account"]');
+  if(accountNav&&accountSection){
+    accountNav.addEventListener("click",function(event){
+      event.preventDefault();accountSection.hidden=false;history.replaceState(null,"","#account");
+      accountSection.scrollIntoView({behavior:"smooth",block:"start"});
+    });
+  }
+  var accountForm=document.getElementById("about-auth-form");
+  if(accountForm){
+    var authMode="login", statusBox=document.getElementById("about-account-status"),
+      errorBox=document.getElementById("about-auth-error"), submitBtn=document.getElementById("about-auth-submit"),
+      switchBtn=document.getElementById("about-auth-switch"), actions=document.getElementById("about-account-actions"),
+      choices=document.getElementById("about-auth-choices"),
+      showLogin=document.getElementById("about-show-login"),showRegister=document.getElementById("about-show-register"),
+      passInput=document.getElementById("about-password");
+    showLogin.addEventListener("click",function(){setAuthMode("login");accountForm.hidden=false;choices.hidden=true;});
+    showRegister.addEventListener("click",function(){setAuthMode("register");accountForm.hidden=false;choices.hidden=true;});
+    function setAuthMode(mode){
+      authMode=mode;submitBtn.textContent=mode==="login"?"Sign in":"Create account";
+      switchBtn.textContent=mode==="login"?"Create an account":"I already have an account";
+      passInput.autocomplete=mode==="login"?"current-password":"new-password";
+      passInput.placeholder=mode==="login"?"Your password":"Choose a password (at least 10 characters)";
+      errorBox.textContent="";
+    }
+    switchBtn.addEventListener("click",function(){setAuthMode(authMode==="login"?"register":"login");});
+    accountForm.addEventListener("submit",async function(event){
+      event.preventDefault();errorBox.textContent="";submitBtn.disabled=true;submitBtn.textContent="Please wait…";
+      var username=document.getElementById("about-username").value.trim(),password=passInput.value;
+      try{
+        var response=await fetch("/api/"+(authMode==="login"?"login":"register"),{
+          method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},
+          body:JSON.stringify({username:username,password:password})
+        });
+        var result=await response.json();
+        if(!response.ok)throw new Error(result.error||"Could not sign in.");
+        await refreshAboutAccount();
+      }catch(error){errorBox.textContent=error.message||"Something went wrong.";}
+      finally{submitBtn.disabled=false;submitBtn.textContent=authMode==="login"?"Sign in":"Create account";}
+    });
+    async function refreshAboutAccount(){
+      try{
+        var response=await fetch("/api/me",{credentials:"same-origin",cache:"no-store"});
+        var result=await response.json();
+        if(!response.ok||!result.user)throw new Error("Signed out");
+        statusBox.textContent="Signed in as "+result.user.username+". Your Lightning friends and shared creations are ready.";
+        accountForm.hidden=true;choices.hidden=true;actions.hidden=false;
+      }catch(_){
+        statusBox.textContent="Sign in or create an account to connect with friends and share privately.";
+        accountForm.hidden=true;choices.hidden=false;actions.hidden=true;
+      }
+    }
+    document.getElementById("about-signout").addEventListener("click",async function(){
+      await fetch("/api/logout",{method:"POST",credentials:"same-origin"});
+      setAuthMode("login");accountForm.reset();accountForm.hidden=true;choices.hidden=false;await refreshAboutAccount();
+    });
+    refreshAboutAccount();
+  }
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }); }, { threshold: .12 });
+    document.querySelectorAll(".reveal").forEach(function (el) { io.observe(el); });
+  } else document.querySelectorAll(".reveal").forEach(function (el) { el.classList.add("in"); });
+})();
+</script>
+</body>
+</html>
