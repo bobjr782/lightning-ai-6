@@ -70,6 +70,18 @@ async function ensureSocialTables(env) {
 }
 function friendPair(a,b){return a<b?[a,b]:[b,a];}
 
+async function ensurePublishedTable(env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS published_artifacts (
+    id TEXT PRIMARY KEY,
+    owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    code TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS published_artifacts_updated_idx ON published_artifacts(updated_at DESC)").run();
+}
+
 const TRIAL_DAYS = 7;
 const TRIAL_TEXT_LIMIT = 40;
 const TRIAL_IMAGE_LIMIT = 5;
@@ -486,6 +498,55 @@ async function route(request, env) {
     const id=decodeURIComponent(path.slice("/api/share/".length));
     await env.DB.prepare("DELETE FROM shares WHERE id=? AND owner_id=?").bind(id,user.id).run();
     return json({ok:true});
+  }
+  if(path==="/api/artifacts" && request.method==="GET") {
+    await ensurePublishedTable(env);
+    const id=String(url.searchParams.get("id")||"").trim();
+    if(id){
+      const row=await env.DB.prepare("SELECT id,title,code,created_at,updated_at FROM published_artifacts WHERE id=?").bind(id).first();
+      if(!row)return json({error:"Online artifact not found."},404);
+      return json({id:row.id,title:row.title,code:row.code,t:row.created_at,updatedAt:row.updated_at});
+    }
+    const rows=await env.DB.prepare("SELECT id,title,created_at,owner_id FROM published_artifacts ORDER BY updated_at DESC LIMIT 200").all();
+    return json({items:(rows.results||[]).map(row=>({id:row.id,title:row.title,t:row.created_at,owner:!!user&&row.owner_id===user.id}))});
+  }
+  if(path==="/api/artifacts" && (request.method==="POST" || request.method==="PUT")) {
+    if(!user)return json({error:"Sign in to publish an artifact."},401);
+    await ensurePublishedTable(env);
+    let b;try{b=await body(request)}catch{return json({error:"Invalid or oversized artifact."},400)}
+    const title=String(b.title||"Untitled artifact").trim().slice(0,100)||"Untitled artifact";
+    const code=String(b.code||"");
+    if(!code.trim())return json({error:"The artifact is empty."},400);
+    if(encoder.encode(code).length>1000000)return json({error:"This artifact is too large to publish (1 MB maximum)."},413);
+    const now=Math.floor(Date.now()/1000);
+    if(request.method==="PUT"){
+      const id=String(b.id||"").trim();
+      if(!id)return json({error:"Missing artifact ID."},400);
+      const existing=await env.DB.prepare("SELECT id FROM published_artifacts WHERE id=? AND owner_id=?").bind(id,user.id).first();
+      if(!existing)return json({error:"Your published artifact was not found."},404);
+      await env.DB.prepare("UPDATE published_artifacts SET title=?,code=?,updated_at=? WHERE id=? AND owner_id=?").bind(title,code,now,id,user.id).run();
+      return json({ok:true,id,url:new URL("/a/"+encodeURIComponent(id),request.url).toString(),updated:true});
+    }
+    const id=b64(randomBytes(12));
+    await env.DB.prepare("INSERT INTO published_artifacts(id,owner_id,title,code,created_at,updated_at) VALUES(?,?,?,?,?,?)").bind(id,user.id,title,code,now,now).run();
+    return json({ok:true,id,url:new URL("/a/"+encodeURIComponent(id),request.url).toString()},{status:201});
+  }
+  if(path==="/api/artifacts" && request.method==="DELETE") {
+    if(!user)return json({error:"Sign in to delete your published artifact."},401);
+    await ensurePublishedTable(env);
+    const id=String(url.searchParams.get("id")||"").trim();
+    if(!id)return json({error:"Missing artifact ID."},400);
+    const result=await env.DB.prepare("DELETE FROM published_artifacts WHERE id=? AND owner_id=?").bind(id,user.id).run();
+    if(!result.meta?.changes)return json({error:"Your published artifact was not found."},404);
+    return json({ok:true});
+  }
+  if(path.startsWith("/a/") && request.method==="GET") {
+    await ensurePublishedTable(env);
+    const id=decodeURIComponent(path.slice(3));
+    const row=await env.DB.prepare("SELECT title,code FROM published_artifacts WHERE id=?").bind(id).first();
+    if(!row)return new Response("Online artifact not found.",{status:404,headers:{"content-type":"text/plain; charset=utf-8","cache-control":"no-store"}});
+    const csp="sandbox allow-scripts allow-forms allow-modals; default-src 'none'; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src data: blob: https:; font-src data: https:; media-src data: blob: https:; connect-src 'none'; base-uri 'none'; form-action 'none'";
+    return new Response(row.code,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"public, max-age=60","content-security-policy":csp,"x-content-type-options":"nosniff","referrer-policy":"no-referrer"}});
   }
   return env.ASSETS.fetch(request);
 }
