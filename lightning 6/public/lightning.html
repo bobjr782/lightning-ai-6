@@ -1966,6 +1966,26 @@ function combineFences(text) {
     .account-settings-body { padding:14px !important; }
 }
 
+
+/* Final control sizing and project form fixes */
+.shared-with-me-btn{min-height:48px!important;min-width:164px!important;padding:13px 22px!important;border-radius:11px!important;font-size:1rem!important;font-weight:700!important;background:var(--accent)!important;color:var(--accent-ink)!important;border:1px solid var(--accent)!important}
+.shared-with-me-btn:hover{filter:brightness(1.08)}
+.mini-btn,.account-settings-body button,.account-settings-card button{min-height:42px;padding:11px 16px!important;line-height:1.25;font-size:.9rem}
+.account-settings-body .trial-account .mini-btn{padding:11px 16px!important}
+.account-settings-body .prov-row .mini-btn{min-width:76px;padding:11px 16px!important}
+.account-settings-body input.field{min-height:46px;padding:12px 14px!important}
+.account-settings-body input[type=file].field{height:auto}
+.account-settings-body .close-modal-btn{min-height:36px;padding:5px 10px!important}
+.pixel-avatar-choices{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;width:100%}
+.pixel-avatar-choice{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-width:0;min-height:76px!important;padding:9px 6px!important;border:1px solid var(--border-color)!important;border-radius:10px!important;background:var(--surface)!important;color:var(--text-primary)!important}
+.pixel-avatar-choice.selected{border:2px solid var(--accent)!important;background:var(--surface-2)!important}
+.pixel-avatar-choice .profile-avatar{width:34px!important;height:34px!important;border:0;border-radius:5px;image-rendering:pixelated}
+.pixel-avatar-choice small{font-size:.72rem;color:var(--text-secondary)}
+.page-body .row-item.col>input.field{display:block;width:100%;max-width:100%;min-width:0;height:44px;min-height:44px;flex:0 0 44px;padding:10px 13px!important;font-size:.95rem!important;line-height:1.2;box-sizing:border-box}
+.page-body .row-item.col>textarea.field{width:100%;min-height:68px;padding:10px 13px!important;font-size:.92rem!important;line-height:1.4;box-sizing:border-box}
+.page-body .row-item.col>button{align-self:flex-start;min-height:44px;padding:11px 18px!important}
+@media(max-width:520px){.pixel-avatar-choices{grid-template-columns:repeat(3,minmax(0,1fr))}.shared-with-me-btn{min-width:0!important;padding:11px 13px!important}}
+
 </style>` + doc;
     if (js) doc = /<\/body>/i.test(doc) ? doc.replace(/<\/body>/i, () => `<script>\n${js}\n<\/script><\/body>`) : doc + `<script>\n${js}\n<\/script>`;
     const title = ((doc.match(/<title>([^<]*)/i) || [])[1] || "Web app").trim();
@@ -2221,15 +2241,15 @@ function provRow(id, label) {
     r.append(has ? btn("✕", () => disconnect(id)) : btn("My key", signIn)); return r;
 }
 let lightningAccount=null, lightningEntitlement=null;
-function makeProfileAvatar(profile,size=38){
+function makeProfileAvatar(profile,size=38,variant=0){
     if(profile?.avatar){const img=document.createElement("img");img.className="profile-avatar";img.style.width=size+"px";img.style.height=size+"px";img.src=profile.avatar;img.alt="Profile picture";return img;}
-    const canvas=document.createElement("canvas");canvas.width=5;canvas.height=5;canvas.className="profile-avatar";canvas.style.width=size+"px";canvas.style.height=size+"px";
-    const ctx=canvas.getContext("2d"),code=String(profile?.friendCode||profile?.username||"LIGHT");let hash=2166136261;
+    const canvas=document.createElement("canvas");canvas.width=8;canvas.height=8;canvas.className="profile-avatar";canvas.style.width=size+"px";canvas.style.height=size+"px";
+    const ctx=canvas.getContext("2d"),code=String(profile?.friendCode||profile?.username||"LIGHT")+":"+variant;let hash=2166136261;
     for(let i=0;i<code.length;i++){hash^=code.charCodeAt(i);hash=Math.imul(hash,16777619);}
-    const palettes=["#2f80ed","#8250df","#1a7f37","#bf8700","#cf4b4b","#0969da","#6639ba","#0f766e"],color=palettes[(hash>>>0)%palettes.length];
-    ctx.fillStyle="#e6edf3";ctx.fillRect(0,0,5,5);
-    for(let y=0;y<5;y++)for(let x=0;x<3;x++){hash^=hash<<13;hash^=hash>>>17;hash^=hash<<5;if((hash>>>0)&1){ctx.fillStyle=color;ctx.fillRect(x,y,1,1);ctx.fillRect(4-x,y,1,1);}}
-    canvas.title="Automatic Lightning pixel avatar";return canvas;
+    const palettes=["#2f80ed","#8250df","#1a7f37","#bf8700","#cf4b4b","#0969da","#6639ba","#0f766e","#d97757","#0e7490","#be185d","#64748b"],color=palettes[(hash>>>0)%palettes.length];
+    ctx.fillStyle="#e6edf3";ctx.fillRect(0,0,8,8);
+    for(let y=0;y<8;y++)for(let x=0;x<4;x++){hash^=hash<<13;hash^=hash>>>17;hash^=hash<<5;if(((hash>>>0)&1)||((x===1||x===2)&&y===3)){ctx.fillStyle=color;ctx.fillRect(x,y,1,1);ctx.fillRect(7-x,y,1,1);}}
+    canvas.title="Lightning pixel avatar "+(variant+1);return canvas;
 }
 function compactProfileImage(source){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{try{const c=document.createElement("canvas");c.width=256;c.height=256;const ctx=c.getContext("2d"),side=Math.min(img.naturalWidth,img.naturalHeight),sx=(img.naturalWidth-side)/2,sy=(img.naturalHeight-side)/2;ctx.drawImage(img,sx,sy,side,side,0,0,256,256);let q=.78,data=c.toDataURL("image/webp",q);while(data.length>95000&&q>.3){q-=.08;data=c.toDataURL("image/webp",q);}if(data.length>100000)throw new Error("That picture is too large. Try a smaller image.");resolve(data);}catch(e){reject(e);}};img.onerror=()=>reject(new Error("Could not read that image."));img.src=source;});}
 function openProfileEditor(){
@@ -2256,18 +2276,26 @@ function openProfileEditor(){
 
     if(lightningAccount){
         body.append(el("h3","settings-section-title","Profile picture"));
-        let chosen=lightningAccount.avatar||null;
+        let chosen=lightningAccount.avatar||null, selectedPixel=0;
         const preview=el("div","profile-settings-preview");
-        const paint=()=>preview.replaceChildren(makeProfileAvatar({...lightningAccount,avatar:chosen},76));
+        const paint=()=>preview.replaceChildren(makeProfileAvatar({...lightningAccount,avatar:chosen},76,selectedPixel));
         paint();
-        const note=el("small","auth-note","Upload a picture, generate one with FLUX, or use your automatic pixel avatar.");
+        const note=el("small","auth-note","Choose from the pixel avatars, upload a picture, or generate one with FLUX.");
+        const pixelChoices=el("div","pixel-avatar-choices");
+        for(let v=0;v<12;v++){
+            const choice=btn("",()=>{selectedPixel=v;chosen=makeProfileAvatar({...lightningAccount,avatar:null},64,v).toDataURL("image/png");pixelChoices.querySelectorAll("button").forEach((b,k)=>b.classList.toggle("selected",k===v));paint();});
+            choice.classList.add("pixel-avatar-choice");
+            choice.append(makeProfileAvatar({...lightningAccount,avatar:null},34,v),el("small","","Pixel "+(v+1)));
+            if(v===0)choice.classList.add("selected");
+            pixelChoices.append(choice);
+        }
         const file=el("input","field");file.type="file";file.accept="image/png,image/jpeg,image/webp";
         file.onchange=async()=>{const f=file.files?.[0];if(!f)return;try{const src=await new Promise((res,rej)=>{const reader=new FileReader();reader.onload=()=>res(reader.result);reader.onerror=rej;reader.readAsDataURL(f);});chosen=await compactProfileImage(src);paint();}catch(e){alert(e.message);}};
         const promptInput=el("input","field");promptInput.placeholder="Describe your profile picture for FLUX…";promptInput.value="A crisp, friendly pixel-art lightning bolt emblem, centered, bold simple shapes, dark background";
         const generate=btn("Generate with FLUX",async()=>{if(!promptInput.value.trim())return;generate.disabled=true;generate.textContent="Generating…";try{const r=await fetch("/api/image",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({prompt:promptInput.value.trim(),width:512,height:512})});const j=await r.json();if(!r.ok)throw new Error(j.error||"FLUX could not generate your picture.");chosen=await compactProfileImage(j.image);paint();showAiBubbleOnScreen("Profile picture generated with "+(j.model||"FLUX")+".");}catch(e){alert(e.message);}finally{generate.disabled=false;generate.textContent="Generate with FLUX";}});
-        const reset=btn("Use pixel avatar",()=>{chosen=null;paint();});
+        const reset=btn("Use default pixel avatar",()=>{chosen=null;selectedPixel=0;pixelChoices.querySelectorAll("button").forEach((b,k)=>b.classList.toggle("selected",k===0));paint();});
         const save=btn("Save profile picture",async()=>{save.disabled=true;save.textContent="Saving…";try{const r=await fetch("/api/profile",{method:"PUT",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({avatar:chosen})});const j=await r.json();if(!r.ok)throw new Error(j.error||"Could not save profile.");ov.remove();await refreshLightningAccount();showAiBubbleOnScreen("Lightning profile saved.");}catch(e){alert(e.message);}finally{save.disabled=false;save.textContent="Save profile picture";}});
-        body.append(preview,note,file,promptInput,generate,reset,save);
+        body.append(preview,note,pixelChoices,file,promptInput,generate,reset,save);
     }
     body.append(el("h3","settings-section-title","AI providers"),provRow("openrouter","OpenRouter"),provRow("groq","Groq"),provRow("google","Google"));
     card.append(head,body);ov.append(card);
