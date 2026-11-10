@@ -68,6 +68,8 @@ async function ensureSocialTables(env) {
     UNIQUE(sender_id,recipient_id)
   )`).run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS friend_requests_recipient_idx ON friend_requests(recipient_id,status,created_at)").run();
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS direct_messages (id TEXT PRIMARY KEY, sender_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, recipient_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, message TEXT NOT NULL, created_at INTEGER NOT NULL)").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS direct_messages_pair_idx ON direct_messages(sender_id,recipient_id,created_at)").run();
 }
 function friendPair(a,b){return a<b?[a,b]:[b,a];}
 
@@ -506,6 +508,35 @@ async function route(request, env) {
       env.DB.prepare("SELECT friend_requests.id,users.username AS from,user_profiles.friend_code AS friendCode,user_profiles.avatar_data AS avatar FROM friend_requests JOIN users ON users.id=friend_requests.sender_id LEFT JOIN user_profiles ON user_profiles.user_id=users.id WHERE friend_requests.recipient_id=? AND friend_requests.status='pending' ORDER BY friend_requests.created_at DESC").bind(user.id).all()
     ]);
     return json({friends:friends.results||[],requests:requests.results||[]});
+  }
+  if(path==="/api/friends/messages" && request.method==="GET") {
+    if(!user)return json({error:"Sign in required."},401);
+    await ensureSocialTables(env);
+    const lookup=String(url.searchParams.get("with")||"").trim();
+    if(!lookup)return json({error:"Choose a friend to chat with."},400);
+    const target=await env.DB.prepare("SELECT id,username FROM users WHERE username_norm=?").bind(lookup.toLowerCase()).first();
+    if(!target)return json({error:"Friend not found."},404);
+    const [low,high]=friendPair(user.id,target.id);
+    const friendship=await env.DB.prepare("SELECT 1 AS ok FROM friendships WHERE user_low=? AND user_high=?").bind(low,high).first();
+    if(!friendship)return json({error:"You can only message accepted friends."},403);
+    const rows=await env.DB.prepare("SELECT direct_messages.id,direct_messages.sender_id,direct_messages.message,direct_messages.created_at,users.username AS sender_name FROM direct_messages JOIN users ON users.id=direct_messages.sender_id WHERE (direct_messages.sender_id=? AND direct_messages.recipient_id=?) OR (direct_messages.sender_id=? AND direct_messages.recipient_id=?) ORDER BY direct_messages.created_at ASC LIMIT 200").bind(user.id,target.id,target.id,user.id).all();
+    return json({messages:(rows.results||[]).map(m=>({id:m.id,from:m.sender_name,message:m.message,createdAt:m.created_at,mine:m.sender_id===user.id}))});
+  }
+  if(path==="/api/friends/messages" && request.method==="POST") {
+    if(!user)return json({error:"Sign in required."},401);
+    await ensureSocialTables(env);
+    let b;try{b=await body(request)}catch{return json({error:"Invalid message."},400)}
+    const lookup=String(b.friend||"").trim(),message=String(b.message||"").trim();
+    if(!lookup||!message)return json({error:"Choose a friend and enter a message."},400);
+    if(message.length>2000)return json({error:"Messages are limited to 2,000 characters."},413);
+    const target=await env.DB.prepare("SELECT id FROM users WHERE username_norm=?").bind(lookup.toLowerCase()).first();
+    if(!target)return json({error:"Friend not found."},404);
+    const [low,high]=friendPair(user.id,target.id);
+    const friendship=await env.DB.prepare("SELECT 1 AS ok FROM friendships WHERE user_low=? AND user_high=?").bind(low,high).first();
+    if(!friendship)return json({error:"You can only message accepted friends."},403);
+    const id=b64(randomBytes(18)),now=Math.floor(Date.now()/1000);
+    await env.DB.prepare("INSERT INTO direct_messages(id,sender_id,recipient_id,message,created_at) VALUES(?,?,?,?,?)").bind(id,user.id,target.id,message,now).run();
+    return json({ok:true,id,createdAt:now});
   }
   if(path==="/api/friends/request" && request.method==="POST") {
     if(!user)return json({error:"Sign in required."},401);
