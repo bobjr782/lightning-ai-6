@@ -1,5 +1,6 @@
 const SESSION_DAYS = 30;
 const MAX_DATA_BYTES = 20000000;
+let accountTablesReady = false;
 const encoder = new TextEncoder();
 
 function json(data, status = 200, headers = {}) {
@@ -382,7 +383,7 @@ async function route(request, env) {
   if(path==="/api/chat" && request.method==="POST") return chatRoute(request,env);
   if(path==="/api/generate" && request.method==="POST") return generateRoute(request, env);
   if(!env.DB) return json({error:"Account database is not configured yet."},503);
-  try { await ensureAccountTables(env); } catch(error) { return json({error:"Lightning account database setup failed. Check the DB binding and D1 permissions.",detail:env.ENVIRONMENT==="development"?String(error):undefined},503); }
+  if(!accountTablesReady) { try { await ensureAccountTables(env); accountTablesReady=true; } catch(error) { return json({error:"Lightning account database setup failed. Check the DB binding and D1 permissions.",detail:env.ENVIRONMENT==="development"?String(error):undefined},503); } }
   if(path==="/api/register" && request.method==="POST") {
     let b; try{b=await body(request)}catch{return json({error:"Invalid request."},400)}
     const limit=await authLimit(request,env);
