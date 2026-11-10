@@ -570,6 +570,122 @@ body.img-mode .img-opts { display: flex; }
     .sidebar-content > .sidebar-btn { min-height: 48px; }
 }
 
+
+/* Requested layout refinements: chats at the bottom, larger controls */
+.sidebar-content {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+}
+.sidebar-chat-heading {
+    margin-top: auto !important;
+    padding-top: 16px !important;
+    border-top: 1px solid var(--border-color);
+}
+.sidebar-chat-list {
+    max-height: 24vh !important;
+    flex: 0 0 auto !important;
+    gap: 7px !important;
+}
+.sidebar-chat-item {
+    min-height: 44px !important;
+    padding: 11px 13px !important;
+    font-size: .94rem !important;
+}
+.friends-sidebar-btn,
+.sidebar-content > .sidebar-btn {
+    min-height: 48px;
+    padding: 13px 15px !important;
+    font-size: 1rem !important;
+}
+.friends-sidebar-btn { gap: 12px; }
+.friends-pixel-icon { width: 22px; height: 22px; flex-basis: 22px; }
+
+/* Make the profile shortcut a proper orange My stuff action */
+.profile-shortcut {
+    width: auto !important;
+    min-width: 116px;
+    height: 44px !important;
+    padding: 5px 15px 5px 8px !important;
+    gap: 10px;
+    border: 1px solid var(--accent) !important;
+    border-radius: 12px !important;
+    background: var(--accent) !important;
+    color: var(--accent-ink) !important;
+    font: 700 .95rem 'DM Sans', sans-serif;
+    white-space: nowrap;
+}
+.profile-shortcut:hover {
+    background: var(--accent-blue-hover) !important;
+    border-color: var(--accent-blue-hover) !important;
+    transform: translateY(-1px);
+}
+.profile-shortcut .profile-avatar {
+    width: 30px !important;
+    height: 30px !important;
+    border: 1px solid rgba(0,0,0,.2) !important;
+}
+
+/* Friends page: larger touch targets and tidy rows */
+#friends-page .page-body .mini-btn,
+#friends-page .page-body button,
+.art-page.open .page-body .mini-btn {
+    min-height: 42px;
+    padding: 10px 15px;
+    font-size: .92rem;
+}
+.page-body .row-item {
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.page-body .row-item .mini-btn {
+    min-width: 88px;
+    min-height: 42px;
+    padding: 10px 14px;
+    font-size: .9rem;
+    margin: 0;
+}
+.page-body .row-item .field {
+    min-width: 0;
+    flex: 1 1 240px;
+    min-height: 44px;
+}
+.page-body h3 { margin: 22px 0 12px; }
+
+/* Account settings must fit within the viewport */
+.account-settings-overlay {
+    padding: 16px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    align-items: flex-start !important;
+}
+.account-settings-card {
+    width: min(560px, 100%) !important;
+    max-width: 100% !important;
+    max-height: calc(100vh - 32px);
+    margin: auto;
+    overflow: hidden;
+}
+.account-settings-body {
+    min-height: 0;
+    max-height: calc(100vh - 112px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+.account-settings-card .modal-header { flex: 0 0 auto; }
+.account-settings-body > h3 { margin: 8px 0 0; }
+.account-settings-body .prov-row,
+.account-settings-body .trial-account { flex: 0 0 auto; }
+
+@media (max-width: 600px) {
+    .profile-shortcut { min-width: 104px; height: 42px !important; }
+    .account-settings-overlay { padding: 8px; }
+    .account-settings-card { max-height: calc(100vh - 16px); }
+    .account-settings-body { max-height: calc(100vh - 88px); padding: 15px; }
+    .page-body .row-item .mini-btn { flex: 1 1 100px; }
+}
+
 </style>
 </head>
 <body> 
@@ -587,7 +703,6 @@ body.img-mode .img-opts { display: flex; }
                 <button class="sidebar-btn font-bold" onclick="startNewChat()">＋ New chat</button>
                 <button class="sidebar-btn friends-sidebar-btn" onclick="openFriendsPage()"><svg class="friends-pixel-icon" viewBox="0 0 8 8" aria-hidden="true"><path fill="currentColor" d="M1 1h2v2H1zM5 1h2v2H5zM0 4h4v1H0zM4 4h4v1H4zM1 5h2v2H1zM5 5h2v2H5z"/></svg> Friends</button>
                 <button class="sidebar-btn" onclick="openTasksPage()">Tasks</button>
-                <div class="sidebar-chat-heading">Your chats</div><div id="sidebar-chat-list" class="sidebar-chat-list"></div>
                 <button class="sidebar-btn" onclick="openProjectsPage()">📁 Projects</button>
                 <button class="sidebar-btn" onclick="openArtifactsPage()">🧩 Artifacts</button>
                 <button class="sidebar-btn" onclick="openOnlinePage()">🌐 Online artifacts</button>
@@ -597,6 +712,7 @@ body.img-mode .img-opts { display: flex; }
                 <button class="sidebar-btn" onclick="openPlugins()">🔌 Plugins</button>
                 <button class="sidebar-btn" onclick="toggleTheme()">◐ Light / dark</button>
                 <button class="sidebar-btn" onclick="clearHistory()">🗑 Clear all chats</button>
+                <div class="sidebar-chat-heading">Your chats</div><div id="sidebar-chat-list" class="sidebar-chat-list"></div>
             </div>
 
             <div class="sidebar-footer">
@@ -2077,7 +2193,7 @@ function makeProfileAvatar(profile,size=38){
 }
 function compactProfileImage(source){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{try{const c=document.createElement("canvas");c.width=256;c.height=256;const ctx=c.getContext("2d"),side=Math.min(img.naturalWidth,img.naturalHeight),sx=(img.naturalWidth-side)/2,sy=(img.naturalHeight-side)/2;ctx.drawImage(img,sx,sy,side,side,0,0,256,256);let q=.78,data=c.toDataURL("image/webp",q);while(data.length>95000&&q>.3){q-=.08;data=c.toDataURL("image/webp",q);}if(data.length>100000)throw new Error("That picture is too large. Try a smaller image.");resolve(data);}catch(e){reject(e);}};img.onerror=()=>reject(new Error("Could not read that image."));img.src=source;});}
 function openProfileEditor(){
-    const ov=el("div","modal-overlay open"),card=el("div","modal-card"),body=el("div","modal-body"),head=el("div","modal-header");
+    const ov=el("div","modal-overlay open account-settings-overlay"),card=el("div","modal-card account-settings-card"),body=el("div","modal-body account-settings-body"),head=el("div","modal-header");
     head.append(el("h3","","Account settings"),btn("✕",()=>ov.remove()));
     body.append(trialCard(),el("h3","","AI providers"),provRow("openrouter","OpenRouter"),provRow("groq","Groq"),provRow("google","Google"));
     if(!lightningAccount){body.append(el("p","auth-note","Sign in to Lightning to edit your profile picture and friend key."));card.append(head,body);ov.append(card);ov.onclick=e=>{if(e.target===ov)ov.remove();};document.body.append(ov);return;}
@@ -2100,7 +2216,7 @@ window.openProfileEditor = openProfileEditor;
 function updateTopProfileShortcut(){
     const button=document.getElementById("profile-shortcut");
     if(!button)return;
-    button.replaceChildren(makeProfileAvatar(lightningAccount||{username:"Lightning",friendCode:"LIGHT"},32));
+    button.replaceChildren(makeProfileAvatar(lightningAccount||{username:"Lightning",friendCode:"LIGHT"},28),document.createTextNode("My stuff"));
     button.title=lightningAccount?"Open "+lightningAccount.username+"'s Lightning profile settings":"Sign in to Lightning";
     button.setAttribute("aria-label",button.title);
 }
