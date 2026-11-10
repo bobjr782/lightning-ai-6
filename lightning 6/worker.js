@@ -70,6 +70,33 @@ async function ensureSocialTables(env) {
 }
 function friendPair(a,b){return a<b?[a,b]:[b,a];}
 
+async function ensureAccountTables(env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY, username TEXT NOT NULL, username_norm TEXT NOT NULL UNIQUE,
+    salt TEXT NOT NULL, password_hash TEXT NOT NULL, created_at INTEGER NOT NULL
+  )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS sessions (
+    token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at INTEGER NOT NULL, created_at INTEGER NOT NULL
+  )`).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions(user_id)").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS sessions_expiry_idx ON sessions(expires_at)").run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS auth_attempts (
+    ip_hash TEXT NOT NULL, attempted_at INTEGER NOT NULL
+  )`).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS auth_attempts_ip_time_idx ON auth_attempts(ip_hash,attempted_at)").run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS user_data (
+    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    data_json TEXT NOT NULL DEFAULT '{}', object_key TEXT, updated_at INTEGER NOT NULL
+  )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS shares (
+    id TEXT PRIMARY KEY, owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    recipient_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    artifact_json TEXT NOT NULL, created_at INTEGER NOT NULL, UNIQUE(owner_id,recipient_id,id)
+  )`).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS shares_recipient_idx ON shares(recipient_id,created_at)").run();
+}
+
 async function ensurePublishedTable(env) {
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS published_artifacts (
     id TEXT PRIMARY KEY,
@@ -355,16 +382,19 @@ async function route(request, env) {
   if(path==="/api/chat" && request.method==="POST") return chatRoute(request,env);
   if(path==="/api/generate" && request.method==="POST") return generateRoute(request, env);
   if(!env.DB) return json({error:"Account database is not configured yet."},503);
+  try { await ensureAccountTables(env); } catch(error) { return json({error:"Lightning account database setup failed. Check the DB binding and D1 permissions.",detail:env.ENVIRONMENT==="development"?String(error):undefined},503); }
   if(path==="/api/register" && request.method==="POST") {
     let b; try{b=await body(request)}catch{return json({error:"Invalid request."},400)}
+    const limit=await authLimit(request,env);
+    if(limit.blocked) return json({error:"Too many account attempts. Wait 15 minutes and try again."},429);
     const username=String(b.username||"").trim(), norm=username.toLowerCase(), password=String(b.password||"");
     if(!/^[A-Za-z0-9_]{3,24}$/.test(username)) return json({error:"Username must be 3–24 characters and use only letters, numbers or underscores."},400);
     if(password.length<10 || password.length>128) return json({error:"Password must be 10–128 characters."},400);
     const exists=await env.DB.prepare("SELECT id FROM users WHERE username_norm=?").bind(norm).first();
-    if(exists) return json({error:"That username is already taken."},409);
+    if(exists) { await env.DB.prepare("INSERT INTO auth_attempts(ip_hash,attempted_at) VALUES(?,?)").bind(limit.key,limit.now).run(); return json({error:"That username is already taken."},409); }
     const id=b64(randomBytes(18)), salt=b64(randomBytes(16)), hash=await passwordHash(password,salt), now=Math.floor(Date.now()/1000);
     try { await env.DB.prepare("INSERT INTO users(id,username,username_norm,salt,password_hash,created_at) VALUES(?,?,?,?,?,?)").bind(id,username,norm,salt,hash,now).run(); }
-    catch { return json({error:"Could not create the account. Try another username."},409); }
+    catch(error) { await env.DB.prepare("INSERT INTO auth_attempts(ip_hash,attempted_at) VALUES(?,?)").bind(limit.key,limit.now).run(); return json({error:env.ENVIRONMENT==="development"?String(error):"Could not create the account. Please try again."},500); }
     const user={id,username}, token=await newSession(user,env);
     return json({ok:true,user},{status:201,headers:{ "set-cookie":cookie(token,SESSION_DAYS*86400) }});
   }
