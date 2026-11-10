@@ -464,7 +464,7 @@ textarea.field { resize: vertical; }
 .logo-bolt .px { width: 24px; height: 24px; vertical-align: -5px; }
 .art-icon .px { width: 32px; height: 32px; }
 .avatar .px { width: 16px; height: 16px; }
-.profile-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;border:1px solid var(--border-color);background:var(--surface-2);flex:0 0 auto;image-rendering:pixelated}.profile-key{font-family:ui-monospace,monospace;letter-spacing:.12em;font-weight:700}.profile-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.profile-tools .mini-btn{margin:0}
+.profile-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;border:1px solid var(--border-color);background:var(--surface-2);flex:0 0 auto;image-rendering:pixelated}.profile-key{font-family:ui-monospace,monospace;letter-spacing:.12em;font-weight:700}.profile-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.profile-tools .mini-btn{margin:0}.profile-shortcut{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;padding:2px;border:1px solid var(--border-color);border-radius:50%;background:var(--surface);cursor:pointer;flex:0 0 auto}.profile-shortcut:hover{border-color:var(--accent);transform:translateY(-1px)}.profile-shortcut .profile-avatar{width:32px!important;height:32px!important;border:0}.profile-shortcut:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .message-row.ai-align::before { content: ""; flex: 0 0 28px; width: 28px; height: 28px; border-radius: 0; background: var(--accent); -webkit-mask: var(--px-bolt) center / 24px 24px no-repeat; mask: var(--px-bolt) center / 24px 24px no-repeat; margin-right: 12px; font-size: 0; }
 #model-pick { max-width: 150px; text-overflow: ellipsis; }
 .acct { flex-direction: column; align-items: stretch; gap: 8px; }
@@ -549,7 +549,7 @@ body.img-mode .img-opts { display: flex; }
             <!-- Floating Top Menu Header Row -->
             <div class="top-menu-bar">
                 <button class="sidebar-btn toggle-btn" onclick="toggleSidebar()">☰ Menu</button>
-                <span class="top-right"><select id="lang-pick" class="select" translate="no" title="Translate this page"><option value="en">Translate: original</option><option value="es">Español</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="pt">Português</option><option value="it">Italiano</option><option value="ar">العربية</option><option value="zh-CN">中文 (简体)</option><option value="ja">日本語</option><option value="ko">한국어</option><option value="hi">हिन्दी</option><option value="ru">Русский</option><option value="tr">Türkçe</option><option value="id">Bahasa Indonesia</option><option value="vi">Tiếng Việt</option><option value="nl">Nederlands</option><option value="pl">Polski</option><option value="uk">Українська</option><option value="th">ไทย</option><option value="sv">Svenska</option></select><button class="upgrade" onclick="upgrade()" id="upro">upgrade to pro</button></span>
+                <span class="top-right"><select id="lang-pick" class="select" translate="no" title="Translate this page"><option value="en">Translate: original</option><option value="es">Español</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="pt">Português</option><option value="it">Italiano</option><option value="ar">العربية</option><option value="zh-CN">中文 (简体)</option><option value="ja">日本語</option><option value="ko">한국어</option><option value="hi">हिन्दी</option><option value="ru">Русский</option><option value="tr">Türkçe</option><option value="id">Bahasa Indonesia</option><option value="vi">Tiếng Việt</option><option value="nl">Nederlands</option><option value="pl">Polski</option><option value="uk">Українська</option><option value="th">ไทย</option><option value="sv">Svenska</option></select><button class="upgrade" onclick="upgrade()" id="upro">upgrade to pro</button><button class="profile-shortcut" id="profile-shortcut" type="button" title="Open Lightning account settings" aria-label="Open Lightning account settings" onclick="openProfileEditor()"></button></span>
             </div>
 
             <!-- Messages container where your JavaScript rows will inject -->
@@ -2014,6 +2014,13 @@ function openProfileEditor(){
     const save=btn("Save profile picture",async()=>{save.disabled=true;save.textContent="Saving…";try{const r=await fetch("/api/profile",{method:"PUT",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({avatar:chosen})});const j=await r.json();if(!r.ok)throw new Error(j.error||"Could not save profile.");ov.remove();await refreshLightningAccount();showAiBubbleOnScreen("Lightning profile saved.");}catch(e){alert(e.message);}finally{save.disabled=false;save.textContent="Save profile picture";}});
     body.append(preview,note,file,promptInput,generate,reset,save);card.append(head,body);ov.append(card);ov.onclick=e=>{if(e.target===ov)ov.remove();};document.body.append(ov);
 }
+function updateTopProfileShortcut(){
+    const button=document.getElementById("profile-shortcut");
+    if(!button)return;
+    button.replaceChildren(makeProfileAvatar(lightningAccount||{username:"Lightning",friendCode:"LIGHT"},32));
+    button.title=lightningAccount?"Open "+lightningAccount.username+"'s Lightning profile settings":"Sign in to Lightning";
+    button.setAttribute("aria-label",button.title);
+}
 function trialCard() {
     const wrap=el("div","trial-account");
     const head=el("div","trial-account-head");
@@ -2023,10 +2030,10 @@ function trialCard() {
     if(lightningAccount && lightningEntitlement){
         const e=lightningEntitlement;
         const line=el("small","",e.trialActive ? `${e.textRemaining} chat messages · ${e.imagesRemaining} images left` : "Sign in to manage your account");
-        wrap.append(makeProfileAvatar(lightningAccount,38),line);
+        wrap.append(line);
         const keyLine=el("small","profile-key","Friend key: "+(lightningAccount.friendCode||"Creating…"));
         const keyActions=el("div","profile-tools");
-        keyActions.append(keyLine,btn("Copy",async()=>{try{await navigator.clipboard.writeText(lightningAccount.friendCode);showAiBubbleOnScreen("Friend key copied.");}catch(_){prompt("Your Lightning friend key",lightningAccount.friendCode);}}),btn("Edit profile",openProfileEditor));
+        keyActions.append(keyLine,btn("Copy",async()=>{try{await navigator.clipboard.writeText(lightningAccount.friendCode);showAiBubbleOnScreen("Friend key copied.");}catch(_){prompt("Your Lightning friend key",lightningAccount.friendCode);}}));
         wrap.append(keyActions);
         if(e.trialActive){
             const bar=el("div","trial-meter"), fill=el("span");
@@ -2048,6 +2055,7 @@ async function refreshLightningAccount(){
         lightningEntitlement=r.ok?j.entitlement:null;
     }catch(e){lightningAccount=null;lightningEntitlement=null;}
     drawAcct();
+    updateTopProfileShortcut();
 }
 function openLightningAuth(){
     const ov=el("div","modal-overlay open"),card=el("div","modal-card");ov.append(card);document.body.append(ov);
@@ -2081,7 +2089,7 @@ function openLightningAuth(){
     };
     ov.onclick=e=>{if(e.target===ov)ov.remove();};render();
 }
-function drawAcct() { acct.innerHTML = ""; acct.append(trialCard(),provRow("openrouter", "OpenRouter"),provRow("groq", "Groq"),provRow("google", "Google")); }
+function drawAcct() { acct.innerHTML = ""; acct.append(trialCard(),provRow("openrouter", "OpenRouter"),provRow("groq", "Groq"),provRow("google", "Google")); updateTopProfileShortcut(); }
 const KEYINFO = { groq: { name: "Groq", prefix: "gsk_", url: "https://console.groq.com/keys", check: "https://api.groq.com/openai/v1/models", cache: () => { groqCache = null; } },
     google: { name: "Google", prefix: "AIza", url: "https://aistudio.google.com/apikey", check: "https://generativelanguage.googleapis.com/v1beta/openai/models", cache: () => { googleCache = null; } } };
 function keyModal(id) {
