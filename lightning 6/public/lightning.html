@@ -2329,6 +2329,7 @@ async function fillModels() {
     const grp = (label, opts) => { const g = document.createElement("optgroup"); g.label = label; opts.forEach(([v, t]) => g.append(new Option(t, v))); sel.append(g); };
     grp("Lightning (free, no key)", [["lightning|lightning-free", "Auto-connect — no API key"]]);
     grp("OpenRouter (free)", [["openrouter|", "Auto — rotate free"], ["openrouter|" + CODE_MODEL, "Qwen3 Coder"], ...(await freeModels()).slice(0, 30).filter(m => m.id !== CODE_MODEL).map(m => ["openrouter|" + m.id, short(m.id)])]);
+    grp("OpenRouter (paid — requires credits)", [["openrouter|anthropic/claude-sonnet-4.5", "Claude Sonnet 4.5"]]);
     grp("Groq (fast)", (await groqModels((s.keys && s.keys.groq) || "")).map(m => ["groq|" + m, m]));
     grp("Google Gemini", (await googleModels((s.keys && s.keys.google) || "")).slice(0, 8).map(m => ["google|" + m, m]));
     if (s.endpoint && s.models && s.models.custom) grp("Custom", [["custom|" + s.models.custom, s.models.custom]]);
