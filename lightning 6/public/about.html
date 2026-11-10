@@ -117,6 +117,16 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
 .account-form[hidden],.account-actions[hidden]{display:none}
 @media (max-width: 760px) { nav .links { display: none; } .hero { padding: 70px 0 60px; } section { padding: 64px 0; } .fcols { grid-template-columns: 1fr 1fr; } .arrow { display: none; } }
 #account[hidden]{display:none!important}
+.about-profile-link{display:none;align-items:center;gap:9px;padding:6px 12px 6px 7px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.about-profile-link.visible{display:inline-flex}
+.about-profile-link img,.about-profile-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;display:grid;place-items:center;background:linear-gradient(135deg,#f2bd58,#a66b22);color:#20170b;font-weight:800;flex:0 0 36px}
+.about-profile-card{display:flex;align-items:center;gap:16px;padding:17px 0 21px;margin-bottom:18px;border-bottom:1px solid var(--line)}
+.about-profile-card[hidden]{display:none}
+.about-profile-card img,.about-profile-card .about-profile-avatar{width:72px;height:72px;flex-basis:72px;font-size:25px}
+.about-profile-name{font-size:20px;font-weight:750;overflow-wrap:anywhere}
+.about-profile-key{font-size:12px;color:var(--mute);margin-top:4px}
+@media(max-width:760px){.about-profile-link{padding:5px}.about-profile-link span{display:none}}
+
 </style>
 </head>
 <body>
@@ -125,6 +135,7 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
   <div class="wrap">
     <a class="brand" href="#top"><i data-px="bolt"></i> lightning</a>
     <div class="links"><a href="#features">Features</a><a href="#providers">Models</a><a href="#privacy">Privacy</a><a href="#faq">FAQ</a><a href="#account">Account</a></div>
+    <button class="about-profile-link" id="about-profile-link" type="button" aria-label="Open your Lightning account"><img id="about-nav-avatar" alt=""><span id="about-nav-username"></span></button>
     <a class="btn app-link" href="https://lightning-ai-6.ray-collier264.workers.dev/">Open lightning</a>
   </div>
 </nav>
@@ -143,6 +154,7 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
   <div class="wrap reveal">
     <div class="account-panel">
       <div class="eyebrow">Your Lightning identity</div>
+      <div class="about-profile-card" id="about-profile-card" hidden><img id="about-account-avatar" alt="Your profile picture"><div><div class="about-profile-name" id="about-account-username"></div><div class="about-profile-key" id="about-account-key"></div></div></div>
       <h2 class="serif">One account. Your creations. Your friends.</h2>
       <p class="lead">Sign in or create a free Lightning account to add friends and privately share images and artifacts.</p>
       <div id="about-account-status" class="account-status" aria-live="polite">Sign in or create an account to connect with friends and share privately.</div>
@@ -309,6 +321,37 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
       choices=document.getElementById("about-auth-choices"),
       showLogin=document.getElementById("about-show-login"),showRegister=document.getElementById("about-show-register"),
       passInput=document.getElementById("about-password");
+
+    var profileCard=document.getElementById("about-profile-card"),
+      profileAvatar=document.getElementById("about-account-avatar"),
+      profileName=document.getElementById("about-account-username"),
+      profileKey=document.getElementById("about-account-key"),
+      navProfile=document.getElementById("about-profile-link"),
+      navAvatar=document.getElementById("about-nav-avatar"),
+      navUsername=document.getElementById("about-nav-username");
+    function paintAboutProfile(user){
+      if(!user){profileCard.hidden=true;navProfile.classList.remove("visible");return;}
+      var label=(user.username||"Lightning").trim(),initials=label.slice(0,1).toUpperCase();
+      function putAvatar(node,id,src,alt){
+        if(src){
+          if(node.tagName!=="IMG"){node.outerHTML='<img id="'+id+'" alt="'+alt+'">';node=document.getElementById(id);}
+          node.src=src;node.alt=alt;node.className="";
+        }else{
+          if(node.tagName!=="DIV"){node.outerHTML='<div id="'+id+'" class="about-profile-avatar" aria-label="'+alt+'"></div>';node=document.getElementById(id);}
+          node.textContent=initials;node.className="about-profile-avatar";
+        }
+        return node;
+      }
+      profileAvatar=putAvatar(profileAvatar,"about-account-avatar",user.avatar,"Your profile picture");
+      navAvatar=putAvatar(navAvatar,"about-nav-avatar",user.avatar,"Profile picture");
+      profileName.textContent=label;
+      profileKey.textContent=user.friendCode?"Lightning friend key · "+user.friendCode:"Your Lightning account";
+      navUsername.textContent=label;profileCard.hidden=false;navProfile.classList.add("visible");
+    }
+    navProfile.addEventListener("click",function(){
+      accountSection.hidden=false;history.replaceState(null,"","#account");
+      accountSection.scrollIntoView({behavior:"smooth",block:"start"});
+    });
     showLogin.addEventListener("click",function(){setAuthMode("login");accountForm.hidden=false;choices.hidden=true;});
     showRegister.addEventListener("click",function(){setAuthMode("register");accountForm.hidden=false;choices.hidden=true;});
     function setAuthMode(mode){
@@ -338,9 +381,11 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
         var response=await fetch("/api/me",{credentials:"same-origin",cache:"no-store"});
         var result=await response.json();
         if(!response.ok||!result.user)throw new Error("Signed out");
+        paintAboutProfile(result.user);
         statusBox.textContent="Signed in as "+result.user.username+". Your Lightning friends and shared creations are ready.";
         accountForm.hidden=true;choices.hidden=true;actions.hidden=false;
       }catch(_){
+        paintAboutProfile(null);
         statusBox.textContent="Sign in or create an account to connect with friends and share privately.";
         accountForm.hidden=true;choices.hidden=false;actions.hidden=true;
       }
