@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://lightning-ai-6.ray-collier264.workers.dev/sitemap.xml
