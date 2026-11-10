@@ -2001,7 +2001,7 @@ function trialCard() {
         }
         wrap.append(btn("Sign out",async()=>{await fetch("/api/logout",{method:"POST",credentials:"same-origin"});lightningAccount=null;lightningEntitlement=null;drawAcct();showAiBubbleOnScreen("Signed out of Lightning.");}));
     } else {
-        wrap.append(btn("Sign in on About page",()=>{window.location.href="/#account";}));
+        wrap.append(btn("Sign in / Create account",()=>openLightningAuth()));
         wrap.append(el("small","auth-note","Start a 7-day trial. No API key required."));
     }
     return wrap;
@@ -2047,7 +2047,7 @@ function openLightningAuth(){
     };
     ov.onclick=e=>{if(e.target===ov)ov.remove();};render();
 }
-function drawAcct() { acct.innerHTML = ""; acct.append(provRow("openrouter", "OpenRouter"),provRow("groq", "Groq"),provRow("google", "Google")); }
+function drawAcct() { acct.innerHTML = ""; acct.append(trialCard(),provRow("openrouter", "OpenRouter"),provRow("groq", "Groq"),provRow("google", "Google")); }
 const KEYINFO = { groq: { name: "Groq", prefix: "gsk_", url: "https://console.groq.com/keys", check: "https://api.groq.com/openai/v1/models", cache: () => { groqCache = null; } },
     google: { name: "Google", prefix: "AIza", url: "https://aistudio.google.com/apikey", check: "https://generativelanguage.googleapis.com/v1beta/openai/models", cache: () => { googleCache = null; } } };
 function keyModal(id) {
