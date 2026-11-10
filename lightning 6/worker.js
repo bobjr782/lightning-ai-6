@@ -477,7 +477,7 @@ async function route(request, env) {
     if(!user)return json({error:"Sign in required."},401);
     let b;try{b=await body(request)}catch{return json({error:"Invalid profile update."},400)}
     const avatar=b.avatar===null?null:String(b.avatar||"");
-    if(avatar && (!/^data:image\\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(avatar)||avatar.length>100000))return json({error:"Profile images must be PNG, JPG or WebP and under 75 KB after compression."},413);
+    if(avatar && (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(avatar)||avatar.length>100000))return json({error:"Profile images must be PNG, JPG or WebP and under 75 KB after compression."},413);
     await ensureProfile(user,env);
     await env.DB.prepare("UPDATE user_profiles SET avatar_data=?,updated_at=? WHERE user_id=?").bind(avatar||null,Math.floor(Date.now()/1000),user.id).run();
     return json({ok:true,avatar:avatar||null});
