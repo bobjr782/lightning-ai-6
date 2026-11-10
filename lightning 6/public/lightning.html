@@ -496,6 +496,20 @@ body.img-mode .img-opts { display: flex; }
 .art-tools { flex-wrap: wrap; justify-content: flex-end; row-gap: 4px; }
 
 .friends-sidebar-btn{display:flex;align-items:center;gap:11px}.friends-pixel-icon{width:19px;height:19px;flex:0 0 19px;image-rendering:pixelated}
+
+/* Lightning cookie-consent prank */
+#lightning-cookie-prank { position:fixed; inset:0; z-index:10001; pointer-events:none; overflow:hidden; font-family:inherit; }
+#lightning-cookie-prank .cookie-pop { position:absolute; width:min(340px,calc(100vw - 32px)); background:var(--surface,#151a24); color:var(--text-primary,#e8ecf4); border:1px solid var(--border-color,#242c3b); border-radius:12px; box-shadow:0 18px 55px rgba(0,0,0,.48); padding:18px; pointer-events:auto; animation:cookiePopIn .16s ease-out; box-sizing:border-box; }
+#lightning-cookie-prank .cookie-pop h3 { margin:0 0 8px; font-size:16px; }
+#lightning-cookie-prank .cookie-pop p { margin:0 0 15px; color:var(--text-secondary,#8791a5); font-size:13px; line-height:1.5; }
+#lightning-cookie-prank .cookie-actions { display:flex; gap:8px; justify-content:flex-end; }
+#lightning-cookie-prank .cookie-actions button { border-radius:7px; padding:8px 11px; font:600 12px inherit; cursor:pointer; border:1px solid var(--border-color,#242c3b); }
+#lightning-cookie-prank .cookie-accept { background:var(--accent,#f5b700); color:var(--accent-ink,#1a1400); border-color:var(--accent,#f5b700)!important; }
+#lightning-cookie-prank .cookie-reject { background:var(--surface-2,#1c2330); color:var(--text-primary,#e8ecf4); }
+#lightning-cookie-prank .cookie-count { font:11px 'JetBrains Mono',monospace; color:var(--text-secondary,#8791a5); margin-top:10px; }
+#lightning-cookie-prank .cookie-secret-close { position:absolute; right:0; top:0; width:34px; height:34px; opacity:0; cursor:default; }
+@keyframes cookiePopIn { from { opacity:.3; transform:scale(.94); } to { opacity:1; transform:scale(1); } }
+
 </style>
 </head>
 <body> 
@@ -2367,5 +2381,75 @@ finishOpenRouter().catch(e => startupError("openrouter", e));
 })();
 
 </script>
+
+<div id="lightning-cookie-prank" hidden aria-live="polite"></div>
+<script>
+(() => {
+  const host = document.getElementById('lightning-cookie-prank');
+  if (!host || sessionStorage.getItem('lt_cookie_prank_seen')) return;
+  let count = 0, closed = false;
+  const MAX = 36;
+  const closePrank = () => {
+    closed = true;
+    host.hidden = true;
+    host.replaceChildren();
+    sessionStorage.setItem('lt_cookie_prank_seen', '1');
+  };
+  const makePopup = (x, y) => {
+    if (closed || count >= MAX) return;
+    count++;
+    const box = document.createElement('section');
+    box.className = 'cookie-pop';
+    box.style.left = Math.max(8, Math.min(innerWidth - 350, x)) + 'px';
+    box.style.top = Math.max(8, Math.min(innerHeight - 190, y)) + 'px';
+    const title = document.createElement('h3');
+    title.textContent = 'Cookie preferences';
+    const message = document.createElement('p');
+    message.textContent = 'Lightning would like to use cookies. Would you like to accept them?';
+    const actions = document.createElement('div');
+    actions.className = 'cookie-actions';
+    const accept = document.createElement('button');
+    accept.className = 'cookie-accept';
+    accept.textContent = 'Accept all';
+    accept.addEventListener('click', closePrank);
+    const reject = document.createElement('button');
+    reject.className = 'cookie-reject';
+    reject.textContent = 'Reject';
+    reject.addEventListener('click', () => {
+      if (closed) return;
+      box.remove();
+      const remaining = Math.min(4, MAX - count);
+      for (let i = 0; i < remaining; i++) {
+        const nx = Math.random() * Math.max(1, innerWidth - 350);
+        const ny = Math.random() * Math.max(1, innerHeight - 190);
+        makePopup(nx, ny);
+      }
+      if (!host.querySelector('.cookie-pop') && count < MAX) makePopup(innerWidth/2 - 170, innerHeight/2 - 90);
+    });
+    const counter = document.createElement('div');
+    counter.className = 'cookie-count';
+    counter.textContent = 'COOKIE REQUEST #' + count + ' / ' + MAX;
+    actions.append(accept, reject);
+    box.append(title, message, actions, counter);
+    // Invisible hover target: like a hidden close control, but never intercepts the visible buttons.
+    const secret = document.createElement('span');
+    secret.className = 'cookie-secret-close';
+    secret.title = '';
+    secret.setAttribute('aria-hidden', 'true');
+    secret.addEventListener('mouseenter', closePrank);
+    box.append(secret);
+    host.append(box);
+  };
+  host.hidden = false;
+  makePopup(innerWidth/2 - 170, innerHeight/2 - 90);
+  window.addEventListener('resize', () => {
+    if (count >= MAX) host.querySelectorAll('.cookie-pop').forEach(p => {
+      p.style.left = Math.max(8, Math.min(innerWidth - 350, parseFloat(p.style.left)||8)) + 'px';
+      p.style.top = Math.max(8, Math.min(innerHeight - 190, parseFloat(p.style.top)||8)) + 'px';
+    });
+  });
+})();
+</script>
+
 </body>
 </html>
