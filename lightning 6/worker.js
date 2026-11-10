@@ -71,6 +71,27 @@ async function ensureSocialTables(env) {
 }
 function friendPair(a,b){return a<b?[a,b]:[b,a];}
 
+const FRIEND_CODE_CHARS="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+async function ensureProfile(user,env){
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS user_profiles (
+    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    friend_code TEXT NOT NULL UNIQUE,
+    avatar_data TEXT,
+    updated_at INTEGER NOT NULL
+  )`).run();
+  let profile=await env.DB.prepare("SELECT friend_code,avatar_data FROM user_profiles WHERE user_id=?").bind(user.id).first();
+  if(!profile){
+    for(let attempt=0;attempt<12&&!profile;attempt++){
+      const bytes=randomBytes(5);let code="";
+      for(const byte of bytes)code+=FRIEND_CODE_CHARS[byte%FRIEND_CODE_CHARS.length];
+      await env.DB.prepare("INSERT OR IGNORE INTO user_profiles(user_id,friend_code,avatar_data,updated_at) VALUES(?,?,NULL,?)").bind(user.id,code,Math.floor(Date.now()/1000)).run();
+      profile=await env.DB.prepare("SELECT friend_code,avatar_data FROM user_profiles WHERE user_id=?").bind(user.id).first();
+    }
+  }
+  if(!profile)throw new Error("Could not allocate a Lightning friend key. Please try again.");
+  return profile;
+}
+
 async function ensureAccountTables(env) {
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY, username TEXT NOT NULL, username_norm TEXT NOT NULL UNIQUE,
@@ -415,6 +436,8 @@ async function route(request, env) {
       const id=b64(randomBytes(18)), salt=b64(randomBytes(16)), hash=await passwordHash(password,salt), now=Math.floor(Date.now()/1000);
       stage="insert-user";
       await env.DB.prepare("INSERT INTO users(id,username,username_norm,salt,password_hash,created_at) VALUES(?,?,?,?,?,?)").bind(id,username,norm,salt,hash,now).run();
+      stage="create-profile";
+      await ensureProfile({id,username},env);
       stage="create-session";
       const user={id,username}, token=await newSession(user,env);
       return json({ok:true,user},201,{ "set-cookie":cookie(token,SESSION_DAYS*86400) });
@@ -435,6 +458,7 @@ async function route(request, env) {
       return json({error:"Incorrect username or password."},401);
     }
     await env.DB.prepare("DELETE FROM auth_attempts WHERE ip_hash=?").bind(limit.key).run();
+    await ensureProfile(row,env);
     const token=await newSession(row,env);
     return json({ok:true,user:{id:row.id,username:row.username}},200,{"set-cookie":cookie(token,SESSION_DAYS*86400)});
   }
@@ -446,8 +470,17 @@ async function route(request, env) {
   const user=await userFor(request,env);
   if(path==="/api/me" && request.method==="GET") {
     if(!user)return json({user:null},401);
-    const usage=await ensureUsage(user,env);
-    return json({user,entitlement:entitlement(usage)});
+    const [usage,profile]=await Promise.all([ensureUsage(user,env),ensureProfile(user,env)]);
+    return json({user:{...user,friendCode:profile.friend_code,avatar:profile.avatar_data||null},entitlement:entitlement(usage)});
+  }
+  if(path==="/api/profile" && request.method==="PUT") {
+    if(!user)return json({error:"Sign in required."},401);
+    let b;try{b=await body(request)}catch{return json({error:"Invalid profile update."},400)}
+    const avatar=b.avatar===null?null:String(b.avatar||"");
+    if(avatar && (!/^data:image\\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(avatar)||avatar.length>100000))return json({error:"Profile images must be PNG, JPG or WebP and under 75 KB after compression."},413);
+    await ensureProfile(user,env);
+    await env.DB.prepare("UPDATE user_profiles SET avatar_data=?,updated_at=? WHERE user_id=?").bind(avatar||null,Math.floor(Date.now()/1000),user.id).run();
+    return json({ok:true,avatar:avatar||null});
   }
   if(path==="/api/data" && request.method==="GET") {
     if(!user)return json({error:"Sign in required."},401);
@@ -469,8 +502,8 @@ async function route(request, env) {
     if(!user)return json({error:"Sign in required."},401);
     await ensureSocialTables(env);
     const [friends,requests]=await Promise.all([
-      env.DB.prepare("SELECT users.username,users.id FROM friendships JOIN users ON users.id=CASE WHEN friendships.user_low=? THEN friendships.user_high ELSE friendships.user_low END WHERE friendships.user_low=? OR friendships.user_high=? ORDER BY users.username").bind(user.id,user.id,user.id).all(),
-      env.DB.prepare("SELECT friend_requests.id,users.username AS from FROM friend_requests JOIN users ON users.id=friend_requests.sender_id WHERE friend_requests.recipient_id=? AND friend_requests.status='pending' ORDER BY friend_requests.created_at DESC").bind(user.id).all()
+      env.DB.prepare("SELECT users.username,users.id,user_profiles.friend_code AS friendCode,user_profiles.avatar_data AS avatar FROM friendships JOIN users ON users.id=CASE WHEN friendships.user_low=? THEN friendships.user_high ELSE friendships.user_low END LEFT JOIN user_profiles ON user_profiles.user_id=users.id WHERE friendships.user_low=? OR friendships.user_high=? ORDER BY users.username").bind(user.id,user.id,user.id).all(),
+      env.DB.prepare("SELECT friend_requests.id,users.username AS from,user_profiles.friend_code AS friendCode,user_profiles.avatar_data AS avatar FROM friend_requests JOIN users ON users.id=friend_requests.sender_id LEFT JOIN user_profiles ON user_profiles.user_id=users.id WHERE friend_requests.recipient_id=? AND friend_requests.status='pending' ORDER BY friend_requests.created_at DESC").bind(user.id).all()
     ]);
     return json({friends:friends.results||[],requests:requests.results||[]});
   }
@@ -478,10 +511,10 @@ async function route(request, env) {
     if(!user)return json({error:"Sign in required."},401);
     await ensureSocialTables(env);
     let b;try{b=await body(request)}catch{return json({error:"Invalid request."},400)}
-    const username=String(b.username||"").trim().toLowerCase();
-    if(!username)return json({error:"Enter a username."},400);
-    const target=await env.DB.prepare("SELECT id,username FROM users WHERE username_norm=?").bind(username).first();
-    if(!target)return json({error:"No Lightning account found with that username."},404);
+    const lookup=String(b.key||b.username||b.friendCode||"").trim();
+    if(!lookup)return json({error:"Enter a Lightning friend key or username."},400);
+    const target=await env.DB.prepare("SELECT users.id,users.username FROM users LEFT JOIN user_profiles ON user_profiles.user_id=users.id WHERE users.username_norm=? OR user_profiles.friend_code=?").bind(lookup.toLowerCase(),lookup.toUpperCase()).first();
+    if(!target)return json({error:"No Lightning account found with that key or username."},404);
     if(target.id===user.id)return json({error:"You cannot add yourself."},400);
     const [low,high]=friendPair(user.id,target.id);
     const existing=await env.DB.prepare("SELECT 1 AS ok FROM friendships WHERE user_low=? AND user_high=?").bind(low,high).first();
@@ -521,11 +554,11 @@ async function route(request, env) {
   if(path==="/api/share" && request.method==="POST") {
     if(!user)return json({error:"Sign in required."},401);
     let b;try{b=await body(request)}catch{return json({error:"Invalid request."},400)}
-    const target=String(b.username||"").trim().toLowerCase(), artifact=JSON.stringify(b.artifact??{});
-    if(!target)return json({error:"Enter the username to share with."},400);
+    const target=String(b.key||b.username||b.friendCode||"").trim(), artifact=JSON.stringify(b.artifact??{});
+    if(!target)return json({error:"Enter a Lightning friend key or username."},400);
     if(encoder.encode(artifact).length>1000000)return json({error:"That creation is too large to share (1 MB maximum). Images are automatically compressed before sharing."},413);
-    const recipient=await env.DB.prepare("SELECT id FROM users WHERE username_norm=?").bind(target).first();
-    if(!recipient)return json({error:"No Lightning account found with that username."},404);
+    const recipient=await env.DB.prepare("SELECT users.id FROM users LEFT JOIN user_profiles ON user_profiles.user_id=users.id WHERE users.username_norm=? OR user_profiles.friend_code=?").bind(target.toLowerCase(),target.toUpperCase()).first();
+    if(!recipient)return json({error:"No Lightning account found with that key or username."},404);
     if(recipient.id===user.id)return json({error:"You cannot share an artefact with yourself."},400);
     await ensureSocialTables(env);
     const [low,high]=friendPair(user.id,recipient.id);
