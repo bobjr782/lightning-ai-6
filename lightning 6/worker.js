@@ -398,18 +398,30 @@ async function route(request, env) {
   if(!accountTablesReady) { try { await ensureAccountTables(env); accountTablesReady=true; } catch(error) { return json({error:"Lightning account database setup failed. Check the DB binding and D1 permissions.",detail:env.ENVIRONMENT==="development"?String(error):undefined},503); } }
   if(path==="/api/register" && request.method==="POST") {
     let b; try{b=await body(request)}catch{return json({error:"Invalid request."},400)}
-    const limit=await authLimit(request,env);
-    if(limit.blocked) return json({error:"Too many account attempts. Wait 15 minutes and try again."},429);
-    const username=String(b.username||"").trim(), norm=username.toLowerCase(), password=String(b.password||"");
-    if(!/^[A-Za-z0-9_]{3,24}$/.test(username)) return json({error:"Username must be 3–24 characters and use only letters, numbers or underscores."},400);
-    if(password.length<10 || password.length>128) return json({error:"Password must be 10–128 characters."},400);
-    const exists=await env.DB.prepare("SELECT id FROM users WHERE username_norm=?").bind(norm).first();
-    if(exists) { await env.DB.prepare("INSERT INTO auth_attempts(ip_hash,attempted_at) VALUES(?,?)").bind(limit.key,limit.now).run(); return json({error:"That username is already taken."},409); }
-    const id=b64(randomBytes(18)), salt=b64(randomBytes(16)), hash=await passwordHash(password,salt), now=Math.floor(Date.now()/1000);
-    try { await env.DB.prepare("INSERT INTO users(id,username,username_norm,salt,password_hash,created_at) VALUES(?,?,?,?,?,?)").bind(id,username,norm,salt,hash,now).run(); }
-    catch(error) { await env.DB.prepare("INSERT INTO auth_attempts(ip_hash,attempted_at) VALUES(?,?)").bind(limit.key,limit.now).run(); return json({error:env.ENVIRONMENT==="development"?String(error):"Could not create the account. Please try again."},500); }
-    const user={id,username}, token=await newSession(user,env);
-    return json({ok:true,user},201,{ "set-cookie":cookie(token,SESSION_DAYS*86400) });
+    let stage="rate-limit";
+    try {
+      const limit=await authLimit(request,env);
+      if(limit.blocked) return json({error:"Too many account attempts. Wait 15 minutes and try again."},429);
+      const username=String(b.username||"").trim(), norm=username.toLowerCase(), password=String(b.password||"");
+      if(!/^[A-Za-z0-9_]{3,24}$/.test(username)) return json({error:"Username must be 3–24 characters and use only letters, numbers or underscores."},400);
+      if(password.length<10 || password.length>128) return json({error:"Password must be 10–128 characters."},400);
+      stage="check-username";
+      const exists=await env.DB.prepare("SELECT id FROM users WHERE username_norm=?").bind(norm).first();
+      if(exists) {
+        await env.DB.prepare("INSERT INTO auth_attempts(ip_hash,attempted_at) VALUES(?,?)").bind(limit.key,limit.now).run();
+        return json({error:"That username is already taken."},409);
+      }
+      stage="hash-password";
+      const id=b64(randomBytes(18)), salt=b64(randomBytes(16)), hash=await passwordHash(password,salt), now=Math.floor(Date.now()/1000);
+      stage="insert-user";
+      await env.DB.prepare("INSERT INTO users(id,username,username_norm,salt,password_hash,created_at) VALUES(?,?,?,?,?,?)").bind(id,username,norm,salt,hash,now).run();
+      stage="create-session";
+      const user={id,username}, token=await newSession(user,env);
+      return json({ok:true,user},201,{ "set-cookie":cookie(token,SESSION_DAYS*86400) });
+    } catch(error) {
+      console.error("Lightning registration failed at "+stage+":",error?.stack||error);
+      return json({error:"Account registration failed.",stage,detail:String(error?.message||error||"Unknown error")},500);
+    }
   }
   if(path==="/api/login" && request.method==="POST") {
     let b; try{b=await body(request)}catch{return json({error:"Invalid request."},400)}
