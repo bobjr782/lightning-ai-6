@@ -526,6 +526,7 @@ body.img-mode .img-opts { display: flex; }
             
             <div class="sidebar-content">
                 <button class="sidebar-btn font-bold" onclick="startNewChat()">＋ New chat</button>
+                <button class="sidebar-btn friends-sidebar-btn" onclick="openFriendsPage()"><svg class="friends-pixel-icon" viewBox="0 0 8 8" aria-hidden="true"><path fill="currentColor" d="M1 1h2v2H1zM5 1h2v2H5zM0 4h4v1H0zM4 4h4v1H4zM1 5h2v2H1zM5 5h2v2H5z"/></svg> Friends</button>
                 <button class="sidebar-btn" onclick="openChatsPage()">💬 Chats &amp; tasks</button>
                 <button class="sidebar-btn" onclick="openProjectsPage()">📁 Projects</button>
                 <button class="sidebar-btn" onclick="openArtifactsPage()">🧩 Artifacts</button>
@@ -1793,6 +1794,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeAll(); 
 
 /* ---------- Friends and private sharing ---------- */
 const friendsPage=makePage("Friends & sharing",'<button class="mini-btn" data-inbox>Shared with me</button>');
+const friendChatPage=makePage("Private chat");
 async function socialRequest(url,body){
  const r=await fetch(url,{method:body?"POST":"GET",credentials:"same-origin",headers:body?{"content-type":"application/json"}:{},body:body?JSON.stringify(body):undefined});
  const j=await r.json();if(!r.ok)throw new Error(j.error||"Request failed.");return j;
@@ -1860,8 +1862,26 @@ async function drawFriends(){
   });
   b.append(el("h3","","Your friends"));
   if(!data.friends.length)b.append(el("p","art-empty","No friends yet. Send someone a request using their friend key or username."));
-  data.friends.forEach(fr=>{const row=el("div","row-item");row.append(makeProfileAvatar({username:fr.username,friendCode:fr.friendCode,avatar:fr.avatar},30),el("b","",fr.username),el("small","grow",fr.friendCode||"Lightning friend"));b.append(row);});
+  data.friends.forEach(fr=>{const row=el("div","row-item");row.append(makeProfileAvatar({username:fr.username,friendCode:fr.friendCode,avatar:fr.avatar},30),el("b","",fr.username),el("small","grow",fr.friendCode||"Lightning friend"),btn("Chat",()=>openFriendChat(fr.username)));b.append(row);});
  }catch(e){b.append(el("p","art-empty",e.message));}
+}
+async function openFriendChat(username){
+ const page=friendChatPage.body;
+ const draw=async()=>{
+  page.innerHTML="";
+  const top=el("div","row-item");top.append(el("b","grow","Chat with @"+username),btn("Refresh",draw),btn("Back to friends",()=>window.openFriendsPage()));page.append(top);
+  const messages=el("div","friend-messages");messages.style.cssText="display:flex;flex-direction:column;gap:8px;max-height:55vh;overflow:auto;padding:8px 2px";page.append(messages);
+  try{
+   const data=await socialRequest("/api/friends/messages?with="+encodeURIComponent(username));
+   if(!data.messages.length)messages.append(el("p","art-empty","This is the start of your private chat."));
+   data.messages.forEach(m=>{const bubble=el("div","row-item");bubble.style.cssText="align-self:"+(m.mine?"flex-end":"flex-start")+";max-width:min(85%,620px);display:block";bubble.append(el("b","",m.mine?"You":"@"+m.from),el("small","",new Date(m.createdAt*1000).toLocaleString()),el("div","",m.message));messages.append(bubble);});
+   messages.scrollTop=messages.scrollHeight;
+  }catch(e){messages.append(el("p","art-empty",e.message));}
+  const form=el("div","row-item"),input=el("input","field");input.placeholder="Message @"+username+"…";input.maxLength=2000;input.style.flex="1";
+  const send=btn("Send",async()=>{const message=input.value.trim();if(!message)return;send.disabled=true;try{await socialRequest("/api/friends/messages",{friend:username,message});input.value="";await draw();}catch(e){alert(e.message);}finally{send.disabled=false;}});
+  input.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();send.click();}};form.append(input,send);page.append(form);input.focus();
+ };
+ openPage(friendChatPage,draw,"/friends/"+encodeURIComponent(username));
 }
 friendsPage.p.querySelector("[data-inbox]").onclick=()=>drawSharedInbox(friendsPage.body);
 window.openFriendsPage=()=>openPage(friendsPage,drawFriends,"/friends");
@@ -2014,6 +2034,7 @@ function openProfileEditor(){
     const save=btn("Save profile picture",async()=>{save.disabled=true;save.textContent="Saving…";try{const r=await fetch("/api/profile",{method:"PUT",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({avatar:chosen})});const j=await r.json();if(!r.ok)throw new Error(j.error||"Could not save profile.");ov.remove();await refreshLightningAccount();showAiBubbleOnScreen("Lightning profile saved.");}catch(e){alert(e.message);}finally{save.disabled=false;save.textContent="Save profile picture";}});
     body.append(preview,note,file,promptInput,generate,reset,save);card.append(head,body);ov.append(card);ov.onclick=e=>{if(e.target===ov)ov.remove();};document.body.append(ov);
 }
+window.openProfileEditor = openProfileEditor;
 function updateTopProfileShortcut(){
     const button=document.getElementById("profile-shortcut");
     if(!button)return;
