@@ -2179,12 +2179,35 @@ async function drawSharedInbox(container){
 }
 async function drawFriends(){
  const b=friendsPage.body;b.innerHTML="";
- const form=el("div","row-item"),inp=el("input","field"),add=btn("Send friend request",async()=>{
-  if(!inp.value.trim())return;
-  try{const j=await socialRequest("/api/friends/request",{key:inp.value.trim()});inp.value="";await drawFriends();showAiBubbleOnScreen(j.accepted?"Friend added.":"Friend request sent.");}
-  catch(e){alert(e.message);}
- });
- inp.placeholder="Enter a 5-character friend key or username";form.append(inp,add);b.append(form);
+ const usersSection=el("section","friends-users-section");
+ usersSection.append(el("h3","","Users"),el("p","art-empty","Find Lightning accounts and send a friend request by selecting a user."));
+ const searchRow=el("div","row-item"),search=el("input","field"),searchBtn=btn("Search users",()=>loadFriendUsers(search.value));
+ search.placeholder="Search usernames…";search.autocomplete="off";
+ search.addEventListener("keydown",e=>{if(e.key==="Enter")loadFriendUsers(search.value);});
+ searchRow.append(search,searchBtn);usersSection.append(searchRow);
+ const userList=el("div","friends-user-list");usersSection.append(userList);b.append(usersSection);
+ let userSearchSerial=0;
+ async function loadFriendUsers(query=""){
+  const serial=++userSearchSerial;userList.innerHTML="";userList.append(el("p","art-empty","Loading users…"));
+  try{
+   const result=await socialRequest("/api/users?q="+encodeURIComponent(query.trim()));
+   if(serial!==userSearchSerial)return;
+   userList.innerHTML="";
+   if(!result.users.length){userList.append(el("p","art-empty",query.trim()?"No users match that search.":"No other Lightning users yet."));return;}
+   result.users.forEach(u=>{
+    const row=el("div","row-item");
+    row.append(makeProfileAvatar({username:u.username,avatar:u.avatar},36),el("b","grow",u.username));
+    if(u.isFriend)row.append(el("small","","Already friends"));
+    else if(u.requestSent)row.append(el("small","","Request sent"));
+    else row.append(btn("Add friend",async()=>{
+     try{await socialRequest("/api/friends/request",{username:u.username});await drawFriends();showAiBubbleOnScreen("Friend request sent to "+u.username+".");}
+     catch(e){alert(e.message);}
+    }));
+    userList.append(row);
+   });
+  }catch(e){userList.innerHTML="";userList.append(el("p","art-empty",e.message));}
+ }
+ loadFriendUsers();
  try{
   const data=await socialRequest("/api/friends");
   b.append(el("h3","","Friend requests"));
@@ -2195,7 +2218,7 @@ async function drawFriends(){
     btn("Decline",async()=>{try{await socialRequest("/api/friends/respond",{id:r.id,action:"decline"});drawFriends();}catch(e){alert(e.message);}}));b.append(row);
   });
   b.append(el("h3","","Your friends"));
-  if(!data.friends.length)b.append(el("p","art-empty","No friends yet. Send someone a request using their friend key or username."));
+  if(!data.friends.length)b.append(el("p","art-empty","No friends yet. Find someone in the Users section above."));
   data.friends.forEach(fr=>{const row=el("div","row-item");row.append(makeProfileAvatar({username:fr.username,friendCode:fr.friendCode,avatar:fr.avatar},30),el("b","",fr.username),el("small","grow",fr.friendCode||"Lightning friend"),btn("Chat",()=>openFriendChat(fr.username)));b.append(row);});
  }catch(e){b.append(el("p","art-empty",e.message));}
 }
