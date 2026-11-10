@@ -21,7 +21,7 @@ under their respective owners' terms and licences, listed below.
 
 THIRD-PARTY SOFTWARE AND SERVICES
 ---------------------------------
-lightning does not bundle the items below. The browser loads them at runtime
+Lightning does not bundle the items below. The browser loads them at runtime
 from their own servers, and each keeps its own licence and terms.
 
 - Google Fonts: DM Sans, Source Serif 4, JetBrains Mono — SIL Open Font License 1.1
