@@ -1724,7 +1724,7 @@ function route(boot) {
         const p = (boot ? START : location.pathname).replace(/\/+$/, "") || "/", m = p.match(/^\/chats\/([^/]+)$/);
         if (boot && new URLSearchParams(location.search).get("open") === "friends") { openFriendsPage(); return; }
         if (m) { if (chats.some(c => c.id === m[1])) openChat(m[1]); else { newChat(); history.replaceState(null, "", "/"); showAiBubbleOnScreen("That chat isn't saved in this browser."); } }
-        else if (p === "/chats") openChatsPage(); else if (p === "/projects") openProjectsPage(); else if (p === "/artifacts") openArtifactsPage(); else if (p === "/images") openImagesPage(); else if (p === "/online") openOnlinePage();
+        else if (p === "/chats") openChatsPage(); else if (p === "/projects") openProjectsPage(); else if (p === "/artifacts") openArtifactsPage(); else if (p === "/images") openImagesPage(); else if (p === "/online") openOnlinePage(); else if (p === "/friends") openFriendsPage(); else if (p.startsWith("/friends/")) openFriendChat(decodeURIComponent(p.slice(9)));
         else if (p === "/") { if (boot) { routing = false; go(chatPath(), true); } else newChat(); }
     } finally { routing = false; }
 }
