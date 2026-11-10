@@ -2190,7 +2190,7 @@ async function drawFriends(){
   b.append(el("h3","","Friend requests"));
   if(!data.requests.length)b.append(el("p","art-empty","No pending friend requests."));
   data.requests.forEach(r=>{
-   const row=el("div","row-item");row.append(makeProfileAvatar({username:r.from,friendCode:r.friendCode,avatar:r.avatar},30),el("b","grow",r.from+(r.friendCode?" · "+r.friendCode:"")),
+   const row=el("div","row-item");row.append(makeProfileAvatar({username:r.from,friendCode:r.friendCode,avatar:r.avatar},30),el("b","grow",r.from_username+(r.friendCode?" · "+r.friendCode:"")),
     btn("Accept",async()=>{try{await socialRequest("/api/friends/respond",{id:r.id,action:"accept"});drawFriends();}catch(e){alert(e.message);}}),
     btn("Decline",async()=>{try{await socialRequest("/api/friends/respond",{id:r.id,action:"decline"});drawFriends();}catch(e){alert(e.message);}}));b.append(row);
   });
