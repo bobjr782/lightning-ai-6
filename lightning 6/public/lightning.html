@@ -1441,7 +1441,7 @@ window.handleImageGeneration = async function (prompt, box) {
             if (/free image-generation allowance|daily reset/i.test(String(e.message || e))) {
                 return finalizeAiBubble(box, "⚠️ " + e.message);
             }
-            live(box, "", "Cloudflare image model unavailable. Trying backup image service… " + secs() + "s");
+            live(box, "", "FLUX model unavailable. Waiting for the service to respond… " + secs() + "s");
         }
         if (!img) return finalizeAiBubble(box, "⚠️ Cloudflare Workers AI image generation failed. Please try again later.");
         if (!img) return finalizeAiBubble(box, "⚠️ Image generation failed. The image services may be busy or blocked by your network or an ad blocker. Try again in a minute.");
