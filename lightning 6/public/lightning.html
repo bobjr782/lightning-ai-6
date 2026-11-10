@@ -1412,7 +1412,7 @@ function saveArt(title, code) {
     saved.unshift({ id, title, code, t: Date.now() }); persistArts();
 }
 const page = el("div", "art-page");
-page.innerHTML = `<div class="art-page-head"><h2>Artifacts</h2><input class="art-search" placeholder="Search artifacts…"><button class="mini-btn" data-shared>Shared with me</button><button class="mini-btn" data-x>✕ Close</button></div><div class="art-grid"></div>`;
+page.innerHTML = `<div class="art-page-head"><h2>Artifacts</h2><input class="art-search" placeholder="Search artifacts…"><button class="mini-btn shared-with-me-btn" data-shared>Shared with me</button><button class="mini-btn" data-x>✕ Close</button></div><div class="art-grid"></div>`;
 document.body.append(page);
 const grid = page.querySelector(".art-grid"), search = page.querySelector(".art-search");
 const closePage = () => closeAll();
@@ -1926,7 +1926,47 @@ function combineFences(text) {
     if (!H || (!C.length && !J.length)) return text;
     const css = C.map(b => b.code).join("\n"), js = J.map(b => b.code).join("\n");
     let doc = wrapDoc(H.code).replace(/<link[^>]+href=["'][^"']+\.css["'][^>]*>/gi, "").replace(/<script[^>]+src=["'](?!https?:)[^"']+["'][^>]*><\/script>/gi, "");
-    if (css) doc = /<\/head>/i.test(doc) ? doc.replace(/<\/head>/i, () => `<style>\n${css}\n</style><\/head>`) : `<style>\n${css}\n</style>` + doc;
+    if (css) doc = /<\/head>/i.test(doc) ? doc.replace(/<\/head>/i, () => `<style>\n${css}\n</style><\/head>`) : `<style>\n${css}\n
+/* Account settings refresh */
+.account-settings-overlay { align-items:center !important; padding:18px !important; }
+.account-settings-card { width:min(620px,100%) !important; max-height:calc(100vh - 36px) !important; }
+.account-settings-body { gap:14px !important; padding:20px !important; overflow-y:auto !important; }
+.profile-settings-identity { display:flex; flex-direction:column; gap:12px; padding:16px; border:1px solid var(--border-color); border-radius:14px; background:var(--surface); }
+.profile-settings-top { display:flex; align-items:center; gap:15px; min-width:0; }
+.profile-settings-top .profile-avatar { width:68px !important; height:68px !important; }
+.profile-settings-name { min-width:0; }
+.profile-settings-name h2 { margin:0 0 5px; font-size:1.3rem; overflow-wrap:anywhere; }
+.profile-settings-name small,.profile-settings-key-label { color:var(--text-secondary); }
+.profile-settings-key-label { font-size:.7rem; font-weight:800; letter-spacing:.1em; }
+.profile-settings-key-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-top:10px; border-top:1px solid var(--border-color); }
+.profile-settings-key-row .profile-key { font-size:1.05rem; overflow-wrap:anywhere; }
+.profile-settings-key-row .mini-btn { flex:0 0 auto; }
+.profile-settings-preview { display:flex; justify-content:center; padding:8px; }
+.profile-settings-preview .profile-avatar { width:76px !important; height:76px !important; }
+.settings-section-title { margin:12px 0 0 !important; padding-top:12px; border-top:1px solid var(--border-color); font-size:1rem; }
+.account-settings-body button,.account-settings-body .mini-btn,.account-settings-body .send-btn {
+    min-height:46px !important; padding:12px 17px !important; font-size:.94rem !important;
+    border-radius:9px !important; box-sizing:border-box;
+}
+.account-settings-body input.field { min-height:46px; padding:12px 14px !important; box-sizing:border-box; }
+.account-settings-body .prov-row { padding:13px 14px !important; gap:12px; }
+.account-settings-body .prov-row .mini-btn { min-width:100px; }
+.account-settings-body .trial-account { padding:14px !important; gap:10px; }
+.account-settings-body .trial-account button { width:100%; }
+.shared-with-me-btn {
+    min-height:46px !important; padding:12px 20px !important; margin:0 8px !important;
+    font-size:1rem !important; font-weight:700 !important; border-radius:10px !important;
+    border:1px solid var(--accent) !important; background:var(--accent) !important;
+    color:var(--accent-ink) !important; white-space:nowrap;
+}
+.shared-with-me-btn:hover { background:var(--accent-blue-hover) !important; }
+@media(max-width:600px) {
+    .profile-settings-key-row { align-items:stretch; flex-direction:column; }
+    .profile-settings-key-row .mini-btn { width:100%; }
+    .account-settings-body { padding:14px !important; }
+}
+
+</style>` + doc;
     if (js) doc = /<\/body>/i.test(doc) ? doc.replace(/<\/body>/i, () => `<script>\n${js}\n<\/script><\/body>`) : doc + `<script>\n${js}\n<\/script>`;
     const title = ((doc.match(/<title>([^<]*)/i) || [])[1] || "Web app").trim();
     let out = text; [...C, ...J].forEach(b => { out = out.replace(b.full, ""); });
@@ -2195,22 +2235,44 @@ function compactProfileImage(source){return new Promise((resolve,reject)=>{const
 function openProfileEditor(){
     const ov=el("div","modal-overlay open account-settings-overlay"),card=el("div","modal-card account-settings-card"),body=el("div","modal-body account-settings-body"),head=el("div","modal-header");
     head.append(el("h3","","Account settings"),btn("✕",()=>ov.remove()));
-    body.append(trialCard(),el("h3","","AI providers"),provRow("openrouter","OpenRouter"),provRow("groq","Groq"),provRow("google","Google"));
-    if(!lightningAccount){body.append(el("p","auth-note","Sign in to Lightning to edit your profile picture and friend key."));card.append(head,body);ov.append(card);ov.onclick=e=>{if(e.target===ov)ov.remove();};document.body.append(ov);return;}
-    body.append(el("h3","","Profile picture"));
-    let chosen=lightningAccount.avatar||null;
-    const preview=el("div","profile-tools"),keyInfo=el("div","grow");
-    keyInfo.append(el("b","","@"+lightningAccount.username),el("small","profile-key","Friend key: "+lightningAccount.friendCode));
-    const copy=btn("Copy key",async()=>{try{await navigator.clipboard.writeText(lightningAccount.friendCode);showAiBubbleOnScreen("Friend key copied.");}catch(_){prompt("Your Lightning friend key",lightningAccount.friendCode);}});
-    const paint=()=>preview.replaceChildren(makeProfileAvatar({...lightningAccount,avatar:chosen},64),keyInfo,copy);paint();
-    const note=el("small","auth-note","Choose a picture, generate one with FLUX, or leave it blank for your automatic GitHub-style pixel avatar. FLUX uses one image from your trial allowance.");
-    const file=el("input","field");file.type="file";file.accept="image/png,image/jpeg,image/webp";
-    file.onchange=async()=>{const f=file.files?.[0];if(!f)return;try{const src=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f);});chosen=await compactProfileImage(src);paint();}catch(e){alert(e.message);}};
-    const promptInput=el("input","field");promptInput.placeholder="Describe your profile picture for FLUX…";promptInput.value="A crisp, friendly pixel-art lightning bolt emblem, centered, bold simple shapes, dark background";
-    const generate=btn("Generate with FLUX",async()=>{if(!promptInput.value.trim())return;generate.disabled=true;generate.textContent="Generating…";try{const r=await fetch("/api/image",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({prompt:promptInput.value.trim(),width:512,height:512})});const j=await r.json();if(!r.ok)throw new Error(j.error||"FLUX could not generate your picture.");chosen=await compactProfileImage(j.image);paint();showAiBubbleOnScreen("Profile picture generated with "+(j.model||"FLUX")+".");}catch(e){alert(e.message);}finally{generate.disabled=false;generate.textContent="Generate with FLUX";}});
-    const reset=btn("Use pixel avatar",()=>{chosen=null;paint();});
-    const save=btn("Save profile picture",async()=>{save.disabled=true;save.textContent="Saving…";try{const r=await fetch("/api/profile",{method:"PUT",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({avatar:chosen})});const j=await r.json();if(!r.ok)throw new Error(j.error||"Could not save profile.");ov.remove();await refreshLightningAccount();showAiBubbleOnScreen("Lightning profile saved.");}catch(e){alert(e.message);}finally{save.disabled=false;save.textContent="Save profile picture";}});
-    body.append(preview,note,file,promptInput,generate,reset,save);card.append(head,body);ov.append(card);ov.onclick=e=>{if(e.target===ov)ov.remove();};document.body.append(ov);
+
+    const identity=el("section","profile-settings-identity");
+    const identityTop=el("div","profile-settings-top");
+    identityTop.append(makeProfileAvatar(lightningAccount||{username:"Lightning",friendCode:"LIGHT"},68));
+    const identityName=el("div","profile-settings-name");
+    identityName.append(el("h2","",lightningAccount?lightningAccount.username:"Lightning account"));
+    identityName.append(el("small","",lightningAccount?"Your Lightning profile":"Sign in to unlock your account"));
+    identityTop.append(identityName);
+    identity.append(identityTop);
+    if(lightningAccount){
+        const keyLabel=el("small","profile-settings-key-label","YOUR FRIEND KEY");
+        const keyRow=el("div","profile-settings-key-row");
+        const keyValue=el("strong","profile-key",lightningAccount.friendCode||"Creating…");
+        const copyKey=btn("Copy key",async()=>{try{await navigator.clipboard.writeText(lightningAccount.friendCode);copyKey.textContent="Copied";setTimeout(()=>copyKey.textContent="Copy key",1300);}catch(_){prompt("Your Lightning friend key",lightningAccount.friendCode);}});
+        keyRow.append(keyValue,copyKey);
+        identity.append(keyLabel,keyRow);
+    }
+    body.append(identity,trialCard());
+
+    if(lightningAccount){
+        body.append(el("h3","settings-section-title","Profile picture"));
+        let chosen=lightningAccount.avatar||null;
+        const preview=el("div","profile-settings-preview");
+        const paint=()=>preview.replaceChildren(makeProfileAvatar({...lightningAccount,avatar:chosen},76));
+        paint();
+        const note=el("small","auth-note","Upload a picture, generate one with FLUX, or use your automatic pixel avatar.");
+        const file=el("input","field");file.type="file";file.accept="image/png,image/jpeg,image/webp";
+        file.onchange=async()=>{const f=file.files?.[0];if(!f)return;try{const src=await new Promise((res,rej)=>{const reader=new FileReader();reader.onload=()=>res(reader.result);reader.onerror=rej;reader.readAsDataURL(f);});chosen=await compactProfileImage(src);paint();}catch(e){alert(e.message);}};
+        const promptInput=el("input","field");promptInput.placeholder="Describe your profile picture for FLUX…";promptInput.value="A crisp, friendly pixel-art lightning bolt emblem, centered, bold simple shapes, dark background";
+        const generate=btn("Generate with FLUX",async()=>{if(!promptInput.value.trim())return;generate.disabled=true;generate.textContent="Generating…";try{const r=await fetch("/api/image",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({prompt:promptInput.value.trim(),width:512,height:512})});const j=await r.json();if(!r.ok)throw new Error(j.error||"FLUX could not generate your picture.");chosen=await compactProfileImage(j.image);paint();showAiBubbleOnScreen("Profile picture generated with "+(j.model||"FLUX")+".");}catch(e){alert(e.message);}finally{generate.disabled=false;generate.textContent="Generate with FLUX";}});
+        const reset=btn("Use pixel avatar",()=>{chosen=null;paint();});
+        const save=btn("Save profile picture",async()=>{save.disabled=true;save.textContent="Saving…";try{const r=await fetch("/api/profile",{method:"PUT",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({avatar:chosen})});const j=await r.json();if(!r.ok)throw new Error(j.error||"Could not save profile.");ov.remove();await refreshLightningAccount();showAiBubbleOnScreen("Lightning profile saved.");}catch(e){alert(e.message);}finally{save.disabled=false;save.textContent="Save profile picture";}});
+        body.append(preview,note,file,promptInput,generate,reset,save);
+    }
+    body.append(el("h3","settings-section-title","AI providers"),provRow("openrouter","OpenRouter"),provRow("groq","Groq"),provRow("google","Google"));
+    card.append(head,body);ov.append(card);
+    ov.onclick=e=>{if(e.target===ov)ov.remove();};
+    document.body.append(ov);
 }
 window.openProfileEditor = openProfileEditor;
 function updateTopProfileShortcut(){
@@ -2222,27 +2284,23 @@ function updateTopProfileShortcut(){
 }
 function trialCard() {
     const wrap=el("div","trial-account");
-    const head=el("div","trial-account-head");
-    head.append(el("b","",lightningAccount ? lightningAccount.username : "Lightning account"));
-    if(lightningEntitlement) head.append(el("small","",lightningEntitlement.trialActive ? "Free trial" : "Trial ended"));
-    wrap.append(head);
     if(lightningAccount && lightningEntitlement){
         const e=lightningEntitlement;
-        const line=el("small","",e.trialActive ? `${e.textRemaining} chat messages · ${e.imagesRemaining} images left` : "Sign in to manage your account");
-        wrap.append(line);
-        const keyLine=el("small","profile-key","Friend key: "+(lightningAccount.friendCode||"Creating…"));
-        const keyActions=el("div","profile-tools");
-        keyActions.append(keyLine,btn("Copy",async()=>{try{await navigator.clipboard.writeText(lightningAccount.friendCode);showAiBubbleOnScreen("Friend key copied.");}catch(_){prompt("Your Lightning friend key",lightningAccount.friendCode);}}));
-        wrap.append(keyActions);
+        const head=el("div","trial-account-head");
+        head.append(el("b","","Account status"));
+        head.append(el("small","",e.trialActive?"Free trial":"Trial ended"));
+        wrap.append(head);
+        wrap.append(el("small","",e.trialActive?`${e.textRemaining} chat messages · ${e.imagesRemaining} images left`:"Your trial has ended."));
         if(e.trialActive){
-            const bar=el("div","trial-meter"), fill=el("span");
+            const bar=el("div","trial-meter"),fill=el("span");
             fill.style.width=Math.min(100,Math.max(0,e.imagesUsed/e.imageLimit*100))+"%";
             bar.append(fill);wrap.append(bar);
         }
         wrap.append(btn("Sign out",async()=>{await fetch("/api/logout",{method:"POST",credentials:"same-origin"});lightningAccount=null;lightningEntitlement=null;drawAcct();showAiBubbleOnScreen("Signed out of Lightning.");}));
-    } else {
+    }else{
+        wrap.append(el("div","trial-account-head",el("b","","Not signed in")));
+        wrap.append(el("small","auth-note","Sign in to save your profile and share artifacts with friends."));
         wrap.append(btn("Sign in / Create account",()=>openLightningAuth()));
-        wrap.append(el("small","auth-note","Start a 7-day trial. No API key required."));
     }
     return wrap;
 }
