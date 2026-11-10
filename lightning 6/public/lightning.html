@@ -687,6 +687,44 @@ body.img-mode .img-opts { display: flex; }
 }
 
 
+
+/* Styled native file picker in Account Settings */
+.account-settings-body input[type="file"] {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-height: 54px;
+    box-sizing: border-box;
+    padding: 9px 12px;
+    color: var(--text-primary);
+    background: var(--surface, #151a24);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    font: inherit;
+    font-size: .9rem;
+    cursor: pointer;
+}
+.account-settings-body input[type="file"]::file-selector-button {
+    min-height: 36px;
+    margin: 0 12px 0 0;
+    padding: 8px 15px;
+    color: var(--accent-ink, #1a1400);
+    background: var(--accent, #f5b700);
+    border: 0;
+    border-radius: 7px;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s ease, transform .15s ease;
+}
+.account-settings-body input[type="file"]::file-selector-button:hover {
+    background: var(--accent-blue-hover, #d99f00);
+}
+.account-settings-body input[type="file"]:focus-visible {
+    outline: 2px solid var(--accent, #f5b700);
+    outline-offset: 2px;
+}
+
 /* Extra vertical breathing room for profile/account action buttons */
 .account-settings-body button:not(.pixel-avatar-choice) {
     min-height: 58px !important;
