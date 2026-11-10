@@ -41,7 +41,8 @@ body, html {
 .sidebar.collapsed { width: 0px !important; min-width: 0px !important; opacity: 0; pointer-events: none; border-right: none; }
 .sidebar-header { padding: 20px; border-bottom: 1px solid var(--border-color); }
 .sidebar-header h2 { margin: 0; font-size: 1.2rem; color: var(--text-primary); }
-.sidebar-content { flex: 1; padding: 15px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+.sidebar-content { flex: 1; padding: 15px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.sidebar-chat-heading{padding:13px 9px 2px;color:var(--text-secondary);font-size:.76rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}.sidebar-chat-list{display:flex;flex-direction:column;gap:3px;min-height:0}.sidebar-chat-item{display:block;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;padding:8px 10px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--text-secondary);font-size:.86rem;cursor:pointer}.sidebar-chat-item:hover{background:var(--surface-2);color:var(--text-primary)}.sidebar-chat-item.active{background:var(--surface-2);color:var(--text-primary);border-color:var(--border-color)}
 .sidebar-footer { padding: 15px; border-top: 1px solid var(--border-color); font-size: 0.85rem; color: var(--text-secondary); text-align: center; }
 
 .sidebar-btn {
@@ -527,7 +528,8 @@ body.img-mode .img-opts { display: flex; }
             <div class="sidebar-content">
                 <button class="sidebar-btn font-bold" onclick="startNewChat()">＋ New chat</button>
                 <button class="sidebar-btn friends-sidebar-btn" onclick="openFriendsPage()"><svg class="friends-pixel-icon" viewBox="0 0 8 8" aria-hidden="true"><path fill="currentColor" d="M1 1h2v2H1zM5 1h2v2H5zM0 4h4v1H0zM4 4h4v1H4zM1 5h2v2H1zM5 5h2v2H5z"/></svg> Friends</button>
-                <button class="sidebar-btn" onclick="openChatsPage()">💬 Chats &amp; tasks</button>
+                <button class="sidebar-btn" onclick="openTasksPage()">Tasks</button>
+                <div class="sidebar-chat-heading">Your chats</div><div id="sidebar-chat-list" class="sidebar-chat-list"></div>
                 <button class="sidebar-btn" onclick="openProjectsPage()">📁 Projects</button>
                 <button class="sidebar-btn" onclick="openArtifactsPage()">🧩 Artifacts</button>
                 <button class="sidebar-btn" onclick="openOnlinePage()">🌐 Online artifacts</button>
@@ -1724,7 +1726,7 @@ function route(boot) {
         const p = (boot ? START : location.pathname).replace(/\/+$/, "") || "/", m = p.match(/^\/chats\/([^/]+)$/);
         if (boot && new URLSearchParams(location.search).get("open") === "friends") { openFriendsPage(); return; }
         if (m) { if (chats.some(c => c.id === m[1])) openChat(m[1]); else { newChat(); history.replaceState(null, "", "/"); showAiBubbleOnScreen("That chat isn't saved in this browser."); } }
-        else if (p === "/chats") openChatsPage(); else if (p === "/projects") openProjectsPage(); else if (p === "/artifacts") openArtifactsPage(); else if (p === "/images") openImagesPage(); else if (p === "/online") openOnlinePage(); else if (p === "/friends") openFriendsPage(); else if (p.startsWith("/friends/")) openFriendChat(decodeURIComponent(p.slice(9)));
+        else if (p === "/chats" || p === "/tasks") openTasksPage(); else if (p === "/projects") openProjectsPage(); else if (p === "/artifacts") openArtifactsPage(); else if (p === "/images") openImagesPage(); else if (p === "/online") openOnlinePage(); else if (p === "/friends") openFriendsPage(); else if (p.startsWith("/friends/")) openFriendChat(decodeURIComponent(p.slice(9)));
         else if (p === "/") { if (boot) { routing = false; go(chatPath(), true); } else newChat(); }
     } finally { routing = false; }
 }
@@ -1921,9 +1923,15 @@ window.store = function () {
     let c = chats.find(x => x.id === curId);
     if (!c) { curId = chatId(); c = { id: curId, title: "New chat", t: Date.now(), project: curProject, msgs: chat }; chats.unshift(c); go("/chats/" + curId, true); }
     c.msgs = chat; c.t = Date.now(); if (c.title === "New chat") c.title = titleOf(chat);
-    wr("chats", chats); wr("cur", curId); updateTop();
+    wr("chats", chats); wr("cur", curId); updateTop(); renderSidebarChats();
 };
-function renderChat() { $(".messages-container").innerHTML = ""; if (chat.length) renderMsgs(); else showWelcome(); updateTop(); }
+function renderSidebarChats(){
+ const box=document.getElementById("sidebar-chat-list");if(!box)return;box.innerHTML="";
+ const recent=[...chats].sort((a,b)=>(b.t||0)-(a.t||0)).slice(0,35);
+ if(!recent.length){const empty=el("div","","No chats yet");empty.style.cssText="padding:7px 9px;color:var(--text-secondary);font-size:.82rem";box.append(empty);return;}
+ recent.forEach(c=>{const item=el("button","sidebar-chat-item"+(c.id===curId?" active":""),c.title||"New chat");item.type="button";item.title=c.title||"New chat";item.onclick=()=>openChat(c.id);box.append(item);});
+}
+function renderChat() { $(".messages-container").innerHTML = ""; if (chat.length) renderMsgs(); else showWelcome(); updateTop(); renderSidebarChats(); }
 function newChat() { curId = null; chat = []; clearAttachedFile(); renderChat(); closeAll(); }
 window.startNewChat = () => { curProject = null; newChat(); };
 function openChat(id) { const c = chats.find(x => x.id === id); if (!c) return; curId = id; curProject = c.project; chat = c.msgs; wr("cur", id); renderChat(); closeAll(); }
@@ -1940,7 +1948,7 @@ function greeting() {
     const h = new Date().getHours(), part = h < 5 ? "Good evening" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
     return user ? `${part}, ${esc(user.name.split(" ")[0])}` : "How can I help you today?";
 }
-const chatPg = makePage("Chats &amp; tasks");
+const chatPg = makePage("Tasks");
 function chatList(box) {
     box.innerHTML = ""; const q = cq.toLowerCase(), list = chats.filter(c => c.title.toLowerCase().includes(q));
     if (!list.length) return box.append(el("p", "art-empty", "No chats yet."));
@@ -1954,26 +1962,20 @@ function chatList(box) {
     });
 }
 function drawChats() {
-    const b = chatPg.body; b.innerHTML = ""; const tabs = el("div", "tabs");
-    ["chats", "tasks"].forEach(t => { const x = el("button", "tab" + (tab === t ? " on" : ""), t === "chats" ? "💬 Chats" : "✅ Tasks"); x.onclick = () => { tab = t; drawChats(); }; tabs.append(x); });
-    b.append(tabs);
-    if (tab === "chats") {
-        const s = el("input", "field"), box = el("div"); s.placeholder = "Search chats…"; s.value = cq; s.oninput = () => { cq = s.value; chatList(box); };
-        b.append(s, box); chatList(box);
-    } else {
-        const inp = el("input", "field"); inp.placeholder = "Add a task and press Enter…";
-        inp.onkeydown = e => { if (e.key === "Enter" && inp.value.trim()) { tasks.unshift({ id: nid(), text: inp.value.trim(), done: false }); wr("tasks", tasks); drawChats(); } };
-        b.append(inp);
-        tasks.forEach(t => {
-            const r = el("div", "row-item"), cb = el("input"), g = el("div", "grow", t.text); cb.type = "checkbox"; cb.checked = t.done;
-            cb.onchange = () => { t.done = cb.checked; wr("tasks", tasks); drawChats(); }; if (t.done) g.style.textDecoration = "line-through";
-            r.append(cb, g, btn("✕", () => { tasks = tasks.filter(x => x !== t); wr("tasks", tasks); drawChats(); })); b.append(r);
-        });
-        if (!tasks.length) b.append(el("p", "art-empty", "No tasks yet."));
-        inp.focus();
-    }
+    const b = chatPg.body; b.innerHTML = "";
+    const inp = el("input", "field"); inp.placeholder = "Add a task and press Enter…";
+    inp.onkeydown = e => { if (e.key === "Enter" && inp.value.trim()) { tasks.unshift({ id: nid(), text: inp.value.trim(), done: false }); wr("tasks", tasks); drawChats(); } };
+    b.append(inp);
+    tasks.forEach(t => {
+        const r = el("div", "row-item"), cb = el("input"), g = el("div", "grow", t.text); cb.type = "checkbox"; cb.checked = t.done;
+        cb.onchange = () => { t.done = cb.checked; wr("tasks", tasks); drawChats(); }; if (t.done) g.style.textDecoration = "line-through";
+        r.append(cb, g, btn("✕", () => { tasks = tasks.filter(x => x !== t); wr("tasks", tasks); drawChats(); })); b.append(r);
+    });
+    if (!tasks.length) b.append(el("p", "art-empty", "No tasks yet."));
+    inp.focus();
 }
-window.openChatsPage = () => openPage(chatPg, drawChats, "/chats");
+window.openTasksPage = () => openPage(chatPg, drawChats, "/tasks");
+window.openChatsPage = window.openTasksPage;
 
 /* projects */
 const projPg = makePage("Projects");
@@ -1992,7 +1994,7 @@ function drawProjects() {
 window.openProjectsPage = () => openPage(projPg, drawProjects, "/projects");
 
 /* providers: sign in with OpenRouter or Groq, choose which one to use */
-const acct = el("div", "acct"); $(".sidebar-footer").prepend(acct);
+const acct = el("div", "acct");
 function saveCfg(s) { try { localStorage.setItem("lt_cfg", JSON.stringify(s)); } catch (e) {} }
 function useProv(id) { const s = rawCfg(); s.provider = id; saveCfg(s); Object.keys(cool).forEach(k => delete cool[k]); drawAcct(); fillModels(); showAiBubbleOnScreen("Now using " + PRESETS[id].name.split(" (")[0] + "."); }
 function disconnect(id) { const s = rawCfg(); s.keys = { ...s.keys, [id]: "" }; if (s.provider === id) s.provider = "openrouter"; if (id === "groq") groqCache = null; if (id === "google") googleCache = null; saveCfg(s); drawAcct(); fillModels(); }
@@ -2019,7 +2021,8 @@ function compactProfileImage(source){return new Promise((resolve,reject)=>{const
 function openProfileEditor(){
     if(!lightningAccount)return openLightningAuth();
     const ov=el("div","modal-overlay open"),card=el("div","modal-card"),body=el("div","modal-body"),head=el("div","modal-header");
-    head.append(el("h3","","Your Lightning profile"),btn("✕",()=>ov.remove()));
+    head.append(el("h3","","Account settings"),btn("✕",()=>ov.remove()));
+    body.append(trialCard(),el("h3","","AI providers"),provRow("openrouter","OpenRouter"),provRow("groq","Groq"),provRow("google","Google"),el("h3","","Profile picture"));
     let chosen=lightningAccount.avatar||null;
     const preview=el("div","profile-tools"),keyInfo=el("div","grow");
     keyInfo.append(el("b","","@"+lightningAccount.username),el("small","profile-key","Friend key: "+lightningAccount.friendCode));
@@ -2110,7 +2113,7 @@ function openLightningAuth(){
     };
     ov.onclick=e=>{if(e.target===ov)ov.remove();};render();
 }
-function drawAcct() { acct.innerHTML = ""; acct.append(trialCard(),provRow("openrouter", "OpenRouter"),provRow("groq", "Groq"),provRow("google", "Google")); updateTopProfileShortcut(); }
+function drawAcct() { acct.innerHTML = ""; updateTopProfileShortcut(); }
 const KEYINFO = { groq: { name: "Groq", prefix: "gsk_", url: "https://console.groq.com/keys", check: "https://api.groq.com/openai/v1/models", cache: () => { groqCache = null; } },
     google: { name: "Google", prefix: "AIza", url: "https://aistudio.google.com/apikey", check: "https://generativelanguage.googleapis.com/v1beta/openai/models", cache: () => { googleCache = null; } } };
 function keyModal(id) {
