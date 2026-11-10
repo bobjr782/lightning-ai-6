@@ -505,7 +505,7 @@ async function route(request, env) {
     await ensureSocialTables(env);
     const [friends,requests]=await Promise.all([
       env.DB.prepare("SELECT users.username,users.id,user_profiles.friend_code AS friendCode,user_profiles.avatar_data AS avatar FROM friendships JOIN users ON users.id=CASE WHEN friendships.user_low=? THEN friendships.user_high ELSE friendships.user_low END LEFT JOIN user_profiles ON user_profiles.user_id=users.id WHERE friendships.user_low=? OR friendships.user_high=? ORDER BY users.username").bind(user.id,user.id,user.id).all(),
-      env.DB.prepare("SELECT friend_requests.id,users.username AS from,user_profiles.friend_code AS friendCode,user_profiles.avatar_data AS avatar FROM friend_requests JOIN users ON users.id=friend_requests.sender_id LEFT JOIN user_profiles ON user_profiles.user_id=users.id WHERE friend_requests.recipient_id=? AND friend_requests.status='pending' ORDER BY friend_requests.created_at DESC").bind(user.id).all()
+      env.DB.prepare("SELECT friend_requests.id,users.username AS from_username,user_profiles.friend_code AS friendCode,user_profiles.avatar_data AS avatar FROM friend_requests JOIN users ON users.id=friend_requests.sender_id LEFT JOIN user_profiles ON user_profiles.user_id=users.id WHERE friend_requests.recipient_id=? AND friend_requests.status='pending' ORDER BY friend_requests.created_at DESC").bind(user.id).all()
     ]);
     return json({friends:friends.results||[],requests:requests.results||[]});
   }
