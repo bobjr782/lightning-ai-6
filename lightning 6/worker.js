@@ -468,7 +468,7 @@ async function route(request, env) {
     let b;try{b=await body(request)}catch{return json({error:"Invalid request."},400)}
     const target=String(b.username||"").trim().toLowerCase(), artifact=JSON.stringify(b.artifact??{});
     if(!target)return json({error:"Enter the username to share with."},400);
-    if(encoder.encode(artifact).length>70000)return json({error:"That creation is too large to share. Images are automatically compressed before sharing."},413);
+    if(encoder.encode(artifact).length>1000000)return json({error:"That creation is too large to share (1 MB maximum). Images are automatically compressed before sharing."},413);
     const recipient=await env.DB.prepare("SELECT id FROM users WHERE username_norm=?").bind(target).first();
     if(!recipient)return json({error:"No Lightning account found with that username."},404);
     if(recipient.id===user.id)return json({error:"You cannot share an artefact with yourself."},400);
