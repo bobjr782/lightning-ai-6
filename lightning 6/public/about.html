@@ -102,6 +102,26 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
 .reveal.in { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } html { scroll-behavior: auto; } }
 
+
+/* dev workspace */
+.dev-section{background:var(--bg2)}
+.dev-project{max-width:900px;border:1px solid var(--line);border-radius:18px;background:var(--card);padding:clamp(22px,4vw,38px);box-shadow:0 16px 44px rgba(0,0,0,.045)}
+.dev-project-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.dev-kicker{font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:700}
+.dev-project h3{font-size:clamp(1.8rem,4vw,2.5rem);margin:5px 0 0}
+.dev-status{border:1px solid var(--line);border-radius:999px;padding:6px 11px;color:var(--mute);font-size:.78rem;font-weight:700;white-space:nowrap}
+.dev-description{color:var(--mute);max-width:66ch;margin:18px 0 25px}
+.dev-pipeline{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.dev-pipeline>div{display:flex;flex-direction:column;gap:8px;padding:15px;border:1px solid var(--line);border-radius:11px;background:var(--bg);min-height:92px}
+.dev-pipeline b{font:600 .78rem 'DM Sans',sans-serif;color:var(--accent)}
+.dev-pipeline span{font-size:.88rem;line-height:1.35}
+.dev-slot{display:flex;align-items:center;gap:15px;margin-top:22px;padding:20px;border:1px dashed var(--line);border-radius:12px;background:var(--bg)}
+.dev-slot-mark{width:38px;height:38px;display:grid;place-items:center;border-radius:10px;background:var(--bg2);color:var(--accent);font-size:1.5rem;flex:0 0 38px}
+.dev-slot strong,.dev-slot span{display:block}
+.dev-slot strong{font-size:.95rem}
+.dev-slot span{font-size:.85rem;color:var(--mute);margin-top:3px}
+@media(max-width:650px){.dev-pipeline{grid-template-columns:repeat(2,minmax(0,1fr))}.dev-project{padding:20px}}
+
 .account-section{padding:72px 0;background:var(--bg2)}
 .account-panel{max-width:680px;margin:0 auto;padding:34px;border:1px solid var(--line);border-radius:16px;background:var(--card);box-shadow:0 14px 42px rgba(0,0,0,.06)}
 .account-panel h2{font-size:clamp(30px,5vw,46px);line-height:1.12;margin:12px 0}
@@ -134,7 +154,7 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
 <nav>
   <div class="wrap">
     <a class="brand" href="#top"><i data-px="bolt"></i> lightning</a>
-    <div class="links"><a href="#features">Features</a><a href="#providers">Models</a><a href="#privacy">Privacy</a><a href="#faq">FAQ</a></div>
+    <div class="links"><a href="#features">Features</a><a href="#dev">Dev</a><a href="#providers">Models</a><a href="#privacy">Privacy</a><a href="#faq">FAQ</a></div>
     <button class="about-profile-link" id="about-profile-link" type="button" aria-label="Open your Lightning account"><img id="about-nav-avatar" alt=""><span id="about-nav-username"></span></button>
     <a class="btn app-link" href="https://lightning-ai-6.ray-collier264.workers.dev/">Open Lightning</a>
     <button class="btn ghost" id="about-accounts-button" type="button">Accounts</button>
@@ -202,6 +222,34 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
       <div class="card"><i data-px="sparkle"></i><h3>Images</h3><p>Pick a style and size, let AI sharpen your prompt, and keep every picture in a personal gallery.</p><a class="app-link" data-path="/images" href="https://lightning-ai-5.ray-collier264.workers.dev/">Open images →</a></div>
       <div class="card"><i data-px="folder"></i><h3>Projects</h3><p>Group chats and give the AI standing instructions for each project, plus a simple task list.</p><a class="app-link" data-path="/projects" href="https://lightning-ai-5.ray-collier264.workers.dev/">Open projects →</a></div>
       <div class="card"><i data-px="globe"></i><h3>Online artifacts</h3><p>Publish what you build to a public page anyone can open, and browse what others have shared.</p><a class="app-link" data-path="/online" href="https://lightning-ai-5.ray-collier264.workers.dev/">Browse online →</a></div>
+    </div>
+  </div>
+</section>
+
+<section id="dev" class="dev-section">
+  <div class="wrap">
+    <div class="eyebrow reveal">Development workspace</div>
+    <h2 class="serif reveal">Dev</h2>
+    <p class="lead reveal">A home for experimental Lightning tools and projects that are still being built.</p>
+    <div class="dev-project reveal" id="dev-image-forge">
+      <div class="dev-project-head">
+        <div>
+          <div class="dev-kicker">Experimental project</div>
+          <h3 class="serif">Image Forge</h3>
+        </div>
+        <span class="dev-status">In development</span>
+      </div>
+      <p class="dev-description">A lightweight image compositor that analyses reference images, finds useful colour regions and shapes, then combines selected pieces into one new composition.</p>
+      <div class="dev-pipeline" aria-label="Image Forge planned workflow">
+        <div><b>01</b><span>Find 8–20 images</span></div>
+        <div><b>02</b><span>Analyse colour and shapes</span></div>
+        <div><b>03</b><span>Extract useful regions</span></div>
+        <div><b>04</b><span>Build one image</span></div>
+      </div>
+      <div class="dev-slot" id="image-forge-mount">
+        <span class="dev-slot-mark" aria-hidden="true">+</span>
+        <div><strong>Image Forge will live here</strong><span>The generator interface will be added to this workspace when it is ready.</span></div>
+      </div>
     </div>
   </div>
 </section>
