@@ -508,7 +508,7 @@ async function imageReferencesRoute(request,env) {
       artist:""
     }));
     let source="Google Images";
-    if(results.length<count){
+    if(results.length<count && !noBackground){
       try{
         const libraryResults=await openverseImageReferences(searchPrompt,count-results.length);
         const seen=new Set(results.map(item=>item.url));
