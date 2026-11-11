@@ -146,7 +146,7 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
     <div class="eyebrow">About lightning</div>
     <h1 class="serif">Lightning AI 7. A faster way to build with AI.</h1>
     <p>lightning is a free AI workspace. Chat, turn ideas into running apps, generate images, and let it switch AI providers for you when one gets busy.</p>
-    <div class="cta"><a class="btn app-link" href="https://lightning-ai-6.ray-collier264.workers.dev/">Start a chat</a><a class="btn ghost" href="#features">See what it does</a></div>
+    <div class="cta"><a class="btn app-link" href="https://lightning-ai-6.ray-collier264.workers.dev/">Start a chat</a><button class="btn ghost" id="hero-register" type="button">Sign up / Register</button><a class="btn ghost" href="#features">See what it does</a></div>
   </div>
 </header>
 
@@ -357,8 +357,19 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
       accountSection.hidden=false;history.replaceState(null,"","#account");
       accountSection.scrollIntoView({behavior:"smooth",block:"start"});
     });
-    showLogin.addEventListener("click",function(){setAuthMode("login");accountCreatePanel.hidden=false;accountForm.hidden=false;choices.hidden=true;});
-    showRegister.addEventListener("click",function(){setAuthMode("register");accountForm.hidden=false;choices.hidden=true;});
+    function openAccountPanel(mode){
+      accountSection.hidden=false;
+      accountCreatePanel.hidden=false;
+      accountForm.hidden=false;
+      choices.hidden=true;
+      setAuthMode(mode);
+      history.replaceState(null,"","#account");
+      accountSection.scrollIntoView({behavior:"smooth",block:"start"});
+    }
+    showLogin.addEventListener("click",function(){openAccountPanel("login");});
+    showRegister.addEventListener("click",function(){openAccountPanel("register");});
+    var heroRegister=document.getElementById("hero-register");
+    if(heroRegister)heroRegister.addEventListener("click",function(){openAccountPanel("register");});
     function setAuthMode(mode){
       authMode=mode;submitBtn.textContent=mode==="login"?"Sign in":"Create account";
       switchBtn.textContent=mode==="login"?"Create an account":"I already have an account";
