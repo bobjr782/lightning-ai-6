@@ -468,38 +468,44 @@ async function imageReferencesRoute(request,env) {
   if(prompt.length<2) return json({error:"Describe what images you want to find."},400);
   try{
     // Search Google Images directly. No chatbot or intermediate AI prompt is involved.
-    const searchUrl="https://www.google.com/search?tbm=isch&hl=en&safe=active"+(noBackground?"&tbs=ic:trans":"")+"&q="+encodeURIComponent(searchPrompt);
-    const response=await fetch(searchUrl,{headers:{
-      "Accept":"text/html,application/xhtml+xml",
-      "Accept-Language":"en-AU,en;q=0.9",
-      "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-    },redirect:"follow"});
-    if(!response.ok) throw new Error("Google Images returned HTTP "+response.status+". Google may be blocking automated searches.");
-    const html=await response.text();
-    if(/unusual traffic|sorry\/|consent\.google\.com|before you continue to google/i.test(html.slice(0,180000)))
-      throw new Error("Google showed a verification or consent page instead of image results.");
+    // Rotate through Google Images result pages so repeat searches do not
+    // always return the same first-page thumbnails. A short random page offset
+    // also varies the result set between requests.
+    const pageStart=Math.floor(Math.random()*4);
+    const searchUrl="https://www.google.com/search?tbm=isch&udm=2&hl=en&safe=active"+(noBackground?"&tbs=ic:trans":"")+"&q="+encodeURIComponent(searchPrompt)+"&ijn="+pageStart;
     const found=[];
     const addUrl=value=>{
       if(!value)return;
-      let url=String(value).replace(/\\u003d/g,"=").replace(/\\u0026/g,"&").replace(/\\u003c/g,"<").replace(/\\u003e/g,">").replace(/\\\\\//g,"/");
+      let url=String(value).replace(/\\u003d/g,"=").replace(/\\u0026/g,"&").replace(/\\u003c/g,"<").replace(/\\u003e/g,">").replace(/\\\\\\//g,"/");
       try{url=decodeURIComponent(url);}catch(_){}
       url=url.replace(/&amp;/g,"&").replace(/\\u0026/g,"&");
-      if(!/^https:\/\//i.test(url))return;
-      if(/(^|\.)google\.(com|com\.au)$|gstatic\.com|googleusercontent\.com/i.test(new URL(url).hostname))return;
-      if(!/\.(jpe?g|png|webp|gif|avif)(?:$|[?#])/i.test(url))return;
+      if(!/^https:\\/\\//i.test(url))return;
+      if(/(^|\\.)google\\.(com|com\\.au)$|gstatic\\.com|googleusercontent\\.com/i.test(new URL(url).hostname))return;
+      if(!/\\.(jpe?g|png|webp|gif|avif)(?:$|[?#])/i.test(url))return;
       if(!found.includes(url))found.push(url);
     };
-    // Google embeds original image URLs in its image-result JSON ("ou") and
-    // sometimes as an encoded imgurl query parameter.
-    let match;
-    const originalPattern=/"ou"\s*:\s*"([^"]+)"/g;
-    while((match=originalPattern.exec(html))&&found.length<count*4){
-      try{addUrl(JSON.parse('"'+match[1]+'"'));}catch(_){addUrl(match[1]);}
+    // Fetch two neighbouring result pages, not just Google's default first page.
+    for(let page=pageStart;page<pageStart+2&&found.length<count*3;page++){
+      const pageUrl="https://www.google.com/search?tbm=isch&udm=2&hl=en&safe=active"+(noBackground?"&tbs=ic:trans":"")+"&q="+encodeURIComponent(searchPrompt)+"&ijn="+page;
+      const response=await fetch(pageUrl,{headers:{
+        "Accept":"text/html,application/xhtml+xml",
+        "Accept-Language":"en-AU,en;q=0.9",
+        "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+      },redirect:"follow"});
+      if(!response.ok)throw new Error("Google Images returned HTTP "+response.status+". Google may be blocking automated searches.");
+      const html=await response.text();
+      if(/unusual traffic|sorry\\/|consent\\.google\\.com|before you continue to google/i.test(html.slice(0,180000)))
+        throw new Error("Google showed a verification or consent page instead of image results.");
+      let match;
+      const originalPattern=/"ou"\\s*:\\s*"([^"]+)"/g;
+      while((match=originalPattern.exec(html))&&found.length<count*3){
+        try{addUrl(JSON.parse('"'+match[1]+'"'));}catch(_){addUrl(match[1]);}
+      }
+      const encodedPattern=/imgurl=(https?%3A%2F%2F[^&"\\s]+)/gi;
+      while((match=encodedPattern.exec(html))&&found.length<count*3)addUrl(match[1]);
+      const plainPattern=/imgurl=(https?:\\/\\/[^&"\\s]+)/gi;
+      while((match=plainPattern.exec(html))&&found.length<count*3)addUrl(match[1]);
     }
-    const encodedPattern=/imgurl=(https?%3A%2F%2F[^&"\s]+)/gi;
-    while((match=encodedPattern.exec(html))&&found.length<count*4)addUrl(match[1]);
-    const plainPattern=/imgurl=(https?:\/\/[^&"\s]+)/gi;
-    while((match=plainPattern.exec(html))&&found.length<count*4)addUrl(match[1]);
     const results=found.slice(0,count).map((url,index)=>({
       title:"Google Images result "+(index+1),
       url,
@@ -524,6 +530,9 @@ async function imageReferencesRoute(request,env) {
     return json({ok:true,query:prompt,searchQuery:searchPrompt,noBackground,source,count:results.length,requested:count,results,searchUrl});
   }catch(error){
     console.warn("Google Images unavailable; trying Openverse:",error?.message||error);
+    if(noBackground){
+      return json({error:"Google could not verify transparent-image results right now. No unverified images were substituted. Please try again later."},502);
+    }
     try{
       const results=await openverseImageReferences(searchPrompt,count);
       return json({ok:true,query:prompt,searchQuery:searchPrompt,noBackground,source:"Openverse image library",count:results.length,requested:count,results,fallback:true});
