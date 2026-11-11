@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet">
 <style>
 :root {
     --bg-main: #000000;
@@ -674,6 +675,18 @@ body.img-mode .img-opts { display: flex; }
     overscroll-behavior: contain;
 }
 .account-settings-card .modal-header { flex: 0 0 auto; }
+.appearance-setting { display:flex; align-items:center; justify-content:space-between; gap:18px; padding:14px 15px; background:var(--surface); border:1px solid var(--border-color); border-radius:11px; }
+.appearance-setting-copy { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.appearance-setting-copy strong { color:var(--text-primary); font-size:.94rem; }
+.appearance-setting-copy small { color:var(--text-secondary); font-size:.8rem; }
+.setting-switch { position:relative; display:inline-flex; flex:0 0 48px; width:48px; height:28px; }
+.setting-switch input { position:absolute; opacity:0; width:1px; height:1px; }
+.setting-switch-track { position:absolute; inset:0; border-radius:99px; background:#596273; cursor:pointer; transition:background .18s; }
+.setting-switch-track::after { content:""; position:absolute; width:20px; height:20px; left:4px; top:4px; border-radius:50%; background:#fff; transition:transform .18s; box-shadow:0 1px 3px #0005; }
+.setting-switch input:checked + .setting-switch-track { background:var(--accent); }
+.setting-switch input:checked + .setting-switch-track::after { transform:translateX(20px); }
+.setting-switch input:focus-visible + .setting-switch-track { outline:2px solid var(--text-primary); outline-offset:3px; }
+.material-symbols-outlined.px { display:inline-flex; width:1em; height:1em; font-size:1em; line-height:1; vertical-align:-.12em; align-items:center; justify-content:center; font-weight:normal; font-style:normal; letter-spacing:normal; text-transform:none; white-space:nowrap; direction:ltr; -webkit-font-feature-settings:"liga"; -webkit-font-smoothing:antialiased; }
 .account-settings-body > h3 { margin: 8px 0 0; }
 .account-settings-body .prov-row,
 .account-settings-body .trial-account { flex: 0 0 auto; }
@@ -761,7 +774,6 @@ body.img-mode .img-opts { display: flex; }
                 <button class="sidebar-btn" onclick="imgMode()">🎨 Image mode</button>
                 <button class="sidebar-btn" onclick="openSettings()">⚙️ Model settings</button>
                 <button class="sidebar-btn" onclick="openPlugins()">🔌 Plugins</button>
-                <button class="sidebar-btn" onclick="toggleTheme()">◐ Light / dark</button>
                 <button class="sidebar-btn" onclick="clearHistory()">🗑 Clear all chats</button>
                 <div class="sidebar-chat-heading">Your chats</div><div id="sidebar-chat-list" class="sidebar-chat-list"></div>
             </div>
@@ -2395,6 +2407,24 @@ function openProfileEditor(){
     }
     body.append(identity,trialCard());
 
+    body.append(el("h3","settings-section-title","Appearance"));
+    const addAppearanceSwitch=(title,description,checked,onChange)=>{
+        const row=el("div","appearance-setting"),copy=el("div","appearance-setting-copy");
+        copy.append(el("strong","",title),el("small","",description));
+        const label=el("label","setting-switch"),input=el("input");
+        input.type="checkbox";input.checked=checked;input.setAttribute("aria-label",title);
+        const track=el("span","setting-switch-track");
+        input.addEventListener("change",()=>onChange(input.checked));
+        label.append(input,track);row.append(copy,label);body.append(row);
+    };
+    addAppearanceSwitch("Light theme","Switch between Lightning's dark and light appearance",document.body.classList.contains("light-mode"),enabled=>{
+        document.body.classList.toggle("light-mode",enabled);
+        localStorage.setItem("lt_theme",enabled?"light":"dark");
+    });
+    addAppearanceSwitch("Google Fonts icons","Use Google Material Symbols instead of Lightning's default pixel icons",localStorage.getItem("lt_icon_mode")==="google",enabled=>{
+        setIconMode(enabled?"google":"default");
+    });
+
     if(lightningAccount){
         body.append(el("h3","settings-section-title","Profile picture"));
         let chosen=lightningAccount.avatar||null, selectedPixel=0;
@@ -2764,9 +2794,19 @@ const ICONS = {
 const PXMAP = { "⚡": "bolt", "💬": "chat", "📁": "folder", "🧩": "box", "🖼": "image", "🎨": "sparkle", "✨": "sparkle", "🔌": "plug", "⚙": "gear", "◐": "half", "🗑": "trash", "🔑": "key", "＋": "plus", "✓": "check", "✅": "check", "✕": "x", "↑": "up", "▶": "play", "⛶": "expand", "⬇": "download", "🛠": "wrench", "📎": "file", "📄": "file", "⏳": "hourglass", "⏱": "hourglass", "⚠": "warn", "☰": "menu", "🌐": "globe" };
 const PXRE = new RegExp("(" + Object.keys(PXMAP).join("|") + ")\\uFE0F?", "g"), PXTEST = new RegExp(PXRE.source), PXSKIP = "pre,textarea,input,select,option,script,style,.userBox";
 const pxPath = name => { let d = ""; ICONS[name].forEach((row, y) => { for (let x = 0; x < 8; x++) if (row[x] === "#") d += `M${x} ${y}h1v1h-1z`; }); return d; };
+const MATERIAL_ICON_NAMES={bolt:"bolt",chat:"chat_bubble",folder:"folder",box:"deployed_code",image:"image",sparkle:"auto_awesome",plug:"power",gear:"settings",half:"contrast",trash:"delete",key:"key",plus:"add",check:"check",x:"close",up:"arrow_upward",play:"play_arrow",expand:"open_in_full",download:"download",wrench:"build",file:"description",hourglass:"hourglass_top",warn:"warning",globe:"language",menu:"menu"};
 function pxSvg(name) {
+    if(localStorage.getItem("lt_icon_mode")==="google"){
+        const span=document.createElement("span");
+        span.className="material-symbols-outlined px";span.dataset.icon=name;
+        span.setAttribute("aria-hidden","true");span.textContent=MATERIAL_ICON_NAMES[name]||"circle";return span;
+    }
     const ns = "http://www.w3.org/2000/svg", s = document.createElementNS(ns, "svg"), p = document.createElementNS(ns, "path");
-    s.setAttribute("viewBox", "0 0 8 8"); s.setAttribute("class", "px"); s.setAttribute("aria-hidden", "true"); p.setAttribute("d", pxPath(name)); s.append(p); return s;
+    s.setAttribute("viewBox", "0 0 8 8"); s.setAttribute("class", "px"); s.dataset.icon=name; s.setAttribute("aria-hidden", "true"); p.setAttribute("d", pxPath(name)); s.append(p); return s;
+}
+function setIconMode(mode){
+    localStorage.setItem("lt_icon_mode",mode==="google"?"google":"default");
+    document.querySelectorAll(".px[data-icon]").forEach(old=>old.replaceWith(pxSvg(old.dataset.icon)));
 }
 function pixelate(root) {
     if (!root || root.nodeType !== 1) return;
