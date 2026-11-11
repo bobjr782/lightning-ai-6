@@ -351,7 +351,7 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
       </div>
       <div class="dev-accuracy-control"><label for="image-forge-accuracy">Accuracy</label><output id="image-forge-accuracy-value" for="image-forge-accuracy">70%</output><input id="image-forge-accuracy" type="range" min="10" max="100" step="5" value="70"><div class="dev-accuracy-help">Higher accuracy means deeper reference checking and a longer generation time.</div><div class="dev-eta">Predicted time for two candidates and comparison: <strong id="image-forge-eta">about 1 min 30 sec</strong></div></div>
       <div class="dev-test-panel" id="image-forge-mount">
-        <div class="dev-test-heading"><div><h4>Reference image test</h4><p>Describe the subject you want Image Forge to study.</p></div><span class="dev-test-count">8–20 images</span></div>
+        <div class="dev-test-heading"><div><h4>Reference image test</h4><p>Describe the subject you want Image Forge to study. Add <code>#no-background</code> to require genuine transparent pixels.</p></div><span class="dev-test-count">8–20 images</span></div>
         <form id="image-forge-test-form" class="dev-test-form">
           <label class="sr-only" for="image-forge-prompt">Image search prompt</label>
           <input id="image-forge-prompt" type="text" maxlength="240" placeholder="e.g. red fox in a snowy forest" autocomplete="off" required>
@@ -361,7 +361,7 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
         </form>
         <div id="image-forge-test-status" class="dev-test-status" role="status" aria-live="polite">Sign in to Lightning, then run a search to test the reference finder.</div>
         <div id="image-forge-test-results" class="dev-test-results"></div>
-        <div class="dev-test-footer"><span>Images are found through Google Images, with Openverse as a backup library. Check each original source and its usage rights before reuse.</span><button type="button" class="btn ghost" id="image-forge-copy-urls" disabled>Copy image URLs</button></div>
+        <div class="dev-test-footer"><span>Images are searched across rotating Google Images result pages. Transparent-only searches reject unverified results instead of substituting ordinary images. Check each original source and its usage rights before reuse.</span><button type="button" class="btn ghost" id="image-forge-copy-urls" disabled>Copy image URLs</button></div>
       </div>
     </div>
   </div>
