@@ -427,6 +427,29 @@ async function generateRoute(request,env){
   }
 }
 
+async function openverseImageReferences(prompt,count) {
+  const params=new URLSearchParams({q:prompt,page_size:String(Math.min(20,count)),mature:"false"});
+  const response=await fetch("https://api.openverse.org/v1/images/?"+params.toString(),{
+    headers:{"Accept":"application/json","User-Agent":"LightningImageForge/1.0"}
+  });
+  if(!response.ok) throw new Error("Openverse image library returned HTTP "+response.status);
+  const data=await response.json();
+  return (data?.results||[]).map(item=>{
+    const url=String(item.url||item.thumbnail||"");
+    if(!/^https:\/\//i.test(url))return null;
+    return {
+      title:String(item.title||"Untitled image").slice(0,180),
+      url,
+      source:String(item.foreign_landing_url||item.detail_url||""),
+      width:item.width||null,
+      height:item.height||null,
+      license:String(item.license||"").slice(0,80),
+      licenseUrl:String(item.license_url||""),
+      artist:String(item.creator||"").slice(0,180)
+    };
+  }).filter(Boolean);
+}
+
 const IMAGE_REFERENCE_RATE = new Map();
 async function imageReferencesRoute(request,env) {
   if(!env.DB) return json({error:"Account database is not configured."},503);
@@ -481,10 +504,30 @@ async function imageReferencesRoute(request,env) {
       license:"Check original source for usage rights",
       artist:""
     }));
-    return json({ok:true,query:prompt,source:"Google Images",count:results.length,requested:count,results,searchUrl});
+    let source="Google Images";
+    if(results.length<count){
+      try{
+        const libraryResults=await openverseImageReferences(prompt,count-results.length);
+        const seen=new Set(results.map(item=>item.url));
+        for(const item of libraryResults){
+          if(results.length>=count)break;
+          if(!seen.has(item.url)){seen.add(item.url);results.push(item);}
+        }
+        if(results.some(item=>item.licenseUrl))source="Google Images + Openverse";
+      }catch(libraryError){
+        console.warn("Openverse top-up unavailable:",libraryError?.message||libraryError);
+      }
+    }
+    return json({ok:true,query:prompt,source,count:results.length,requested:count,results,searchUrl});
   }catch(error){
-    console.error("Lightning Google Images search failed:",error?.message||error);
-    return json({error:"Google Images could not provide image links. "+String(error?.message||"Try again later.")},502);
+    console.warn("Google Images unavailable; trying Openverse:",error?.message||error);
+    try{
+      const results=await openverseImageReferences(prompt,count);
+      return json({ok:true,query:prompt,source:"Openverse image library",count:results.length,requested:count,results,fallback:true});
+    }catch(libraryError){
+      console.error("Both image sources failed:",error?.message||error,libraryError?.message||libraryError);
+      return json({error:"Google Images and the Openverse image library are temporarily unavailable. "+String(libraryError?.message||error?.message||"Try again later.")},502);
+    }
   }
 }
 
