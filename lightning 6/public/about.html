@@ -546,9 +546,9 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
       if(!response.ok)throw new Error(data.error||("Search failed (HTTP "+response.status+")."));
       latest=Array.isArray(data.results)?data.results:[];
       status.textContent=latest.length?"Found "+latest.length+" reference image"+(latest.length===1?"":"s")+" for “"+data.query+"”.":"No images found. Try a broader description.";
-      // Border crop v2: estimate the dominant border colour, then flood-fill
-      // only matching pixels connected to the outside. Complex/uncertain images
-      // are deliberately rejected instead of receiving a bad cut-out.
+      // Image Forge cut-out v3:
+      // Build a small palette from the whole image border (not one average colour),
+      // flood-fill only border-connected background, then remove tiny foreground specks.
       let cropped=0,failed=0;
       const rejectionReasons={};
       for(let index=0;index<latest.length;index++){
@@ -559,70 +559,108 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
             image.onload=function(){resolve(image);};image.onerror=function(){reject(new Error("Image blocked by its host (CORS)"));};image.src=item.url;
           });
           const w=img.naturalWidth,h=img.naturalHeight;
-          if(!w||!h||w*h>8000000)throw new Error("Image is too large to process");
-          const scale=160/Math.max(w,h),sw=Math.max(1,Math.round(w*scale)),sh=Math.max(1,Math.round(h*scale));
+          if(!w||!h||w*h>12000000)throw new Error("Image is too large to process");
+          const scale=256/Math.max(w,h),sw=Math.max(1,Math.round(w*scale)),sh=Math.max(1,Math.round(h*scale));
           const sample=document.createElement("canvas");sample.width=sw;sample.height=sh;
           const sc=sample.getContext("2d",{willReadFrequently:true});sc.drawImage(img,0,0,sw,sh);
           const pixels=sc.getImageData(0,0,sw,sh).data,total=sw*sh;
           const edge=[];
           for(let x=0;x<sw;x++){edge.push(x,(sh-1)*sw+x);}
           for(let y=1;y<sh-1;y++){edge.push(y*sw,y*sw+sw-1);}
-          function median(values){values.sort(function(a,b){return a-b;});return values[Math.floor(values.length/2)];}
-          const rs=[],gs=[],bs=[];
-          edge.forEach(function(p){const q=p*4;if(pixels[q+3]>20){rs.push(pixels[q]);gs.push(pixels[q+1]);bs.push(pixels[q+2]);}});
-          if(rs.length<edge.length*.55)throw new Error("Too much transparency at image border");
-          const bg=[median(rs),median(gs),median(bs)];
-          // Ignore border pixels that clearly differ from the dominant border tone.
-          const threshold=76,threshold2=threshold*threshold*3;
-          function isBackground(p){
-            const q=p*4;
-            if(pixels[q+3]<20)return true;
-            const dr=pixels[q]-bg[0],dg=pixels[q+1]-bg[1],db=pixels[q+2]-bg[2];
-            return dr*dr+dg*dg+db*db<=threshold2;
+          // Quantise border colours into a compact palette to tolerate shadows,
+          // gradients and textured backdrops better than a single RGB average.
+          const bins=new Map();
+          edge.forEach(function(p){
+            const q=p*4;if(pixels[q+3]<24)return;
+            const key=(pixels[q]>>5)+","+ (pixels[q+1]>>5)+","+ (pixels[q+2]>>5);
+            let b=bins.get(key);if(!b){b={r:[],g:[],b:[],n:0};bins.set(key,b);}
+            b.r.push(pixels[q]);b.g.push(pixels[q+1]);b.b.push(pixels[q+2]);b.n++;
+          });
+          if(!bins.size)throw new Error("No usable border pixels");
+          function median(a){a.sort(function(x,y){return x-y;});return a[Math.floor(a.length/2)];}
+          const palette=Array.from(bins.values()).sort(function(a,b){return b.n-a.n;}).slice(0,10).map(function(b){return [median(b.r),median(b.g),median(b.b)];});
+          const threshold2=58*58*3;
+          function bgDistance(p){
+            const q=p*4;if(pixels[q+3]<24)return 0;
+            let best=Infinity;
+            for(let k=0;k<palette.length;k++){
+              const c=palette[k],dr=pixels[q]-c[0],dg=pixels[q+1]-c[1],db=pixels[q+2]-c[2];
+              const d=dr*dr+dg*dg+db*db;if(d<best)best=d;
+            }
+            return best;
           }
+          function isBackground(p){return bgDistance(p)<=threshold2;}
           const background=new Uint8Array(total),queue=new Int32Array(total);
           let head=0,tail=0,matchingEdges=0;
           function seed(p){if(!background[p]&&isBackground(p)){background[p]=1;queue[tail++]=p;matchingEdges++;}}
           for(let x=0;x<sw;x++){seed(x);seed((sh-1)*sw+x);}
           for(let y=1;y<sh-1;y++){seed(y*sw);seed(y*sw+sw-1);}
-          if(matchingEdges<edge.length*.28)throw new Error("Border does not have a consistent background");
+          if(matchingEdges<edge.length*.12)throw new Error("Could not identify enough background along the border");
           while(head<tail){
             const p=queue[head++],x=p%sw,y=(p/sw)|0;
-            const neighbours=[x>0?p-1:-1,x<sw-1?p+1:-1,y>0?p-sw:-1,y<sh-1?p+sw:-1];
-            for(let n=0;n<4;n++){const z=neighbours[n];if(z>=0&&!background[z]&&isBackground(z)){background[z]=1;queue[tail++]=z;}}
+            for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+              if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;
+              if(nx<0||ny<0||nx>=sw||ny>=sh)continue;
+              const z=ny*sw+nx;if(!background[z]&&isBackground(z)){background[z]=1;queue[tail++]=z;}
+            }
           }
+          // Label foreground islands; discard tiny detached flecks while retaining
+          // meaningful separated pieces such as ears, whiskers and tails.
+          const seen=new Uint8Array(total),components=[];
+          for(let p=0;p<total;p++){
+            if(background[p]||seen[p])continue;
+            const stack=[p],members=[];seen[p]=1;
+            while(stack.length){
+              const z=stack.pop();members.push(z);const x=z%sw,y=(z/sw)|0;
+              for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+                if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;
+                if(nx<0||ny<0||nx>=sw||ny>=sh)continue;
+                const n=ny*sw+nx;if(!background[n]&&!seen[n]){seen[n]=1;stack.push(n);}
+              }
+            }
+            components.push(members);
+          }
+          components.sort(function(a,b){return b.length-a.length;});
+          if(!components.length)throw new Error("No foreground object was detected");
+          const largest=components[0].length;
+          if(largest<total*.025)throw new Error("Detected object is too small");
+          const keep=new Uint8Array(total);
+          components.forEach(function(part,i){
+            if(i===0||part.length>=Math.max(8,largest*.003))part.forEach(function(p){keep[p]=1;});
+          });
           let minX=sw,minY=sh,maxX=-1,maxY=-1,foreground=0,edgeForeground=0;
           for(let y=0;y<sh;y++)for(let x=0;x<sw;x++){
-            const p=y*sw+x;
-            if(!background[p]){foreground++;minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);
-              if(x===0||y===0||x===sw-1||y===sh-1)edgeForeground++;}
+            const p=y*sw+x;if(keep[p]){foreground++;minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);if(x===0||y===0||x===sw-1||y===sh-1)edgeForeground++;}
           }
-          const fill=foreground/total;
-          if(foreground<total*.035||fill>.94)throw new Error("Could not separate a clear foreground object");
-          if(edgeForeground>0||minX<1||minY<1||maxX>sw-2||maxY>sh-2)throw new Error("Object touches image edge");
+          if(foreground<total*.025)throw new Error("Foreground mask was too weak");
+          if(edgeForeground)throw new Error("Object touches image edge");
           const boxW=maxX-minX+1,boxH=maxY-minY+1;
-          if(boxW<sw*.10||boxH<sh*.10)throw new Error("Detected object is too small");
-          // Reject if the foreground is fragmented into lots of tiny islands.
-          const cropLeft=Math.max(0,minX-4),cropTop=Math.max(0,minY-4),cropRight=Math.min(sw,maxX+5),cropBottom=Math.min(sh,maxY+5);
-          const cropArea=(cropRight-cropLeft)*(cropBottom-cropTop);
-          if(cropArea>total*.94)throw new Error("Crop would include almost the whole image");
+          if(boxW<sw*.07||boxH<sh*.07)throw new Error("Detected object is too small");
+          const pad=Math.max(2,Math.round(Math.max(boxW,boxH)*.018));
+          const cropLeft=Math.max(0,minX-pad),cropTop=Math.max(0,minY-pad),cropRight=Math.min(sw,maxX+1+pad),cropBottom=Math.min(sh,maxY+1+pad);
           const left=Math.floor(cropLeft/sw*w),top=Math.floor(cropTop/sh*h),right=Math.min(w,Math.ceil(cropRight/sw*w)),bottom=Math.min(h,Math.ceil(cropBottom/sh*h));
           const out=document.createElement("canvas");out.width=right-left;out.height=bottom-top;
           if(!out.width||!out.height)throw new Error("Invalid crop bounds");
           const oc=out.getContext("2d",{willReadFrequently:true});oc.drawImage(img,left,top,out.width,out.height,0,0,out.width,out.height);
           const outPixels=oc.getImageData(0,0,out.width,out.height),od=outPixels.data;
-          let kept=0;
           for(let y=0;y<out.height;y++)for(let x=0;x<out.width;x++){
             const sx=Math.min(sw-1,Math.max(0,Math.floor((left+x)/w*sw)));
             const sy=Math.min(sh-1,Math.max(0,Math.floor((top+y)/h*sh)));
-            if(background[sy*sw+sx])od[(y*out.width+x)*4+3]=0;else kept++;
+            const p=sy*sw+sx,at=(y*out.width+x)*4;
+            if(!keep[p]){od[at+3]=0;continue;}
+            // Soften only the cut-out edge to reduce jagged pixel halos.
+            let nearBackground=false;
+            for(let dy=-1;dy<=1&&!nearBackground;dy++)for(let dx=-1;dx<=1;dx++){
+              const nx=sx+dx,ny=sy+dy;
+              if(nx>=0&&ny>=0&&nx<sw&&ny<sh&&background[ny*sw+nx]){nearBackground=true;break;}
+            }
+            if(nearBackground)od[at+3]=Math.min(od[at+3],210);
           }
-          if(kept<out.width*out.height*.02)throw new Error("Foreground mask was too weak");
           oc.putImageData(outPixels,0,0);
           const card=document.createElement("article");card.className="dev-test-card";
           const preview=document.createElement("img");preview.src=out.toDataURL("image/png");preview.alt="Border-cropped object "+(cropped+1);
           preview.style.cssText="width:100%;height:190px;object-fit:contain;background:repeating-conic-gradient(#8882 0% 25%,transparent 0% 50%) 50%/16px 16px";
-          const title=document.createElement("div");title.className="dev-test-card-title";title.textContent="Border crop "+(cropped+1);
+          const title=document.createElement("div");title.className="dev-test-card-title";title.textContent="Clean cut-out "+(cropped+1);
           card.append(preview,title);results.append(card);cropped++;
         }catch(error){failed++;const reason=error&&error.message?error.message:"Unknown crop error";rejectionReasons[reason]=(rejectionReasons[reason]||0)+1;}
         status.textContent="Border-cropping: "+(index+1)+" / "+latest.length;
