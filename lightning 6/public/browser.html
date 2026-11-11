@@ -5,29 +5,32 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Lightning Browser</title>
 <style>
-:root{color-scheme:dark;font-family:Arial,sans-serif;background:#0b0e14;color:#e8ecf4}
+:root{color-scheme:dark;font-family:Arial,sans-serif;background:#262624;color:#faf9f5;--browser-accent:#d97757;--browser-bg:#262624;--browser-surface:#30302e;--browser-border:#43413d;--browser-text:#faf9f5;--browser-muted:#a6a39a}
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;overflow:hidden}
-body{display:flex;flex-direction:column;background:#0b0e14}
-header{height:58px;flex:0 0 58px;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid #2b303a;background:#11151d}
-.brand{font-weight:700;white-space:nowrap}.brand span{color:#d97757}
+body{display:flex;flex-direction:column;background:var(--browser-bg);color:var(--browser-text)}
+body.embedded header{display:none}body.embedded #bottom{display:none}body.embedded #log{max-height:58px}
+header{height:58px;flex:0 0 58px;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid var(--browser-border);background:var(--browser-surface)}
+.brand{font-weight:700;white-space:nowrap}.brand span{color:var(--browser-accent)}
 button,input{font:inherit}
-button{border:1px solid #3a414d;background:#202631;color:#e8ecf4;border-radius:7px;padding:9px 12px;cursor:pointer}
-button:hover{background:#2a3340}button:disabled{opacity:.45;cursor:not-allowed}
-input{min-width:0;flex:1;background:#0b0e14;border:1px solid #3a414d;color:#e8ecf4;border-radius:7px;padding:10px 12px}
-#status{font-size:12px;color:#9ca8b8;white-space:nowrap}
+button{border:1px solid var(--browser-border);background:var(--browser-surface);color:var(--browser-text);border-radius:7px;padding:9px 12px;cursor:pointer}
+button:hover{background:color-mix(in srgb,var(--browser-accent) 18%,var(--browser-surface))}button:disabled{opacity:.45;cursor:not-allowed}
+input{min-width:0;flex:1;background:var(--browser-bg);border:1px solid var(--browser-border);color:var(--browser-text);border-radius:7px;padding:10px 12px}
+#status{font-size:12px;color:var(--browser-muted);white-space:nowrap}
 main{flex:1;min-height:0;display:flex;flex-direction:column}
-.toolbar{display:flex;gap:8px;align-items:center;padding:10px 12px;background:#151a23;border-bottom:1px solid #2b303a}
+.toolbar{display:flex;gap:8px;align-items:center;padding:10px 12px;background:var(--browser-surface);border-bottom:1px solid var(--browser-border)}
 #viewer-wrap{position:relative;flex:1;min-height:0;background:#07090d;overflow:hidden}
 #live-view{width:100%;height:100%;border:0;display:none;background:#fff}
 #empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;color:#aab4c2;gap:12px}
 #empty h1{color:#f1f4f8;font-size:24px;margin:0}
 #empty p{max-width:560px;line-height:1.55;margin:0}
-#cursor-puppet{position:absolute;left:50%;top:50%;z-index:5;width:18px;height:24px;pointer-events:none;opacity:0;transform:translate(-2px,-2px);transition:left .22s ease,top .22s ease,opacity .15s}
+#cursor-puppet{position:absolute;left:50%;top:50%;z-index:20;width:34px;height:44px;pointer-events:none;opacity:0;transform:translate(-3px,-3px);transition:left .12s linear,top .12s linear,opacity .15s;filter:drop-shadow(0 2px 5px #000)}
+#cursor-puppet svg{width:34px;height:44px}#cursor-tag{position:absolute;left:27px;top:0;white-space:nowrap;padding:3px 7px;border-radius:5px;background:var(--browser-accent);color:#fff;font:700 10px Arial,sans-serif;letter-spacing:.5px;box-shadow:0 2px 7px #0008}
 #cursor-puppet svg{width:18px;height:24px;filter:drop-shadow(1px 2px 2px #000)}
 #bottom{height:42px;flex:0 0 42px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:#11151d;border-top:1px solid #2b303a;color:#9ca8b8;font-size:12px}
 #log{max-height:100px;overflow:auto;padding:7px 14px;background:#0f131a;border-top:1px solid #252b35;font:12px/1.45 Consolas,monospace;color:#aeb8c7}
-#captcha{display:none;padding:10px 14px;background:#4a321b;color:#ffe1b6;border-top:1px solid #7a5128;font-size:13px}
+#captcha{display:none;position:relative;z-index:30;padding:17px 18px;background:#7b2f18;color:#fff;border:3px solid #ff9b55;font-size:16px;font-weight:700;line-height:1.4;box-shadow:0 0 0 3px #ff9b5533}
+#captcha strong{display:block;font-size:20px;margin-bottom:4px}#captcha button{margin-left:10px;background:#fff;color:#61220e;border:0;font-weight:800;padding:10px 16px}#captcha .verify-note{display:block;font-size:13px;font-weight:500;margin-top:4px}
 #shot{display:none;position:absolute;right:12px;bottom:12px;max-width:min(420px,40vw);max-height:38vh;border:1px solid #596273;border-radius:8px;box-shadow:0 8px 28px #0009}
 @media(max-width:700px){header{gap:6px;padding:0 8px}.brand{font-size:13px}#status{display:none}.toolbar{flex-wrap:wrap}.toolbar input{flex-basis:100%;order:2}.toolbar button{padding:8px}.toolbar #go{order:3}}
 </style>
@@ -58,10 +61,10 @@ main{flex:1;min-height:0;display:flex;flex-direction:column}
       <button id="open-viewer" hidden>Open live view in a new tab</button>
     </div>
     <iframe id="live-view" title="Live remote browser" allow="clipboard-read; clipboard-write; fullscreen; autoplay" referrerpolicy="no-referrer"></iframe>
-    <div id="cursor-puppet" aria-hidden="true"><svg viewBox="0 0 18 24"><path d="M1 1L1 19L5.5 14.5L9 22L12 20.5L8.5 13.5L15 13Z" fill="#fff" stroke="#111" stroke-width="1.5"/></svg></div>
+    <div id="cursor-puppet" aria-hidden="true"><svg viewBox="0 0 18 24"><path d="M1 1L1 19L5.5 14.5L9 22L12 20.5L8.5 13.5L15 13Z" fill="#d97757" stroke="#fff" stroke-width="1.5"/></svg><span id="cursor-tag">LIGHTNING AI</span></div>
     <img id="shot" alt="Browser screenshot">
   </div>
-  <div id="captcha">A verification challenge was detected. Complete it in the browser window, then choose Resume.</div>
+  <div id="captcha"><strong>Human verification required</strong>Lightning has paused its actions. Use your own mouse in the browser above to complete the check. <span class="verify-note">When the website confirms you are human, select Resume to let Lightning continue.</span><button id="resume-banner" type="button">I finished verification — Resume Lightning</button></div>
   <div id="log">Browser ready. Choose Start browser to begin.</div>
 </main>
 <footer id="bottom"><span>Simulated cursor · Remote Chromium · Human verification handoff</span><button id="resume" disabled>Resume after verification</button></footer>
@@ -121,10 +124,10 @@ $("back-page").onclick=async()=>{try{const r=await command("back");if(r.moved)lo
 $("forward-page").onclick=async()=>{try{const r=await command("forward");if(r.moved)log("Forward to "+r.url);else log("No next page.");}catch(e){log(e.message);}};
 $("take-shot").onclick=async()=>{try{const r=await command("screenshot");$("shot").src=r.dataUrl;$("shot").style.display="block";log("Screenshot captured.");}catch(e){log(e.message);}};
 $("check-captcha").onclick=async()=>{try{const r=await command("CAPTCHA");if(r.detected){paused=true;$("captcha").style.display="block";$("resume").disabled=false;status("Human verification needed");log("CAPTCHA detected. Automation paused.");}else log("No CAPTCHA detected.");}catch(e){log(e.message);}};
-$("resume").onclick=async()=>{try{const r=await api("/api/browser/resume",{});paused=false;$("captcha").style.display="none";$("resume").disabled=true;status("Live session");log(r.message);}catch(e){log(e.message);alert(e.message);}};
+$("resume-banner").onclick=()=> $("resume").click();\n$("resume").onclick=async()=>{try{const r=await api("/api/browser/resume",{});paused=false;$("captcha").style.display="none";$("resume").disabled=true;status("Live session");log(r.message);}catch(e){log(e.message);alert(e.message);}};
 $("stop").onclick=async()=>{try{await api("/api/browser/stop",{});}catch(e){log(e.message);}running=false;paused=false;liveViewUrl="";$("live-view").src="about:blank";$("live-view").style.display="none";$("empty").style.display="flex";$("captcha").style.display="none";$("resume").disabled=true;status("Stopped");log("Browser session stopped.");};
 $("open-viewer").onclick=()=>{if(liveViewUrl)window.open(liveViewUrl,"_blank","noopener");};
-window.LightningBrowser={
+const embedded=new URLSearchParams(location.search).has("embedded");\nif(embedded){document.body.classList.add("embedded");try{const theme=getComputedStyle(parent.document.body);const root=document.documentElement;root.style.setProperty("--browser-accent",theme.getPropertyValue("--accent").trim()||"#d97757");root.style.setProperty("--browser-bg",theme.getPropertyValue("--bg-main").trim()||"#262624");root.style.setProperty("--browser-surface",theme.getPropertyValue("--surface").trim()||"#30302e");root.style.setProperty("--browser-border",theme.getPropertyValue("--border-color").trim()||"#43413d");root.style.setProperty("--browser-text",theme.getPropertyValue("--text-primary").trim()||"#faf9f5");root.style.setProperty("--browser-muted",theme.getPropertyValue("--text-secondary").trim()||"#a6a39a");}catch(e){}}\nasync function pollVerification(){if(!running||paused)return;try{const r=await command("CAPTCHA");if(r.detected){paused=true;$("captcha").style.display="block";$("resume").disabled=false;status("Human verification needed");log("Verification detected. Automation paused; user control is active.");}}catch(e){/* transient polling errors are shown in the log only when useful */}}\nsetInterval(pollVerification,4500);\nwindow.LightningBrowser={
   navigate:url=>command("navigate",{url}),
   simulate:(action,x,y,extra={})=>command("simulate",{action,x,y,...extra}).then(r=>{if(action==="move"||action==="click")showCursor(x,y);return r;}),
   CAPTCHA:()=>command("CAPTCHA"),
