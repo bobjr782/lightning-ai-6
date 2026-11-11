@@ -3234,5 +3234,23 @@ finishOpenRouter().catch(e => startupError("openrouter", e));
 })();
 </script>
 
+
+<script>
+(() => {
+  const area = document.querySelector(".sidebar-content");
+  if (!area || document.getElementById("lightning-browser-launch")) return;
+  const button = document.createElement("button");
+  button.id = "lightning-browser-launch";
+  button.type = "button";
+  button.className = "sidebar-btn";
+  button.textContent = "Browser";
+  button.title = "Open Lightning Browser";
+  button.addEventListener("click", () => { location.href = "/browser.html"; });
+  const plugins = area.querySelector('button[onclick="openPlugins()"]');
+  if (plugins && plugins.parentNode === area) plugins.after(button);
+  else area.prepend(button);
+})();
+</script>
+
 </body>
 </html>
