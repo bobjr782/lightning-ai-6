@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lightning Browser</title>
+<style>
+:root{color-scheme:dark;font-family:Arial,sans-serif;background:#0b0e14;color:#e8ecf4}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden}
+body{display:flex;flex-direction:column;background:#0b0e14}
+header{height:58px;flex:0 0 58px;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid #2b303a;background:#11151d}
+.brand{font-weight:700;white-space:nowrap}.brand span{color:#d97757}
+button,input{font:inherit}
+button{border:1px solid #3a414d;background:#202631;color:#e8ecf4;border-radius:7px;padding:9px 12px;cursor:pointer}
+button:hover{background:#2a3340}button:disabled{opacity:.45;cursor:not-allowed}
+input{min-width:0;flex:1;background:#0b0e14;border:1px solid #3a414d;color:#e8ecf4;border-radius:7px;padding:10px 12px}
+#status{font-size:12px;color:#9ca8b8;white-space:nowrap}
+main{flex:1;min-height:0;display:flex;flex-direction:column}
+.toolbar{display:flex;gap:8px;align-items:center;padding:10px 12px;background:#151a23;border-bottom:1px solid #2b303a}
+#viewer-wrap{position:relative;flex:1;min-height:0;background:#07090d;overflow:hidden}
+#live-view{width:100%;height:100%;border:0;display:none;background:#fff}
+#empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;color:#aab4c2;gap:12px}
+#empty h1{color:#f1f4f8;font-size:24px;margin:0}
+#empty p{max-width:560px;line-height:1.55;margin:0}
+#cursor-puppet{position:absolute;left:50%;top:50%;z-index:5;width:18px;height:24px;pointer-events:none;opacity:0;transform:translate(-2px,-2px);transition:left .22s ease,top .22s ease,opacity .15s}
+#cursor-puppet svg{width:18px;height:24px;filter:drop-shadow(1px 2px 2px #000)}
+#bottom{height:42px;flex:0 0 42px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:#11151d;border-top:1px solid #2b303a;color:#9ca8b8;font-size:12px}
+#log{max-height:100px;overflow:auto;padding:7px 14px;background:#0f131a;border-top:1px solid #252b35;font:12px/1.45 Consolas,monospace;color:#aeb8c7}
+#captcha{display:none;padding:10px 14px;background:#4a321b;color:#ffe1b6;border-top:1px solid #7a5128;font-size:13px}
+#shot{display:none;position:absolute;right:12px;bottom:12px;max-width:min(420px,40vw);max-height:38vh;border:1px solid #596273;border-radius:8px;box-shadow:0 8px 28px #0009}
+@media(max-width:700px){header{gap:6px;padding:0 8px}.brand{font-size:13px}#status{display:none}.toolbar{flex-wrap:wrap}.toolbar input{flex-basis:100%;order:2}.toolbar button{padding:8px}.toolbar #go{order:3}}
+</style>
+</head>
+<body>
+<header>
+  <button id="back" title="Back to Lightning">← Lightning</button>
+  <div class="brand"><span>⚡</span> Lightning Browser</div>
+  <div id="status">Not connected</div>
+  <button id="stop">Stop browser</button>
+</header>
+<main>
+  <div class="toolbar">
+    <button id="back-page" title="Back">←</button>
+    <button id="reload" title="Reload">↻</button>
+    <input id="address" value="https://scratch.mit.edu/" aria-label="Website address" spellcheck="false">
+    <button id="go">Go</button>
+    <button id="scratch">Open Scratch</button>
+    <button id="check-captcha">CAPTCHA()</button>
+  </div>
+  <div id="viewer-wrap">
+    <div id="empty">
+      <h1>Lightning Browser</h1>
+      <p>Start a remote browser session to visit Scratch or another website. The live browser is shown here, and Lightning's simulated actions are separate from your physical mouse.</p>
+      <button id="start">Start browser</button>
+      <button id="open-viewer" hidden>Open live view in a new tab</button>
+    </div>
+    <iframe id="live-view" title="Live remote browser" allow="clipboard-read; clipboard-write; fullscreen; autoplay" referrerpolicy="no-referrer"></iframe>
+    <div id="cursor-puppet" aria-hidden="true"><svg viewBox="0 0 18 24"><path d="M1 1L1 19L5.5 14.5L9 22L12 20.5L8.5 13.5L15 13Z" fill="#fff" stroke="#111" stroke-width="1.5"/></svg></div>
+    <img id="shot" alt="Browser screenshot">
+  </div>
+  <div id="captcha">A verification challenge was detected. Complete it in the browser window, then choose Resume.</div>
+  <div id="log">Browser ready. Choose Start browser to begin.</div>
+</main>
+<footer id="bottom"><span>Simulated cursor · Remote Chromium · Human verification handoff</span><button id="resume" disabled>Resume after verification</button></footer>
+<script>
+const $ = id => document.getElementById(id);
+let liveViewUrl = "";
+let running = false;
+let paused = false;
+function log(message){$("log").textContent = new Date().toLocaleTimeString()+"  "+message+"\n"+$("log").textContent;}
+function status(message){$("status").textContent=message;}
+async function api(path,data={}){
+  const response=await fetch(path,{method:"POST",headers:{"content-type":"application/json"},credentials:"same-origin",body:JSON.stringify(data)});
+  const result=await response.json().catch(()=>({error:"Invalid server response."}));
+  if(!response.ok)throw new Error(result.error||("HTTP "+response.status));
+  return result;
+}
+function showCursor(x,y){
+  const wrap=$("viewer-wrap"), cursor=$("cursor-puppet");
+  const w=wrap.clientWidth,h=wrap.clientHeight;
+  cursor.style.left=(Math.max(0,Math.min(w,Number(x)||0))/1280*100)+"%";
+  cursor.style.top=(Math.max(0,Math.min(h,Number(y)||0))/720*100)+"%";
+  cursor.style.opacity="1";
+  setTimeout(()=>{cursor.style.opacity="0.9";},250);
+}
+function setConnected(url){
+  liveViewUrl=url;
+  $("live-view").src=url;
+  $("live-view").style.display="block";
+  $("empty").style.display="none";
+  running=true;paused=false;
+  $("resume").disabled=true;
+  status("Live session");
+}
+async function start(url){
+  try{
+    status("Starting browser...");
+    $("start").disabled=true;
+    const result=await api("/api/browser/start",{url});
+    setConnected(result.liveViewUrl);
+    log("Opened "+result.url);
+    $("open-viewer").hidden=false;
+  }catch(error){status("Not connected");log(error.message);alert(error.message);}
+  finally{$("start").disabled=false;}
+}
+async function command(command,data={}){
+  const result=await api("/api/browser/command",{command,...data});
+  if(command==="simulate" && data.action==="move" || command==="simulate" && data.action==="click")showCursor(data.x,data.y);
+  return result;
+}
+$("back").onclick=()=>location.href="/lightning.html";
+$("start").onclick=()=>start($("address").value.trim());
+$("scratch").onclick=()=>{$("address").value="https://scratch.mit.edu/";start($("address").value);};
+$("go").onclick=async()=>{if(!running)return start($("address").value.trim());try{const r=await command("navigate",{url:$("address").value.trim()});log("Navigated to "+r.url);}catch(e){log(e.message);alert(e.message);}};
+$("address").addEventListener("keydown",e=>{if(e.key==="Enter")$("go").click();});
+$("reload").onclick=async()=>{try{await command("reload");log("Reloaded page.");}catch(e){log(e.message);}};
+$("back-page").onclick=()=>log("Use the remote browser's own back control for history navigation.");
+$("check-captcha").onclick=async()=>{try{const r=await command("CAPTCHA");if(r.detected){paused=true;$("captcha").style.display="block";$("resume").disabled=false;status("Human verification needed");log("CAPTCHA detected. Automation paused.");}else log("No CAPTCHA detected.");}catch(e){log(e.message);}};
+$("resume").onclick=async()=>{try{const r=await api("/api/browser/resume",{});paused=false;$("captcha").style.display="none";$("resume").disabled=true;status("Live session");log(r.message);}catch(e){log(e.message);alert(e.message);}};
+$("stop").onclick=async()=>{try{await api("/api/browser/stop",{});}catch(e){log(e.message);}running=false;paused=false;liveViewUrl="";$("live-view").src="about:blank";$("live-view").style.display="none";$("empty").style.display="flex";$("captcha").style.display="none";$("resume").disabled=true;status("Stopped");log("Browser session stopped.");};
+$("open-viewer").onclick=()=>{if(liveViewUrl)window.open(liveViewUrl,"_blank","noopener");};
+window.LightningBrowser={
+  navigate:url=>command("navigate",{url}),
+  simulate:(action,x,y,extra={})=>command("simulate",{action,x,y,...extra}).then(r=>{if(action==="move"||action==="click")showCursor(x,y);return r;}),
+  CAPTCHA:()=>command("CAPTCHA"),
+  screenshot:()=>command("screenshot"),
+  readPage:()=>command("readPage"),
+  resume:()=>$("resume").click(),
+  stop:()=>$("stop").click()
+};
+</script>
+</body>
+</html>
