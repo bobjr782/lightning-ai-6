@@ -854,6 +854,14 @@ body.img-mode .img-opts { display: flex; }
                     </div>
                     <button class="send-btn" style="padding: 8px 16px;" onclick="installPlugin('neon', this)">Install</button>
                 </div>
+
+                <div class="plugin-item">
+                    <div class="plugin-details">
+                        <h4>Browser Run</h4>
+                        <p>Opens a live browser Lightning can navigate and control, with a visible cursor and manual CAPTCHA handoff.</p>
+                    </div>
+                    <button class="send-btn" style="padding: 8px 16px;" onclick="installPlugin('browser', this)">Install</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1023,7 +1031,7 @@ const AI_API_KEY = ""; // no built-in key: users sign in
 const GROQ_MODEL = "openrouter/free";
 
 let chat = [];
-let installedPlugins = { math: false, neon: false };
+let installedPlugins = { math: false, neon: false, browser: false };
 
 let attachedFileContent = "";
 let attachedFileName = "";
@@ -1579,12 +1587,24 @@ row.appendChild(bubbleWrapper); document.querySelector('.messages-container').ap
 scrollToLatestMessage();
 }
 function installPlugin(pluginKey, buttonElement) {
-if (installedPlugins[pluginKey]) return;
-buttonElement.disabled = true; buttonElement.textContent = "⏳ Installing...";
-setTimeout(() => {
-installedPlugins[pluginKey] = true; buttonElement.textContent = "✅ Active"; buttonElement.style.backgroundColor = "#28a745";
-}, 1200);
+if (installedPlugins[pluginKey]) {
+    if (pluginKey === "browser") window.location.href = "/browser.html";
+    return;
 }
+buttonElement.disabled = true; buttonElement.textContent = "Installing...";
+setTimeout(() => {
+    installedPlugins[pluginKey] = true;
+    if (pluginKey === "browser") {
+        buttonElement.disabled = false;
+        buttonElement.textContent = "Open Browser";
+        buttonElement.onclick = () => window.location.href = "/browser.html";
+    } else {
+        buttonElement.textContent = "Active";
+        buttonElement.style.backgroundColor = "#28a745";
+    }
+}, 500);
+}
+
 function sb(containins) {
 const adult = document.getElementById('enject');
 let systemb = document.createElement('div');
