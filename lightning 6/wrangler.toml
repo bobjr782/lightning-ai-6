@@ -1,6 +1,6 @@
 name = "lightning-ai-6"
 main = "worker.js"
-compatibility_date = "2026-11-05"
+compatibility_date = "2026-11-12"
 
 [assets]
 directory = "./public"
@@ -13,3 +13,6 @@ database_id = "bf1cd45d-1e85-4bc5-b37a-d16d6a383a4c"
 
 [ai]
 binding = "AI"
+
+[browser]
+binding = "BROWSER"
