@@ -1156,7 +1156,7 @@ async function findImageReferences(prompt, box) {
             } catch (_) { copy.textContent = "Clipboard unavailable"; }
         };
         const note = document.createElement("span");
-        note.textContent = "Source: Google Images · Check original image rights";
+        note.textContent = "Source: " + (data.source || "Image library") + " · Check original image rights";
         note.style.cssText = "font-size:11px;color:var(--text-secondary)";
         actions.append(copy, note);
         box.appendChild(actions);
