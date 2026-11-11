@@ -539,7 +539,7 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
     const query=prompt.value.trim();
     if(query.length<2){status.textContent="Please enter a more detailed image description.";return;}
     search.disabled=true;search.textContent="Searching…";copy.disabled=true;
-    status.textContent="Searching Wikimedia Commons for reference images…";results.replaceChildren();latest=[];
+    status.textContent="Searching Google Images directly…";results.replaceChildren();latest=[];
     try{
       const response=await fetch("/api/image-references",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:query,count:Number(count.value)})});
       const data=await response.json();
