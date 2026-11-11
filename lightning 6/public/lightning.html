@@ -1091,6 +1091,87 @@ function clearAttachedFile() {
 // ==========================================
 // 4. MESSAGE TRANSMISSION & API PIPELINE
 // ==========================================
+async function findImageReferences(prompt, box) {
+    box.classList.remove("thinking-bubble");
+    box.textContent = "Searching for reference images…";
+    try {
+        const response = await fetch("/api/image-references", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Image search failed.");
+        box.innerHTML = "";
+        const heading = document.createElement("div");
+        heading.textContent = data.count
+            ? `Found ${data.count} reference image${data.count === 1 ? "" : "s"} for “${data.query}”`
+            : `No suitable reference images found for “${data.query}”. Try a broader description.`;
+        heading.style.cssText = "font-weight:650;margin-bottom:12px";
+        box.appendChild(heading);
+        if (!data.results || !data.results.length) return;
+        const grid = document.createElement("div");
+        grid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:10px;max-width:760px";
+        data.results.forEach((item, index) => {
+            const card = document.createElement("div");
+            card.style.cssText = "min-width:0;overflow:hidden;border:1px solid var(--border-color);border-radius:9px;background:var(--surface,rgba(255,255,255,.04))";
+            const link = document.createElement("a");
+            link.href = item.source || item.url;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.style.cssText = "display:block;color:inherit;text-decoration:none";
+            const img = document.createElement("img");
+            img.src = item.url;
+            img.alt = item.title || "Reference image " + (index + 1);
+            img.loading = "lazy";
+            img.referrerPolicy = "no-referrer";
+            img.style.cssText = "display:block;width:100%;height:112px;object-fit:cover;background:var(--surface-2,#222)";
+            const caption = document.createElement("div");
+            caption.textContent = item.title || "Untitled image";
+            caption.title = caption.textContent;
+            caption.style.cssText = "padding:7px 8px;font-size:11px;line-height:1.35;max-height:42px;overflow:hidden;word-break:break-word";
+            link.append(img, caption);
+            card.appendChild(link);
+            grid.appendChild(card);
+        });
+        box.appendChild(grid);
+        const actions = document.createElement("div");
+        actions.style.cssText = "display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap";
+        const copy = document.createElement("button");
+        copy.type = "button";
+        copy.className = "mini-btn";
+        copy.textContent = "Copy image URLs";
+        copy.onclick = async () => {
+            try {
+                await navigator.clipboard.writeText(data.results.map(x => x.url).join("\n"));
+                copy.textContent = "Copied URLs";
+            } catch (_) { copy.textContent = "Clipboard unavailable"; }
+        };
+        const note = document.createElement("span");
+        note.textContent = "Source: Wikimedia Commons";
+        note.style.cssText = "font-size:11px;color:var(--text-secondary)";
+        actions.append(copy, note);
+        box.appendChild(actions);
+        try {
+            localStorage.setItem("image_forge_references", JSON.stringify({
+                query: data.query, savedAt: Date.now(), results: data.results
+            }));
+        } catch (_) {}
+        chat.push({
+            text: heading.textContent,
+            alignment: "ai-align",
+            type: "imageReferences",
+            references: data.results,
+            apiText: data.results.map(x => x.url).join("\n")
+        });
+        try { store("bob_chat_history"); } catch (_) {}
+        scrollToLatestMessage();
+    } catch (error) {
+        box.textContent = "Image search error: " + error.message;
+    }
+}
+
 function ai_send() {
     let inputField = document.getElementById('bob');
     // 👇 1. Ensure this is spelled exactly "textInput" with a capital 'I'
@@ -1138,12 +1219,16 @@ function ai_send() {
     clearAttachedFile();
 
     // 🛑 2. Double-check this conditional routing block spells it "textInput"
-    if (isImageModeActive) {
+    const referenceCommand = textInput.match(/^(?:\/(?:refs|images)\s+|(?:find|search|get)\s+(?:me\s+)?(?:8\s*[-–]\s*20\s+)?(?:reference\s+)?images?\s+(?:for|of)\s+)(.+)$/i);
+    if (referenceCommand) {
+        const targetBubble = injectThinkingPlaceholderBubble();
+        findImageReferences(referenceCommand[1].trim(), targetBubble);
+    } else if (isImageModeActive) {
         let targetBubble = injectThinkingPlaceholderBubble();
         handleImageGeneration(textInput, targetBubble);
     } else {
-    fetchAIResponseFromAPI(textInput, savedImgData);
-}
+        fetchAIResponseFromAPI(textInput, savedImgData);
+    }
 }
 
 ;
