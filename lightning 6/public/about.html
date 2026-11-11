@@ -111,7 +111,9 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
 .dev-project h3{font-size:clamp(1.8rem,4vw,2.5rem);margin:5px 0 0}
 .dev-status{border:1px solid var(--line);border-radius:999px;padding:6px 11px;color:var(--mute);font-size:.78rem;font-weight:700;white-space:nowrap}
 .dev-description{color:var(--mute);max-width:66ch;margin:18px 0 25px}
-.dev-pipeline{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.dev-pipeline{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.dev-accuracy-control{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 18px;align-items:center;margin-top:20px;padding:17px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.dev-accuracy-control label{font-weight:700;font-size:.94rem}.dev-accuracy-control input{grid-column:1/-1;width:100%;accent-color:var(--accent)}.dev-accuracy-control output{font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}.dev-accuracy-help{grid-column:1/-1;color:var(--mute);font-size:.83rem}.dev-eta{grid-column:1/-1;padding-top:10px;border-top:1px solid var(--line);font-size:.9rem}.dev-eta strong{color:var(--ink)}
 .dev-pipeline>div{display:flex;flex-direction:column;gap:8px;padding:15px;border:1px solid var(--line);border-radius:11px;background:var(--bg);min-height:92px}
 .dev-pipeline b{font:600 .78rem 'DM Sans',sans-serif;color:var(--accent)}
 .dev-pipeline span{font-size:.88rem;line-height:1.35}
@@ -341,11 +343,13 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
       <p class="dev-description">A lightweight image compositor that finds 8–20 reference images, checks which ones accurately match the prompt, analyses their colours and shapes, extracts useful regions, and combines them into a realistic composition.</p>
       <div class="dev-pipeline" aria-label="Image Forge planned workflow">
         <div><b>01</b><span>Find 8–20 reference images</span></div>
-        <div><b>02</b><span>Analyse colour, shapes and details</span></div>
-        <div><b>03</b><span>Check accuracy: identify which images genuinely match the prompt and reject inaccurate references</span></div>
-        <div><b>04</b><span>Extract useful regions</span></div>
-        <div><b>05</b><span>Compose the final image</span></div>
+        <div><b>02</b><span>Analyse colours, shapes and details</span></div>
+        <div><b>03</b><span>Check reference accuracy and reject images that do not match</span></div>
+        <div><b>04</b><span>Extract useful regions and visual details</span></div>
+        <div><b>05</b><span>Generate two different candidate images</span></div>
+        <div><b>06</b><span>Compare both candidates and keep the most accurate one</span></div>
       </div>
+      <div class="dev-accuracy-control"><label for="image-forge-accuracy">Accuracy</label><output id="image-forge-accuracy-value" for="image-forge-accuracy">70%</output><input id="image-forge-accuracy" type="range" min="10" max="100" step="5" value="70"><div class="dev-accuracy-help">Higher accuracy means deeper reference checking and a longer generation time.</div><div class="dev-eta">Predicted time for two candidates and comparison: <strong id="image-forge-eta">about 1 min 30 sec</strong></div></div>
       <div class="dev-test-panel" id="image-forge-mount">
         <div class="dev-test-heading"><div><h4>Reference image test</h4><p>Describe the subject you want Image Forge to study.</p></div><span class="dev-test-count">8–20 images</span></div>
         <form id="image-forge-test-form" class="dev-test-form">
@@ -501,6 +505,22 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
     var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }); }, { threshold: .12 });
     document.querySelectorAll(".reveal").forEach(function (el) { io.observe(el); });
   } else document.querySelectorAll(".reveal").forEach(function (el) { el.classList.add("in"); });
+})();
+
+// Image Forge accuracy control: estimates are planning estimates, not measured runtimes.
+(function(){
+  const slider=document.getElementById("image-forge-accuracy");
+  const value=document.getElementById("image-forge-accuracy-value");
+  const eta=document.getElementById("image-forge-eta");
+  if(!slider||!value||!eta)return;
+  function update(){
+    const level=Number(slider.value);
+    value.textContent=level+"%";
+    const seconds=Math.round(25+level*1.55);
+    eta.textContent=seconds<60?"about "+seconds+" sec":"about "+Math.floor(seconds/60)+" min "+(seconds%60)+" sec";
+  }
+  slider.addEventListener("input",update);
+  update();
 })();
 
 // Image Forge reference finder test panel
