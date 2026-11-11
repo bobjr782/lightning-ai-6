@@ -765,7 +765,7 @@ body.img-mode .img-opts { display: flex; }
             
             <div class="sidebar-content">
                 <button class="sidebar-btn font-bold" onclick="startNewChat()">＋ New chat</button>
-                <button class="sidebar-btn friends-sidebar-btn" onclick="openFriendsPage()"><svg class="friends-pixel-icon" viewBox="0 0 8 8" aria-hidden="true"><path fill="currentColor" d="M1 1h2v2H1zM5 1h2v2H5zM0 4h4v1H0zM4 4h4v1H4zM1 5h2v2H1zM5 5h2v2H5z"/></svg> Friends</button>
+                <button class="sidebar-btn friends-sidebar-btn" onclick="openFriendsPage()">👥 Friends</button>
                 <button class="sidebar-btn" onclick="openTasksPage()">Tasks</button>
                 <button class="sidebar-btn" onclick="openProjectsPage()">📁 Projects</button>
                 <button class="sidebar-btn" onclick="openArtifactsPage()">🧩 Artifacts</button>
@@ -2789,12 +2789,21 @@ const ICONS = {
     hourglass: ["########", ".#....#.", "..#..#..", "...##...", "...##...", "..#..#..", ".#.##.#.", "########"],
     warn: ["...##...", "..#..#..", "..#..#..", ".#.##.#.", ".#.##.#.", "#......#", "#..##..#", "########"],
     globe: ["..####..", ".#.##.#.", "#..##..#", "########", "########", "#..##..#", ".#.##.#.", "..####.."],
-    menu: ["........", "########", "........", "########", "........", "########", "........", "........"]
+    menu: ["........", "########", "........", "########", "........", "########", "........", "........"],
+    users: ["#..##..#", "##.##.##", "##.##.##", ".######.", "..####..", "##....##", "########", "........"],
+    error: ["..####..", ".######.", "##.##.##", "##.##.##", "##.##.##", ".######.", "..####..", "...##..."],
+    package: ["########", "#..##..#", "##.##.##", "...##...", "...##...", "##.##.##", "#..##..#", "########"],
+    calculator: ["########", "#.##.###", "#.##.###", "########", "#.##.###", "#.##.###", "########", "........"],
+    link: ["..####..", ".#....#.", "#......#", "#......#", "#......#", ".#....#.", "..####..", "........"],
+    robot: [".######.", "#.####.#", "########", "#.#..#.#", "########", "..#..#..", ".######.", "#......#"],
+    down: ["...##...", "...##...", "...##...", "########", ".######.", "..####..", "...##...", "........"],
+    stop: ["########", "########", "########", "########", "########", "########", "########", "########"],
+    search: ["..####..", ".#....#.", "#......#", "#......#", ".#....#.", "..####..", "....##..", "....##.."]
 };
-const PXMAP = { "⚡": "bolt", "💬": "chat", "📁": "folder", "🧩": "box", "🖼": "image", "🎨": "sparkle", "✨": "sparkle", "🔌": "plug", "⚙": "gear", "◐": "half", "🗑": "trash", "🔑": "key", "＋": "plus", "✓": "check", "✅": "check", "✕": "x", "↑": "up", "▶": "play", "⛶": "expand", "⬇": "download", "🛠": "wrench", "📎": "file", "📄": "file", "⏳": "hourglass", "⏱": "hourglass", "⚠": "warn", "☰": "menu", "🌐": "globe" };
+const PXMAP = { "⚡": "bolt", "💬": "chat", "📁": "folder", "🧩": "box", "🖼": "image", "🎨": "sparkle", "✨": "sparkle", "🔌": "plug", "⚙": "gear", "◐": "half", "🗑": "trash", "🔑": "key", "＋": "plus", "✓": "check", "✅": "check", "✕": "x", "↑": "up", "▶": "play", "⛶": "expand", "⬇": "download", "🛠": "wrench", "📎": "file", "📄": "file", "⏳": "hourglass", "⏱": "hourglass", "⚠": "warn", "☰": "menu", "🌐": "globe", "👥": "users", "❌": "error", "📦": "package", "🧮": "calculator", "🔗": "link", "🤖": "robot", "👇": "down", "🛑": "stop", "🔍": "search" };
 const PXRE = new RegExp("(" + Object.keys(PXMAP).join("|") + ")\\uFE0F?", "g"), PXTEST = new RegExp(PXRE.source), PXSKIP = "pre,textarea,input,select,option,script,style,.userBox";
 const pxPath = name => { let d = ""; ICONS[name].forEach((row, y) => { for (let x = 0; x < 8; x++) if (row[x] === "#") d += `M${x} ${y}h1v1h-1z`; }); return d; };
-const MATERIAL_ICON_NAMES={bolt:"bolt",chat:"chat_bubble",folder:"folder",box:"deployed_code",image:"image",sparkle:"auto_awesome",plug:"power",gear:"settings",half:"contrast",trash:"delete",key:"key",plus:"add",check:"check",x:"close",up:"arrow_upward",play:"play_arrow",expand:"open_in_full",download:"download",wrench:"build",file:"description",hourglass:"hourglass_top",warn:"warning",globe:"language",menu:"menu"};
+const MATERIAL_ICON_NAMES={bolt:"bolt",chat:"chat_bubble",folder:"folder",box:"deployed_code",image:"image",sparkle:"auto_awesome",plug:"power",gear:"settings",half:"contrast",trash:"delete",key:"key",plus:"add",check:"check",x:"close",up:"arrow_upward",play:"play_arrow",expand:"open_in_full",download:"download",wrench:"build",file:"description",hourglass:"hourglass_top",warn:"warning",globe:"language",menu:"menu",users:"group",error:"error",package:"inventory_2",calculator:"calculate",link:"link",robot:"smart_toy",down:"arrow_downward",stop:"stop",search:"search"};
 function pxSvg(name) {
     if(localStorage.getItem("lt_icon_mode")==="google"){
         const span=document.createElement("span");
