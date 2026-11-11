@@ -427,6 +427,42 @@ async function generateRoute(request,env){
   }
 }
 
+const IMAGE_REFERENCE_RATE = new Map();
+async function imageReferencesRoute(request,env) {
+  if(!env.DB) return json({error:"Account database is not configured."},503);
+  const account=await userFor(request,env);
+  if(!account) return json({error:"Sign in to Lightning before searching for image references."},401);
+  const now=Date.now(), prior=IMAGE_REFERENCE_RATE.get(account.id);
+  if(prior&&now-prior<15000) return json({error:"Please wait a few seconds before searching again."},429,{"retry-after":"15"});
+  IMAGE_REFERENCE_RATE.set(account.id,now);
+  let input; try{input=await body(request);}catch{return json({error:"Invalid image search request."},400);}
+  const prompt=String(input.prompt||"").trim().slice(0,240);
+  if(prompt.length<2) return json({error:"Describe what images you want to find."},400);
+  try{
+    const params=new URLSearchParams({
+      action:"query",generator:"search",gsrsearch:prompt,gsrnamespace:"6",gsrlimit:"20",
+      prop:"imageinfo",iiprop:"url",iiurlwidth:"720",format:"json",origin:"*"
+    });
+    const response=await fetch("https://commons.wikimedia.org/w/api.php?"+params.toString(),{
+      headers:{"Accept":"application/json","User-Agent":"LightningImageForge/1.0 (image reference discovery)"}
+    });
+    if(!response.ok) throw new Error("Wikimedia Commons returned HTTP "+response.status);
+    const data=await response.json();
+    const pages=Object.values(data?.query?.pages||{});
+    const results=pages.map(page=>{
+      const info=page.imageinfo?.[0]||{};
+      const url=info.thumburl||info.url||"";
+      if(!/^https:\/\/upload\.wikimedia\.org\//i.test(url)) return null;
+      if(!/\.(jpe?g|png|webp|gif)(?:$|\?)/i.test(url)) return null;
+      return {title:String(page.title||"").replace(/^File:/,""),url,source:info.descriptionurl||"",width:info.width||null,height:info.height||null};
+    }).filter(Boolean).slice(0,20);
+    return json({ok:true,query:prompt,source:"Wikimedia Commons",count:results.length,results});
+  }catch(error){
+    console.error("Lightning image reference search failed:",error?.message||error);
+    return json({error:"Image search is temporarily unavailable. Please try again.",detail:env.ENVIRONMENT==="development"?String(error?.message||error):undefined},502);
+  }
+}
+
 const CHAT_RATE = new Map();
 function chatRateLimit(request) {
   const ip=request.headers.get("CF-Connecting-IP")||"unknown", now=Date.now(), row=CHAT_RATE.get(ip);
@@ -473,6 +509,7 @@ async function route(request, env) {
     }
   }
   if(path==="/api/config" && request.method==="GET") return json({server:null});
+  if(path==="/api/image-references" && request.method==="POST") return imageReferencesRoute(request,env);
   if(path==="/api/image" && request.method==="POST") return imageRoute(request, env);
   if(path==="/api/chat" && request.method==="POST") return chatRoute(request,env);
   if(path==="/api/generate" && request.method==="POST") return generateRoute(request, env);
