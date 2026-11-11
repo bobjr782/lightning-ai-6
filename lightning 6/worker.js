@@ -443,7 +443,7 @@ async function imageReferencesRoute(request,env) {
   try{
     // Run several complementary Commons searches. A single exact-phrase search
     // often returns only one file even when many useful images exist.
-    const words=prompt.toLowerCase().replace(/[^a-z0-9\\s-]/g," ").split(/\\s+/).filter(w=>w.length>2);
+    const words=prompt.toLowerCase().replace(/[^a-z0-9\s-]/g," ").split(/\s+/).filter(w=>w.length>2);
     const uniqueWords=[...new Set(words)];
     const searches=[prompt];
     if(uniqueWords.length>=2) searches.push(uniqueWords.slice(0,5).join(" "));
