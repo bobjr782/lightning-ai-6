@@ -1670,6 +1670,7 @@ window.handleImageGeneration = async function (prompt, box) {
             live(box, "", label + " " + secs() + "s");
             const r = await fetch("/api/image", {
                 method: "POST",
+                credentials: "same-origin",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ prompt: full, width: w, height: h, seed, enhance: o.enhance })
             });
@@ -2197,12 +2198,12 @@ async function drawSharedInbox(container){
   j.shares.forEach(item=>drawSharedCard(item,container));
  }catch(e){container.append(el("p","art-empty",e.message));}
 }
-async function drawFriends(){
+async function drawFriends(searchTerm=""){
  const b=friendsPage.body;b.innerHTML="";
  const usersSection=el("section","friends-users-section");
  usersSection.append(el("h3","","Users"),el("p","art-empty","Find Lightning accounts and send a friend request by selecting a user."));
  const searchRow=el("div","row-item"),search=el("input","field"),searchBtn=btn("Search users",()=>loadFriendUsers(search.value));
- search.placeholder="Search usernames…";search.autocomplete="off";
+ search.placeholder="Search usernames…";search.autocomplete="off";search.value=searchTerm;
  search.addEventListener("keydown",e=>{if(e.key==="Enter")loadFriendUsers(search.value);});
  searchRow.append(search,searchBtn);usersSection.append(searchRow);
  const userList=el("div","friends-user-list");usersSection.append(userList);b.append(usersSection);
@@ -2227,7 +2228,7 @@ async function drawFriends(){
    });
   }catch(e){userList.innerHTML="";userList.append(el("p","art-empty",e.message));}
  }
- loadFriendUsers();
+ loadFriendUsers(searchTerm);
  try{
   const data=await socialRequest("/api/friends");
   b.append(el("h3","","Friend requests"));
@@ -2259,9 +2260,31 @@ async function openFriendChat(username){
   input.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();send.click();}};form.append(input,send);page.append(form);input.focus();
  };
  openPage(friendChatPage,draw,"/friends/"+encodeURIComponent(username));
+ startSocialAutoRefresh(()=>{
+  const input=friendChatPage.body.querySelector("input.field");
+  if(input&&document.activeElement===input)return;
+  return draw();
+ },10000);
 }
-friendsPage.p.querySelector("[data-inbox]").onclick=()=>drawSharedInbox(friendsPage.body);
-window.openFriendsPage=()=>openPage(friendsPage,drawFriends,"/friends");
+let socialRefreshTimer=null;
+function startSocialAutoRefresh(callback,delay=12000){
+ if(socialRefreshTimer)clearInterval(socialRefreshTimer);
+ socialRefreshTimer=setInterval(()=>{
+  if(!friendsPage.p.classList.contains("open")&&!friendChatPage.p.classList.contains("open"))return;
+  Promise.resolve(callback()).catch(()=>{});
+ },delay);
+}
+friendsPage.p.querySelector("[data-inbox]").onclick=()=>{
+ drawSharedInbox(friendsPage.body);
+ startSocialAutoRefresh(()=>drawSharedInbox(friendsPage.body),15000);
+};
+window.openFriendsPage=()=>{
+ openPage(friendsPage,drawFriends,"/friends");
+ startSocialAutoRefresh(()=>{
+  const search=friendsPage.body.querySelector(".friends-users-section input");
+  return drawFriends(search?.value||"");
+ },15000);
+};
 
 /* images */
 function addImage(prompt, url, id) { if (!images.some(i => (id && i.id === id) || (url && i.url === url))) { images.unshift({ url: url || "", id: id || "", prompt, t: Date.now() }); wr("images", images); } }
