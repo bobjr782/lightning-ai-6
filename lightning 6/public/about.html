@@ -134,9 +134,10 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
 <nav>
   <div class="wrap">
     <a class="brand" href="#top"><i data-px="bolt"></i> lightning</a>
-    <div class="links"><a href="#features">Features</a><a href="#providers">Models</a><a href="#privacy">Privacy</a><a href="#faq">FAQ</a><a href="#account">Account</a></div>
+    <div class="links"><a href="#features">Features</a><a href="#providers">Models</a><a href="#privacy">Privacy</a><a href="#faq">FAQ</a></div>
     <button class="about-profile-link" id="about-profile-link" type="button" aria-label="Open your Lightning account"><img id="about-nav-avatar" alt=""><span id="about-nav-username"></span></button>
-    <a class="btn app-link" href="https://lightning-ai-6.ray-collier264.workers.dev/">Open lightning</a>
+    <a class="btn app-link" href="https://lightning-ai-6.ray-collier264.workers.dev/">Open Lightning</a>
+    <button class="btn ghost" id="about-accounts-button" type="button">Accounts</button>
   </div>
 </nav>
 
@@ -162,7 +163,9 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
         <button class="btn" id="about-show-login" type="button">Sign in</button>
         <button class="btn ghost" id="about-show-register" type="button">Create an account</button>
       </div>
-      <form id="about-auth-form" class="account-form" hidden>
+      <div id="about-account-create" class="account-create-panel" hidden>
+        <div class="eyebrow">Account access</div>
+        <form id="about-auth-form" class="account-form" hidden>
         <label for="about-username">Username</label>
         <input id="about-username" name="username" autocomplete="username" minlength="3" maxlength="24" placeholder="Your username" required>
         <label for="about-password">Password</label>
@@ -170,7 +173,8 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
         <div id="about-auth-error" class="account-error" role="alert"></div>
         <button class="btn" id="about-auth-submit" type="submit">Sign in</button>
         <button class="btn ghost" id="about-auth-switch" type="button">Create an account</button>
-      </form>
+        </form>
+      </div>
       <div id="about-account-actions" class="account-actions" hidden>
         <a class="btn app-link" href="/lightning.html">Open Lightning</a>
           <a class="btn ghost" href="/#friends" target="_top">Friends &amp; sharing</a>
@@ -306,7 +310,7 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
 
   // Lightning account controls live on this About page.
   var accountSection=document.getElementById("account");
-  var accountNav=document.querySelector('.links a[href="#account"]');
+  var accountNav=document.getElementById("about-accounts-button");
   if(accountNav&&accountSection){
     accountNav.addEventListener("click",function(event){
       event.preventDefault();accountSection.hidden=false;history.replaceState(null,"","#account");
@@ -314,6 +318,7 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
     });
   }
   var accountForm=document.getElementById("about-auth-form");
+  var accountCreatePanel=document.getElementById("about-account-create");
   if(accountForm){
     var authMode="login", statusBox=document.getElementById("about-account-status"),
       errorBox=document.getElementById("about-auth-error"), submitBtn=document.getElementById("about-auth-submit"),
@@ -352,7 +357,7 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
       accountSection.hidden=false;history.replaceState(null,"","#account");
       accountSection.scrollIntoView({behavior:"smooth",block:"start"});
     });
-    showLogin.addEventListener("click",function(){setAuthMode("login");accountForm.hidden=false;choices.hidden=true;});
+    showLogin.addEventListener("click",function(){setAuthMode("login");accountCreatePanel.hidden=false;accountForm.hidden=false;choices.hidden=true;});
     showRegister.addEventListener("click",function(){setAuthMode("register");accountForm.hidden=false;choices.hidden=true;});
     function setAuthMode(mode){
       authMode=mode;submitBtn.textContent=mode==="login"?"Sign in":"Create account";
@@ -383,16 +388,16 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
         if(!response.ok||!result.user)throw new Error("Signed out");
         paintAboutProfile(result.user);
         statusBox.textContent="Signed in as "+result.user.username+". Your Lightning friends and shared creations are ready.";
-        accountForm.hidden=true;choices.hidden=true;actions.hidden=false;
+        accountCreatePanel.hidden=true;accountForm.hidden=true;choices.hidden=true;actions.hidden=false;
       }catch(_){
         paintAboutProfile(null);
         statusBox.textContent="Sign in or create an account to connect with friends and share privately.";
-        accountForm.hidden=true;choices.hidden=false;actions.hidden=true;
+        accountCreatePanel.hidden=true;accountForm.hidden=true;choices.hidden=false;actions.hidden=true;
       }
     }
     document.getElementById("about-signout").addEventListener("click",async function(){
       await fetch("/api/logout",{method:"POST",credentials:"same-origin"});
-      setAuthMode("login");accountForm.reset();accountForm.hidden=true;choices.hidden=false;await refreshAboutAccount();
+      setAuthMode("login");accountForm.reset();accountCreatePanel.hidden=true;accountForm.hidden=true;choices.hidden=false;await refreshAboutAccount();
     });
     refreshAboutAccount();
   }
