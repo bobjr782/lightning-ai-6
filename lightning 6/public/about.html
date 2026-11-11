@@ -387,7 +387,7 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
           body:JSON.stringify({username:username,password:password})
         });
         var result=await response.json();
-        if(!response.ok)throw new Error(result.error||"Could not sign in.");
+        if(!response.ok){var message=result.error||"Could not sign in.";if(result.stage)message+=" (stage: "+result.stage+")";if(result.detail)message+=" — "+result.detail;throw new Error(message);}
         await refreshAboutAccount();
       }catch(error){errorBox.textContent=error.message||"Something went wrong.";}
       finally{submitBtn.disabled=false;submitBtn.textContent=authMode==="login"?"Sign in":"Create account";}
