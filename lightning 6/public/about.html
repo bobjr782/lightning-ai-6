@@ -398,7 +398,8 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
         var result=await response.json();
         if(!response.ok||!result.user)throw new Error("Signed out");
         paintAboutProfile(result.user);
-        statusBox.textContent="Signed in as "+result.user.username+". Your Lightning friends and shared creations are ready.";
+        try{localStorage.setItem("lightning_username_hint",result.user.username);}catch(_){}
+        statusBox.textContent="Signed in as "+result.user.username+". Your Lightning account is ready to use in the app too.";
         accountCreatePanel.hidden=true;accountForm.hidden=true;choices.hidden=true;actions.hidden=false;
       }catch(_){
         paintAboutProfile(null);
@@ -408,6 +409,7 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
     }
     document.getElementById("about-signout").addEventListener("click",async function(){
       await fetch("/api/logout",{method:"POST",credentials:"same-origin"});
+      try{localStorage.removeItem("lightning_username_hint");}catch(_){}
       setAuthMode("login");accountForm.reset();accountCreatePanel.hidden=true;accountForm.hidden=true;choices.hidden=false;await refreshAboutAccount();
     });
     refreshAboutAccount();
