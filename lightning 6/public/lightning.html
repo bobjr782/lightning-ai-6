@@ -765,7 +765,7 @@ body.img-mode .img-opts { display: flex; }
             
             <div class="sidebar-content">
                 <button class="sidebar-btn font-bold" onclick="startNewChat()">＋ New chat</button>
-                <button class="sidebar-btn friends-sidebar-btn" onclick="openFriendsPage()">👥 Friends</button>
+                <button class="sidebar-btn friends-sidebar-btn" onclick="openFriendsPage()"><svg class="px friends-pixel-icon" data-icon="users" viewBox="0 0 8 8" aria-hidden="true"><path fill="currentColor" d="M1 1h2v2H1zM5 1h2v2H5zM0 4h4v1H0zM4 4h4v1H4zM1 5h2v2H1zM5 5h2v2H5z"/></svg> Friends</button>
                 <button class="sidebar-btn" onclick="openTasksPage()">Tasks</button>
                 <button class="sidebar-btn" onclick="openProjectsPage()">📁 Projects</button>
                 <button class="sidebar-btn" onclick="openArtifactsPage()">🧩 Artifacts</button>
@@ -2803,15 +2803,15 @@ const ICONS = {
 const PXMAP = { "⚡": "bolt", "💬": "chat", "📁": "folder", "🧩": "box", "🖼": "image", "🎨": "sparkle", "✨": "sparkle", "🔌": "plug", "⚙": "gear", "◐": "half", "🗑": "trash", "🔑": "key", "＋": "plus", "✓": "check", "✅": "check", "✕": "x", "↑": "up", "▶": "play", "⛶": "expand", "⬇": "download", "🛠": "wrench", "📎": "file", "📄": "file", "⏳": "hourglass", "⏱": "hourglass", "⚠": "warn", "☰": "menu", "🌐": "globe", "👥": "users", "❌": "error", "📦": "package", "🧮": "calculator", "🔗": "link", "🤖": "robot", "👇": "down", "🛑": "stop", "🔍": "search" };
 const PXRE = new RegExp("(" + Object.keys(PXMAP).join("|") + ")\\uFE0F?", "g"), PXTEST = new RegExp(PXRE.source), PXSKIP = "pre,textarea,input,select,option,script,style,.userBox";
 const pxPath = name => { let d = ""; ICONS[name].forEach((row, y) => { for (let x = 0; x < 8; x++) if (row[x] === "#") d += `M${x} ${y}h1v1h-1z`; }); return d; };
-const MATERIAL_ICON_NAMES={bolt:"bolt",chat:"chat_bubble",folder:"folder",box:"deployed_code",image:"image",sparkle:"auto_awesome",plug:"power",gear:"settings",half:"contrast",trash:"delete",key:"key",plus:"add",check:"check",x:"close",up:"arrow_upward",play:"play_arrow",expand:"open_in_full",download:"download",wrench:"build",file:"description",hourglass:"hourglass_top",warn:"warning",globe:"language",menu:"menu",users:"group",error:"error",package:"inventory_2",calculator:"calculate",link:"link",robot:"smart_toy",down:"arrow_downward",stop:"stop",search:"search"};
+const MATERIAL_ICON_NAMES={bolt:"bolt",chat:"chat_bubble",folder:"folder",box:"deployed_code",image:"image",sparkle:"auto_awesome",plug:"power",gear:"settings",half:"contrast",trash:"delete",key:"key",plus:"add",check:"check",x:"close",up:"arrow_upward",play:"play_arrow",expand:"open_in_full",download:"download",wrench:"build",file:"description",hourglass:"hourglass_top",warn:"warning",globe:"language",menu:"menu",users:"groups",error:"error",package:"inventory_2",calculator:"calculate",link:"link",robot:"smart_toy",down:"arrow_downward",stop:"stop",search:"search",user:"person",shield:"shield",lock:"lock",send:"send",bell:"notifications",mail:"mail",heart:"favorite",star:"star",home:"home",edit:"edit",refresh:"refresh",calendar:"calendar_month",clock:"schedule",upload:"upload",filter:"filter_list",more:"more_horiz",info:"info",visibility:"visibility",verified:"verified",security:"security",groupAdd:"group_add",personAdd:"person_add",logout:"logout"};
 function pxSvg(name) {
     if(localStorage.getItem("lt_icon_mode")==="google"){
         const span=document.createElement("span");
-        span.className="material-symbols-outlined px";span.dataset.icon=name;
+        span.className="material-symbols-outlined px"+(name==="users"?" friends-pixel-icon":"");span.dataset.icon=name;
         span.setAttribute("aria-hidden","true");span.textContent=MATERIAL_ICON_NAMES[name]||"circle";return span;
     }
     const ns = "http://www.w3.org/2000/svg", s = document.createElementNS(ns, "svg"), p = document.createElementNS(ns, "path");
-    s.setAttribute("viewBox", "0 0 8 8"); s.setAttribute("class", "px"); s.dataset.icon=name; s.setAttribute("aria-hidden", "true"); p.setAttribute("d", pxPath(name)); s.append(p); return s;
+    s.setAttribute("viewBox", "0 0 8 8"); s.setAttribute("class", "px"+(name==="users"?" friends-pixel-icon":"")); s.dataset.icon=name; s.setAttribute("aria-hidden", "true"); p.setAttribute("d", pxPath(name)); s.append(p); return s;
 }
 function setIconMode(mode){
     localStorage.setItem("lt_icon_mode",mode==="google"?"google":"default");
