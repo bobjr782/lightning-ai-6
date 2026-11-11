@@ -1130,8 +1130,15 @@ async function findImageReferences(prompt, box) {
             const caption = document.createElement("div");
             caption.textContent = item.title || "Untitled image";
             caption.title = caption.textContent;
-            caption.style.cssText = "padding:7px 8px;font-size:11px;line-height:1.35;max-height:42px;overflow:hidden;word-break:break-word";
+            caption.style.cssText = "padding:7px 8px 3px;font-size:11px;line-height:1.35;max-height:42px;overflow:hidden;word-break:break-word";
             link.append(img, caption);
+            if (item.license || item.artist) {
+                const credit = document.createElement("div");
+                credit.textContent = [item.artist, item.license].filter(Boolean).join(" · ");
+                credit.title = credit.textContent;
+                credit.style.cssText = "padding:0 8px 8px;font-size:10px;line-height:1.3;color:var(--text-secondary);max-height:30px;overflow:hidden";
+                card.appendChild(credit);
+            }
             card.appendChild(link);
             grid.appendChild(card);
         });
