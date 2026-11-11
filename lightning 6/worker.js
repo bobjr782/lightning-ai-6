@@ -191,6 +191,33 @@ function imageRateLimit(accountId) {
   row.count++;
   return { ok: true };
 }
+async function pollinationsImage(prompt,width,height,seed,env) {
+  const key=env.POLLINATIONS_API_KEY;
+  if(!key) return null;
+  const response=await fetch("https://gen.pollinations.ai/v1/images/generations",{
+    method:"POST",
+    headers:{
+      "Authorization":"Bearer "+key,
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify({
+      model:"black-forest-labs/flux.1-schnell",
+      prompt,
+      size:`${width}x${height}`,
+      seed,
+      response_format:"b64_json"
+    })
+  });
+  if(!response.ok) {
+    const detail=await response.text().catch(()=>"");
+    throw new Error("Pollinations image API returned HTTP "+response.status+": "+detail.slice(0,500));
+  }
+  const data=await response.json();
+  const image=data?.data?.[0]?.b64_json;
+  if(typeof image!=="string"||!image) throw new Error("Pollinations did not return a base64 image.");
+  return image;
+}
+
 async function imageRoute(request, env) {
   if(!env.DB) return json({error:"Account database is not configured."},503);
   const account=await userFor(request,env);
@@ -311,19 +338,36 @@ async function imageRoute(request, env) {
 
   } catch (error) {
     const detail = String(error?.message || error || "Unknown Workers AI error");
-    console.error("Lightning image generation failed on all FLUX models:", detail);
-    // A failed Cloudflare inference must not consume the user's Lightning trial credit.
+    console.error("Lightning Workers AI image models failed:", detail);
+    // If Cloudflare is out of capacity/quota, use the separately configured provider.
+    if(env.POLLINATIONS_API_KEY) {
+      try {
+        const image=await pollinationsImage(prompt,width,height,seed,env);
+        return json({
+          image:"data:image/png;base64,"+image,
+          entitlement:entitlement(await ensureUsage(account,env)),
+          promptUsed:prompt,
+          model:"Pollinations · FLUX.1 Schnell (backup)",
+          width,height,seed
+        });
+      } catch(fallbackError) {
+        console.error("Lightning Pollinations image fallback failed:",fallbackError?.message||fallbackError);
+      }
+    }
+    // Neither provider produced an image: return the trial credit.
     try { await refundTrialUse(account,env,"image"); }
     catch (refundError) { console.error("Could not refund failed image trial use:", refundError?.message || refundError); }
     const quota = /4006|quota|daily.*(limit|allocation)|limit.*(reached|exceeded)|neuron|billing|payment|paid plan/i.test(detail);
     const capacity = /3040|capacity|overloaded|temporarily unavailable/i.test(detail);
     const status = quota ? 429 : 502;
     return json({
-      error: quota
-        ? "Cloudflare Workers AI has reached its free daily allowance. Your Lightning image credit has been returned. Try again after Cloudflare's daily reset."
-        : capacity
-          ? "Cloudflare's image models are currently out of capacity. Your Lightning image credit has been returned. Please try again shortly."
-          : "Cloudflare's image models all failed. Your Lightning image credit has been returned. Check the Worker logs for the exact error, then try again."
+      error: env.POLLINATIONS_API_KEY
+        ? "Cloudflare and the backup image provider both failed. Your Lightning image credit has been returned. Check Worker logs for details."
+        : quota
+          ? "Cloudflare Workers AI has reached its free daily allowance. Your Lightning image credit has been returned. Add a POLLINATIONS_API_KEY Worker secret to enable the backup image provider."
+          : capacity
+            ? "Cloudflare's image models are currently out of capacity. Your Lightning image credit has been returned. Add a POLLINATIONS_API_KEY Worker secret to enable backup generation."
+            : "Cloudflare's image models all failed. Your Lightning image credit has been returned. Check the Worker logs for the exact error."
     }, status);
   }
 }
