@@ -2445,7 +2445,7 @@ function trialCard() {
             fill.style.width=Math.min(100,Math.max(0,e.imagesUsed/e.imageLimit*100))+"%";
             bar.append(fill);wrap.append(bar);
         }
-        wrap.append(btn("Sign out",async()=>{await fetch("/api/logout",{method:"POST",credentials:"same-origin"});lightningAccount=null;lightningEntitlement=null;drawAcct();showAiBubbleOnScreen("Signed out of Lightning.");}));
+        wrap.append(btn("Sign out",async()=>{await fetch("/api/logout",{method:"POST",credentials:"same-origin"});lightningAccount=null;lightningEntitlement=null;user=null;try{localStorage.removeItem("lightning_username_hint");}catch(_){}drawAcct();showAiBubbleOnScreen("Signed out of Lightning.");}));
     }else{
         const head=el("div","trial-account-head");head.append(el("b","","Not signed in"));wrap.append(head);
         wrap.append(el("small","auth-note","Sign in to save your profile and share artifacts with friends."));
@@ -2459,7 +2459,11 @@ async function refreshLightningAccount(){
         const j=await r.json();
         lightningAccount=r.ok?j.user:null;
         lightningEntitlement=r.ok?j.entitlement:null;
-    }catch(e){lightningAccount=null;lightningEntitlement=null;}
+        if(lightningAccount){
+            user={id:lightningAccount.id,name:lightningAccount.username};
+            try{localStorage.setItem("lightning_username_hint",lightningAccount.username);}catch(_){}
+        }else{user=null;}
+    }catch(e){lightningAccount=null;lightningEntitlement=null;user=null;}
     drawAcct();
     updateTopProfileShortcut();
 }
@@ -2477,6 +2481,7 @@ function openLightningAuth(){
           <button class="mini-btn wide" id="lt-auth-switch" type="button">${mode==="login"?"Need an account? Create one":"Already have an account? Sign in"}</button>
         </div>`;
         const q=s=>card.querySelector(s);
+        try{q("#lt-user").value=localStorage.getItem("lightning_username_hint")||"";}catch(_){}
         q(".close-modal-btn").onclick=()=>ov.remove();
         q("#lt-auth-switch").onclick=()=>{mode=mode==="login"?"register":"login";render();};
         const submit=async()=>{
@@ -2486,6 +2491,7 @@ function openLightningAuth(){
                 const r=await fetch(mode==="login"?"/api/login":"/api/register",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({username,password})});
                 const j=await r.json();
                 if(!r.ok)throw new Error(j.error||"Account request failed.");
+                try{localStorage.setItem("lightning_username_hint",j.user?.username||username);}catch(_){}
                 ov.remove();await refreshLightningAccount();
                 showAiBubbleOnScreen(mode==="login"?"Welcome back to Lightning.":"Your Lightning free trial has started. No API key required.");
             }catch(e){err.textContent=e.message;button.disabled=false;button.textContent=mode==="login"?"Sign in":"Create account";}
