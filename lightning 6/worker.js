@@ -572,6 +572,189 @@ async function chatRoute(request,env) {
   return json({error:{message:"Lightning chat is temporarily unavailable because its Cloudflare AI model could not respond. Please try again shortly."}},503);
 }
 
+
+async function ensureBrowserTable(env) {
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS browser_sessions (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, session_id TEXT NOT NULL, target_id TEXT NOT NULL, paused INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL)").run();
+}
+function browserSafeUrl(value) {
+  let u;
+  try { u = new URL(String(value || "")); } catch { throw new Error("Enter a valid website URL."); }
+  if (u.protocol !== "https:" && u.protocol !== "http:") throw new Error("Only HTTP and HTTPS websites are allowed.");
+  const host = u.hostname.toLowerCase();
+  if (host === "localhost" || host.endsWith(".localhost") || host === "127.0.0.1" || host === "::1" || host === "0.0.0.0" || host.endsWith(".local")) throw new Error("Local and private network addresses are not allowed.");
+  return u.toString();
+}
+let browserCdpId = 0;
+function browserCdp(socket, method, params = {}) {
+  return new Promise((resolve, reject) => {
+    const id = ++browserCdpId;
+    const timeout = setTimeout(() => { cleanup(); reject(new Error("Browser command timed out: " + method)); }, 20000);
+    const cleanup = () => { clearTimeout(timeout); socket.removeEventListener("message", onMessage); socket.removeEventListener("close", onClose); };
+    const onClose = () => { cleanup(); reject(new Error("Browser connection closed.")); };
+    const onMessage = event => {
+      let message;
+      try { message = JSON.parse(event.data); } catch { return; }
+      if (message.id !== id) return;
+      cleanup();
+      if (message.error) reject(new Error(message.error.message || "Browser command failed."));
+      else resolve(message.result || {});
+    };
+    socket.addEventListener("message", onMessage);
+    socket.addEventListener("close", onClose);
+    try { socket.send(JSON.stringify({ id, method, params })); }
+    catch (error) { cleanup(); reject(error); }
+  });
+}
+async function withBrowserSocket(env, sessionId, targetId, callback) {
+  const connection = await env.BROWSER.connectSession(sessionId, { targetId });
+  const response = await connection.webSocket.fetch("https://browser-binding.invalid", { headers: { Upgrade: "websocket" } });
+  if (!response.webSocket) throw new Error("Cloudflare did not open the browser connection.");
+  const socket = response.webSocket;
+  socket.accept();
+  try { return await callback(socket); }
+  finally { try { socket.close(); } catch {} }
+}
+async function browserPageInfo(socket) {
+  const result = await browserCdp(socket, "Runtime.evaluate", {
+    expression: "({title:document.title,url:location.href,text:(document.body&&document.body.innerText||'').slice(0,12000)})",
+    returnByValue: true,
+    awaitPromise: true
+  });
+  return result.result && result.result.value || {};
+}
+function browserCaptchaDetected(info) {
+  const sample = ((info.title || "") + " " + (info.url || "") + " " + (info.text || "")).toLowerCase();
+  return /captcha|verify (that )?you are human|checking your browser|security challenge|unusual traffic|are you a robot|robot check|challenge-platform|hcaptcha|recaptcha|cf-turnstile|just a moment/.test(sample);
+}
+async function browserStartRoute(request, env) {
+  const user = await userFor(request, env);
+  if (!user) return json({ error: "Sign in to use Lightning Browser." }, 401);
+  if (!env.BROWSER) return json({ error: "Cloudflare Browser Run is not enabled on this Worker yet. Add the BROWSER browser binding in Wrangler and enable Browser Run in Cloudflare." }, 503);
+  await ensureBrowserTable(env);
+  let data;
+  try { data = await body(request); } catch { return json({ error: "Invalid browser request." }, 400); }
+  let targetUrl;
+  try { targetUrl = browserSafeUrl(data.url || "https://scratch.mit.edu/"); }
+  catch (error) { return json({ error: error.message }, 400); }
+  const old = await env.DB.prepare("SELECT session_id FROM browser_sessions WHERE user_id=?").bind(user.id).first();
+  if (old?.session_id) { try { await env.BROWSER.closeSession(old.session_id); } catch {} }
+  let session;
+  try {
+    session = await env.BROWSER.acquire({ targets: true, keepAlive: 1200000, liveViewUrlExpiresInMs: 3600000 });
+    let target = (session.targets || []).find(item => item.type === "page");
+    if (!target) target = await env.BROWSER.devtools.newTarget(session.sessionId, "about:blank");
+    await withBrowserSocket(env, session.sessionId, target.id, async socket => {
+      await browserCdp(socket, "Page.enable");
+      await browserCdp(socket, "Runtime.enable");
+      await browserCdp(socket, "Emulation.setDeviceMetricsOverride", { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
+      await browserCdp(socket, "Page.navigate", { url: targetUrl });
+    });
+    const live = await env.BROWSER.getLiveView(session.sessionId, { targetId: target.id, mode: "tab", expiresInMs: 3600000 });
+    await env.DB.prepare("INSERT OR REPLACE INTO browser_sessions(user_id,session_id,target_id,paused,created_at) VALUES(?,?,?,0,?)")
+      .bind(user.id, session.sessionId, target.id, Math.floor(Date.now()/1000)).run();
+    return json({ ok: true, liveViewUrl: live.devtoolsFrontendUrl, url: targetUrl, title: "Lightning Browser" });
+  } catch (error) {
+    if (session?.sessionId) { try { await env.BROWSER.closeSession(session.sessionId); } catch {} }
+    console.error("Lightning Browser start failed:", error?.stack || error);
+    return json({ error: String(error?.message || error || "Browser could not start.") }, 503);
+  }
+}
+async function browserCommandRoute(request, env) {
+  const user = await userFor(request, env);
+  if (!user) return json({ error: "Sign in to use Lightning Browser." }, 401);
+  if (!env.BROWSER) return json({ error: "Cloudflare Browser Run is not enabled." }, 503);
+  await ensureBrowserTable(env);
+  let data;
+  try { data = await body(request); } catch { return json({ error: "Invalid browser command." }, 400); }
+  const row = await env.DB.prepare("SELECT session_id,target_id,paused FROM browser_sessions WHERE user_id=?").bind(user.id).first();
+  if (!row) return json({ error: "No browser session is open. Start the browser first." }, 404);
+  const command = String(data.command || "");
+  if (command !== "CAPTCHA" && command !== "screenshot" && Number(row.paused)) return json({ error: "Browser automation is paused for human verification. Complete the challenge and press Resume." }, 423);
+  try {
+    if (command === "CAPTCHA") {
+      const info = await withBrowserSocket(env,row.session_id,row.target_id,socket => browserPageInfo(socket));
+      const detected = browserCaptchaDetected(info);
+      if (detected) await env.DB.prepare("UPDATE browser_sessions SET paused=1 WHERE user_id=?").bind(user.id).run();
+      return json({ ok: true, detected, paused: detected, page: { title: info.title || "", url: info.url || "" }, message: detected ? "Verification detected. Please complete it in the browser, then press Resume." : "No CAPTCHA detected." });
+    }
+    if (command === "navigate") {
+      let targetUrl;
+      try { targetUrl = browserSafeUrl(data.url); } catch (error) { return json({ error: error.message }, 400); }
+      await withBrowserSocket(env,row.session_id,row.target_id,socket => browserCdp(socket,"Page.navigate",{url:targetUrl}));
+      return json({ ok:true, url:targetUrl });
+    }
+    if (command === "reload") {
+      await withBrowserSocket(env,row.session_id,row.target_id,socket => browserCdp(socket,"Page.reload",{ignoreCache:false}));
+      return json({ok:true});
+    }
+    if (command === "stop-loading") {
+      await withBrowserSocket(env,row.session_id,row.target_id,socket => browserCdp(socket,"Page.stopLoading"));
+      return json({ok:true});
+    }
+    if (command === "simulate") {
+      const action = String(data.action || "");
+      const x = Math.max(0,Math.min(5000,Number(data.x)||0));
+      const y = Math.max(0,Math.min(5000,Number(data.y)||0));
+      await withBrowserSocket(env,row.session_id,row.target_id,async socket => {
+        if (action === "move") {
+          await browserCdp(socket,"Input.dispatchMouseEvent",{type:"mouseMoved",x,y});
+        } else if (action === "click") {
+          await browserCdp(socket,"Input.dispatchMouseEvent",{type:"mouseMoved",x,y});
+          await browserCdp(socket,"Input.dispatchMouseEvent",{type:"mousePressed",x,y,button:"left",clickCount:1});
+          await browserCdp(socket,"Input.dispatchMouseEvent",{type:"mouseReleased",x,y,button:"left",clickCount:1});
+        } else if (action === "type") {
+          const value = String(data.text || "").slice(0,2000);
+          await browserCdp(socket,"Input.insertText",{text:value});
+        } else if (action === "scroll") {
+          const deltaY = Math.max(-3000,Math.min(3000,Number(data.amount)||500));
+          await browserCdp(socket,"Input.dispatchMouseEvent",{type:"mouseWheel",x:x||640,y:y||360,deltaX:0,deltaY});
+        } else if (action === "press") {
+          const key = String(data.key || "").slice(0,30);
+          if (!/^(Enter|Tab|Escape|Backspace|Arrow(Up|Down|Left|Right)|Space)$/.test(key)) throw new Error("Unsupported key.");
+          const keyValue = key === "Space" ? " " : key;
+          await browserCdp(socket,"Input.dispatchKeyEvent",{type:"keyDown",key:keyValue,code:key==="Space"?"Space":key});
+          await browserCdp(socket,"Input.dispatchKeyEvent",{type:"keyUp",key:keyValue,code:key==="Space"?"Space":key});
+        } else throw new Error("Unknown simulate action.");
+      });
+      return json({ok:true,action,x,y});
+    }
+    if (command === "screenshot") {
+      const result = await withBrowserSocket(env,row.session_id,row.target_id,socket => browserCdp(socket,"Page.captureScreenshot",{format:"jpeg",quality:75,fromSurface:true}));
+      return json({ok:true,dataUrl:"data:image/jpeg;base64,"+result.data});
+    }
+    if (command === "readPage") {
+      const info = await withBrowserSocket(env,row.session_id,row.target_id,socket => browserPageInfo(socket));
+      return json({ok:true,page:info});
+    }
+    return json({error:"Unknown browser command."},400);
+  } catch (error) {
+    console.error("Lightning Browser command failed:",error?.stack||error);
+    return json({error:String(error?.message||error||"Browser command failed.")},500);
+  }
+}
+async function browserResumeRoute(request, env) {
+  const user = await userFor(request, env);
+  if (!user) return json({error:"Sign in to use Lightning Browser."},401);
+  await ensureBrowserTable(env);
+  const row = await env.DB.prepare("SELECT session_id,target_id FROM browser_sessions WHERE user_id=?").bind(user.id).first();
+  if (!row) return json({error:"No browser session is open."},404);
+  try {
+    const info = await withBrowserSocket(env,row.session_id,row.target_id,socket => browserPageInfo(socket));
+    if (browserCaptchaDetected(info)) return json({error:"The verification challenge is still visible. Complete it first, then try again."},409);
+    await env.DB.prepare("UPDATE browser_sessions SET paused=0 WHERE user_id=?").bind(user.id).run();
+    return json({ok:true,message:"Verification cleared. Browser automation resumed."});
+  } catch (error) { return json({error:String(error?.message||error)},500); }
+}
+async function browserStopRoute(request, env) {
+  const user = await userFor(request, env);
+  if (!user) return json({error:"Sign in to use Lightning Browser."},401);
+  await ensureBrowserTable(env);
+  const row = await env.DB.prepare("SELECT session_id FROM browser_sessions WHERE user_id=?").bind(user.id).first();
+  if (row?.session_id && env.BROWSER) { try { await env.BROWSER.closeSession(row.session_id); } catch {} }
+  await env.DB.prepare("DELETE FROM browser_sessions WHERE user_id=?").bind(user.id).run();
+  return json({ok:true});
+}
+
 async function route(request, env) {
   const url=new URL(request.url), path=url.pathname;
   if(path.startsWith("/api/") && !sameOrigin(request)) return json({error:"Origin not allowed."},403);
@@ -588,6 +771,10 @@ async function route(request, env) {
       return json({ok:false,stage:"database",error:String(error?.message||error||"Unknown D1 error")},500);
     }
   }
+  if(path==="/api/browser/start" && request.method==="POST") return browserStartRoute(request,env);
+  if(path==="/api/browser/command" && request.method==="POST") return browserCommandRoute(request,env);
+  if(path==="/api/browser/resume" && request.method==="POST") return browserResumeRoute(request,env);
+  if(path==="/api/browser/stop" && request.method==="POST") return browserStopRoute(request,env);
   if(path==="/api/config" && request.method==="GET") return json({server:null});
   if(path==="/api/image-references" && request.method==="POST") return imageReferencesRoute(request,env);
   if(path==="/api/image" && request.method==="POST") return imageRoute(request, env);
