@@ -480,8 +480,8 @@ async function imageReferencesRoute(request,env) {
       try{url=decodeURIComponent(url);}catch(_){}
       url=url.replace(/&amp;/g,"&").replace(/\\u0026/g,"&");
       if(!/^https:\/\//i.test(url))return;
-      if(/(^|\\.)google\\.(com|com\\.au)$|gstatic\\.com|googleusercontent\\.com/i.test(new URL(url).hostname))return;
-      if(!/\\.(jpe?g|png|webp|gif|avif)(?:$|[?#])/i.test(url))return;
+      if(/(^|\.)google\.(com|com\.au)$|gstatic\.com|googleusercontent\.com/i.test(new URL(url).hostname))return;
+      if(!/\.(jpe?g|png|webp|gif|avif)(?:$|[?#])/i.test(url))return;
       if(!found.includes(url))found.push(url);
     };
     // Fetch two neighbouring result pages, not just Google's default first page.
@@ -494,16 +494,16 @@ async function imageReferencesRoute(request,env) {
       },redirect:"follow"});
       if(!response.ok)throw new Error("Google Images returned HTTP "+response.status+". Google may be blocking automated searches.");
       const html=await response.text();
-      if(/unusual traffic|sorry\\/|consent\\.google\\.com|before you continue to google/i.test(html.slice(0,180000)))
+      if(/unusual traffic|sorry\/|consent\.google\.com|before you continue to google/i.test(html.slice(0,180000)))
         throw new Error("Google showed a verification or consent page instead of image results.");
       let match;
-      const originalPattern=/"ou"\\s*:\\s*"([^"]+)"/g;
+      const originalPattern=/"ou"\s*:\s*"([^"]+)"/g;
       while((match=originalPattern.exec(html))&&found.length<count*3){
         try{addUrl(JSON.parse('"'+match[1]+'"'));}catch(_){addUrl(match[1]);}
       }
-      const encodedPattern=/imgurl=(https?%3A%2F%2F[^&"\\s]+)/gi;
+      const encodedPattern=/imgurl=(https?%3A%2F%2F[^&"\s]+)/gi;
       while((match=encodedPattern.exec(html))&&found.length<count*3)addUrl(match[1]);
-      const plainPattern=/imgurl=(https?:\\/\\/[^&"\\s]+)/gi;
+      const plainPattern=/imgurl=(https?:\/\/[^&"\s]+)/gi;
       while((match=plainPattern.exec(html))&&found.length<count*3)addUrl(match[1]);
     }
     const results=found.slice(0,count).map((url,index)=>({
