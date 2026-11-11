@@ -466,13 +466,13 @@ async function imageReferencesRoute(request,env) {
     // Google embeds original image URLs in its image-result JSON ("ou") and
     // sometimes as an encoded imgurl query parameter.
     let match;
-    const originalPattern=/"ou"\\s*:\\s*"([^"]+)"/g;
+    const originalPattern=/"ou"\s*:\s*"([^"]+)"/g;
     while((match=originalPattern.exec(html))&&found.length<count*4){
       try{addUrl(JSON.parse('"'+match[1]+'"'));}catch(_){addUrl(match[1]);}
     }
-    const encodedPattern=/imgurl=(https?%3A%2F%2F[^&"\\s]+)/gi;
+    const encodedPattern=/imgurl=(https?%3A%2F%2F[^&"\s]+)/gi;
     while((match=encodedPattern.exec(html))&&found.length<count*4)addUrl(match[1]);
-    const plainPattern=/imgurl=(https?:\/\/[^&"\\s]+)/gi;
+    const plainPattern=/imgurl=(https?:\/\/[^&"\s]+)/gi;
     while((match=plainPattern.exec(html))&&found.length<count*4)addUrl(match[1]);
     const results=found.slice(0,count).map((url,index)=>({
       title:"Google Images result "+(index+1),
