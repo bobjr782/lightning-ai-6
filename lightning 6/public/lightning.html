@@ -758,6 +758,14 @@ body.img-mode .img-opts { display: flex; }
 .art-page .online-grid,.art-page .img-grid { min-height:min-content; }
 .material-symbols-outlined.px { width:20px; height:20px; font-size:20px; line-height:1; font-weight:400; font-style:normal; letter-spacing:normal; text-transform:none; white-space:nowrap; direction:ltr; display:inline-flex; align-items:center; justify-content:center; vertical-align:-4px; font-feature-settings:'liga'; -webkit-font-feature-settings:'liga'; -webkit-font-smoothing:antialiased; }
 .friends-pixel-icon { flex:0 0 20px; }
+
+/* Browser Run embedded inside the chat */
+.lightning-browser-chat-card{width:min(100%,1100px);height:min(68vh,760px);min-height:420px;margin:18px auto;padding:0;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--border-color);border-radius:12px;background:var(--surface);box-shadow:0 10px 35px #0003}
+.lightning-browser-chat-head{min-height:58px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:var(--surface-2);border-bottom:1px solid var(--border-color);color:var(--text-primary)}
+.lightning-browser-chat-head strong{display:block;font-size:14px}.lightning-browser-chat-head span{display:block;margin-top:3px;font-size:11px;color:var(--text-secondary)}
+.lightning-browser-chat-card iframe{display:block;flex:1;width:100%;min-height:0;border:0;background:var(--bg-main)}
+.lightning-browser-close{padding:7px 13px;border:1px solid var(--border-color);border-radius:7px;background:var(--surface);color:var(--text-primary);cursor:pointer}
+@media(max-width:650px){.lightning-browser-chat-card{height:65vh;min-height:360px}.lightning-browser-chat-head{padding:8px}}
 </style>
 </head>
 <body> 
@@ -1587,22 +1595,33 @@ row.appendChild(bubbleWrapper); document.querySelector('.messages-container').ap
 scrollToLatestMessage();
 }
 function installPlugin(pluginKey, buttonElement) {
-if (installedPlugins[pluginKey]) {
-    if (pluginKey === "browser") window.location.href = "/browser.html";
+if (pluginKey === "browser") {
+    installedPlugins.browser = true;
+    buttonElement.disabled = false;
+    buttonElement.textContent = "Open Browser";
+    openBrowserPlugin();
     return;
 }
+if (installedPlugins[pluginKey]) return;
 buttonElement.disabled = true; buttonElement.textContent = "Installing...";
 setTimeout(() => {
     installedPlugins[pluginKey] = true;
-    if (pluginKey === "browser") {
-        buttonElement.disabled = false;
-        buttonElement.textContent = "Open Browser";
-        buttonElement.onclick = () => window.location.href = "/browser.html";
-    } else {
-        buttonElement.textContent = "Active";
-        buttonElement.style.backgroundColor = "#28a745";
-    }
+    buttonElement.textContent = "Active";
+    buttonElement.style.backgroundColor = "#28a745";
 }, 500);
+}
+function openBrowserPlugin() {
+    const messages = document.getElementById("enject");
+    if (!messages) return;
+    let panel = document.getElementById("lightning-browser-chat-card");
+    if (panel) { panel.scrollIntoView({behavior:"smooth",block:"nearest"}); return; }
+    panel = document.createElement("section");
+    panel.id = "lightning-browser-chat-card";
+    panel.className = "lightning-browser-chat-card";
+    panel.innerHTML = '<div class="lightning-browser-chat-head"><div><strong>Lightning Browser</strong><span>Live browser · AI cursor · Human verification</span></div><button type="button" class="lightning-browser-close" aria-label="Close browser">Close</button></div><iframe title="Lightning Browser plugin" src="/browser.html?embedded=1" allow="clipboard-read; clipboard-write; fullscreen; autoplay"></iframe>';
+    panel.querySelector(".lightning-browser-close").addEventListener("click",()=>panel.remove());
+    messages.appendChild(panel);
+    panel.scrollIntoView({behavior:"smooth",block:"end"});
 }
 
 function sb(containins) {
@@ -3265,7 +3284,7 @@ finishOpenRouter().catch(e => startupError("openrouter", e));
   button.className = "sidebar-btn";
   button.textContent = "Browser";
   button.title = "Open Lightning Browser";
-  button.addEventListener("click", () => { location.href = "/browser.html"; });
+  button.addEventListener("click", () => openBrowserPlugin());
   const plugins = area.querySelector('button[onclick="openPlugins()"]');
   if (plugins && plugins.parentNode === area) plugins.after(button);
   else area.prepend(button);
