@@ -763,6 +763,39 @@ body.img-mode .img-opts { display: flex; }
 .lightning-browser-chat-card{width:100%;height:min(76vh,900px);min-height:480px;margin:14px 0;padding:0;overflow:hidden;background:#fff}
 .lightning-browser-chat-card iframe{display:block;width:100%;height:100%;min-height:480px;border:0;background:#fff}
 </style>
+
+<style id="lightning-plugin-panel-fix">
+/* Larger marketplace panel with a scrollable list of installed plugins */
+#pluginsModal .modal-card {
+    width: min(760px, 94vw);
+    max-width: 94vw;
+    max-height: 88vh;
+    overflow: hidden;
+}
+#pluginsModal .modal-header { flex: 0 0 auto; }
+#pluginsModal .modal-body {
+    overflow-y: auto;
+    max-height: calc(88vh - 68px);
+    padding: 22px;
+    gap: 14px;
+}
+#pluginsModal .plugin-item {
+    min-height: 92px;
+    padding: 18px 20px;
+    gap: 18px;
+}
+#pluginsModal .plugin-details h4 { font-size: 1.05rem; }
+#pluginsModal .plugin-details p { font-size: .9rem; line-height: 1.5; }
+#pluginsModal .plugin-item > button {
+    min-width: 112px;
+    min-height: 42px;
+    flex: 0 0 auto;
+}
+@media (max-width: 560px) {
+    #pluginsModal .plugin-item { align-items: flex-start; flex-direction: column; }
+    #pluginsModal .plugin-item > button { width: 100%; }
+}
+</style>
 </head>
 <body> 
 
@@ -1036,6 +1069,13 @@ const GROQ_MODEL = "openrouter/free";
 
 let chat = [];
 let installedPlugins = { math: false, neon: false, browser: false };
+try {
+    const savedPlugins = JSON.parse(localStorage.getItem("lt_installed_plugins") || "{}");
+    if (savedPlugins && typeof savedPlugins === "object") installedPlugins = { ...installedPlugins, ...savedPlugins };
+} catch (_) {}
+function saveInstalledPlugins() {
+    try { localStorage.setItem("lt_installed_plugins", JSON.stringify(installedPlugins)); } catch (_) {}
+}
 
 let attachedFileContent = "";
 let attachedFileName = "";
@@ -1558,7 +1598,24 @@ function showAiBubbleOnScreen(staticText) {
 
 function toggleSidebar() { document.querySelector('.sidebar').classList.toggle('collapsed'); }
 function toggleTheme() { document.body.classList.toggle('light-mode'); }
-function openPlugins() { document.getElementById('pluginsModal').classList.add('open'); }
+function openPlugins() {
+    const modal = document.getElementById('pluginsModal');
+    modal.querySelectorAll('.plugin-item button[onclick]').forEach(button => {
+        const match = button.getAttribute('onclick').match(/installPlugin\('([^']+)'/);
+        if (!match) return;
+        const key = match[1];
+        if (installedPlugins[key]) {
+            button.disabled = false;
+            button.textContent = key === "browser" ? "Open Browser" : "Installed";
+            button.style.backgroundColor = key === "browser" ? "" : "#287a45";
+        } else {
+            button.disabled = false;
+            button.textContent = "Install";
+            button.style.backgroundColor = "";
+        }
+    });
+    modal.classList.add('open');
+}
 function closePlugins() { document.getElementById('pluginsModal').classList.remove('open'); }
 function scrollToLatestMessage() { const container = document.querySelector('.messages-container'); container.scrollTop = container.scrollHeight; }
 function store(chatName) { localStorage.setItem(chatName, JSON.stringify(chat)); }
@@ -1591,20 +1648,24 @@ row.appendChild(bubbleWrapper); document.querySelector('.messages-container').ap
 scrollToLatestMessage();
 }
 function installPlugin(pluginKey, buttonElement) {
-if (pluginKey === "browser") {
-    installedPlugins.browser = true;
-    buttonElement.disabled = false;
-    buttonElement.textContent = "Open Browser";
-    openBrowserPlugin();
-    return;
-}
-if (installedPlugins[pluginKey]) return;
-buttonElement.disabled = true; buttonElement.textContent = "Installing...";
-setTimeout(() => {
-    installedPlugins[pluginKey] = true;
-    buttonElement.textContent = "Active";
-    buttonElement.style.backgroundColor = "#28a745";
-}, 500);
+    if (pluginKey === "browser") {
+        installedPlugins.browser = true;
+        saveInstalledPlugins();
+        buttonElement.disabled = false;
+        buttonElement.textContent = "Open Browser";
+        openBrowserPlugin();
+        return;
+    }
+    if (installedPlugins[pluginKey]) return;
+    buttonElement.disabled = true;
+    buttonElement.textContent = "Installing...";
+    setTimeout(() => {
+        installedPlugins[pluginKey] = true;
+        saveInstalledPlugins();
+        buttonElement.disabled = false;
+        buttonElement.textContent = "Installed";
+        buttonElement.style.backgroundColor = "#287a45";
+    }, 250);
 }
 function openBrowserPlugin() {
     const messages = document.getElementById("enject");
@@ -2579,7 +2640,24 @@ function renderChat() { $(".messages-container").innerHTML = ""; if (chat.length
 function newChat() { curId = null; chat = []; clearAttachedFile(); renderChat(); closeAll(); }
 window.startNewChat = () => { curProject = null; newChat(); };
 function openChat(id) { const c = chats.find(x => x.id === id); if (!c) return; curId = id; curProject = c.project; chat = c.msgs; wr("cur", id); renderChat(); closeAll(); }
-window.clearHistory = () => { if (confirm("Delete ALL chats? This can't be undone.")) { chats = []; wr("chats", chats); wr("cur", null); startNewChat(); } };
+window.clearHistory = () => {
+    if (!confirm("Delete ALL chats? This can't be undone.")) return;
+    chats = [];
+    chat = [];
+    curId = null;
+    curProject = null;
+    wr("chats", []);
+    wr("cur", null);
+    try {
+        localStorage.removeItem("bob_chat_history");
+        localStorage.removeItem("cur");
+    } catch (_) {}
+    clearAttachedFile();
+    const messages = document.getElementById("enject");
+    if (messages) messages.innerHTML = "";
+    renderChat();
+    go("/", true);
+};
 function updateTop() {
     let s = $(".proj-badge"); if (!s) { s = el("span", "proj-badge"); $(".top-menu-bar .toggle-btn").after(s); }
     const c = chats.find(x => x.id === curId), p = projects.find(x => x.id === (c ? c.project : curProject)); s.textContent = p ? "📁 " + p.name : "";
