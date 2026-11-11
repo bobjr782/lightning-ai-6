@@ -750,6 +750,14 @@ body.img-mode .img-opts { display: flex; }
     padding-bottom: 9px !important;
 }
 
+
+/* Reliable scrolling for full-page libraries and galleries */
+.art-page { min-height:0; overflow:hidden; }
+.art-page.open { overflow:hidden; }
+.art-page > .page-body { min-height:0; max-height:calc(100vh - 76px); overflow-y:auto !important; overflow-x:hidden; overscroll-behavior:contain; scrollbar-gutter:stable; }
+.art-page .online-grid,.art-page .img-grid { min-height:min-content; }
+.material-symbols-outlined.px { width:20px; height:20px; font-size:20px; line-height:1; font-weight:400; font-style:normal; letter-spacing:normal; text-transform:none; white-space:nowrap; direction:ltr; display:inline-flex; align-items:center; justify-content:center; vertical-align:-4px; font-feature-settings:'liga'; -webkit-font-feature-settings:'liga'; -webkit-font-smoothing:antialiased; }
+.friends-pixel-icon { flex:0 0 20px; }
 </style>
 </head>
 <body> 
@@ -2798,12 +2806,33 @@ const ICONS = {
     robot: [".######.", "#.####.#", "########", "#.#..#.#", "########", "..#..#..", ".######.", "#......#"],
     down: ["...##...", "...##...", "...##...", "########", ".######.", "..####..", "...##...", "........"],
     stop: ["########", "########", "########", "########", "########", "########", "########", "########"],
-    search: ["..####..", ".#....#.", "#......#", "#......#", ".#....#.", "..####..", "....##..", "....##.."]
+    search: ["..####..", ".#....#.", "#......#", "#......#", ".#....#.", "..####..", "....##..", "....##.."],
+    user: ["...##...", "..####..", "..####..", "...##...", "..####..", ".######.", "##....##", "##....##"],
+    shield: ["..####..", ".######.", "########", "########", ".######.", "..####..", "...##...", "........"],
+    lock: ["..####..", ".#....#.", ".#....#.", "########", "########", "##....##", "##....##", "########"],
+    send: [".......#", "......##", "....####", "..######", "########", "..######", "....####", "......##"],
+    bell: ["...##...", "..####..", ".######.", ".######.", ".######.", "########", "...##...", "...##..."],
+    mail: ["########", "##....##", "#.####.#", "#.#..#.#", "##....##", "##....##", "########", "........"],
+    heart: [".##..##.", "########", "########", ".######.", "..####..", "...##...", "........", "........"],
+    star: ["...##...", ".######.", "..####..", "########", ".######.", ".##..##..", "##....##", "........"],
+    home: ["...##...", "..####..", ".######.", "########", "##....##", "##....##", "##....##", "########"],
+    edit: [".......#", "......##", "....###.", "..###...", ".##.....", "##......", "########", "########"],
+    refresh: ["..####..", ".#....#.", "#......#", "#..####.", "#....#..", ".#...#..", "..###...", "........"],
+    calendar: ["########", "#.####.#", "########", "##....##", "##....##", "##....##", "########", "........"],
+    clock: ["..####..", ".######.", "##.##.##", "##.##.##", "##..#..#", ".#..#...", "..####..", "........"],
+    upload: ["...##...", "..####..", ".######.", "########", "...##...", "...##...", "...##...", "...##..."],
+    filter: ["########", ".######.", "..####..", "...##...", "...##...", "...##...", "...##...", "...##..."],
+    more: ["........", "........", ".##..##.", ".##..##.", "........", ".##..##.", ".##..##.", "........"],
+    info: ["..####..", ".######.", "##....##", "##.##.##", "##....##", ".######.", "..####..", "........"],
+    verified: [".......#", "......##", ".##..##.", "########", ".######.", "..####..", "...##...", "........"],
+    security: ["..####..", ".######.", "##....##", "##....##", "########", "##....##", "##....##", "########"],
+    groupAdd: ["#..##..#", "##.##.##", "##.##.##", ".######.", "..####..", "##....##", "########", "...##..."],
+    personAdd: ["...##...", "..####..", "..####..", "...##...", "..####..", ".######.", "##....##", "...##..."]
 };
-const PXMAP = { "⚡": "bolt", "💬": "chat", "📁": "folder", "🧩": "box", "🖼": "image", "🎨": "sparkle", "✨": "sparkle", "🔌": "plug", "⚙": "gear", "◐": "half", "🗑": "trash", "🔑": "key", "＋": "plus", "✓": "check", "✅": "check", "✕": "x", "↑": "up", "▶": "play", "⛶": "expand", "⬇": "download", "🛠": "wrench", "📎": "file", "📄": "file", "⏳": "hourglass", "⏱": "hourglass", "⚠": "warn", "☰": "menu", "🌐": "globe", "👥": "users", "❌": "error", "📦": "package", "🧮": "calculator", "🔗": "link", "🤖": "robot", "👇": "down", "🛑": "stop", "🔍": "search" };
+const PXMAP = { "⚡": "bolt", "💬": "chat", "📁": "folder", "🧩": "box", "🖼": "image", "🎨": "sparkle", "✨": "sparkle", "🔌": "plug", "⚙": "gear", "◐": "half", "🗑": "trash", "🔑": "key", "＋": "plus", "✓": "check", "✅": "check", "✕": "x", "↑": "up", "▶": "play", "⛶": "expand", "⬇": "download", "🛠": "wrench", "📎": "file", "📄": "file", "⏳": "hourglass", "⏱": "hourglass", "⚠": "warn", "☰": "menu", "🌐": "globe", "👥": "users", "❌": "error", "📦": "package", "🧮": "calculator", "🔗": "link", "🤖": "robot", "👇": "down", "🛑": "stop", "🔍": "search", "👤": "user", "🛡": "shield", "🔒": "lock", "📨": "send", "🔔": "bell", "✉": "mail", "❤️": "heart", "⭐": "star", "🏠": "home", "✏": "edit", "🔄": "refresh", "📅": "calendar", "🕒": "clock", "📤": "upload", "🔽": "filter", "⋯": "more", "ℹ": "info", "🛡️": "shield", "➕": "plus" };
 const PXRE = new RegExp("(" + Object.keys(PXMAP).join("|") + ")\\uFE0F?", "g"), PXTEST = new RegExp(PXRE.source), PXSKIP = "pre,textarea,input,select,option,script,style,.userBox";
 const pxPath = name => { let d = ""; ICONS[name].forEach((row, y) => { for (let x = 0; x < 8; x++) if (row[x] === "#") d += `M${x} ${y}h1v1h-1z`; }); return d; };
-const MATERIAL_ICON_NAMES={bolt:"bolt",chat:"chat_bubble",folder:"folder",box:"deployed_code",image:"image",sparkle:"auto_awesome",plug:"power",gear:"settings",half:"contrast",trash:"delete",key:"key",plus:"add",check:"check",x:"close",up:"arrow_upward",play:"play_arrow",expand:"open_in_full",download:"download",wrench:"build",file:"description",hourglass:"hourglass_top",warn:"warning",globe:"language",menu:"menu",users:"groups",error:"error",package:"inventory_2",calculator:"calculate",link:"link",robot:"smart_toy",down:"arrow_downward",stop:"stop",search:"search",user:"person",shield:"shield",lock:"lock",send:"send",bell:"notifications",mail:"mail",heart:"favorite",star:"star",home:"home",edit:"edit",refresh:"refresh",calendar:"calendar_month",clock:"schedule",upload:"upload",filter:"filter_list",more:"more_horiz",info:"info",visibility:"visibility",verified:"verified",security:"security",groupAdd:"group_add",personAdd:"person_add",logout:"logout"};
+const MATERIAL_ICON_NAMES={bolt:"bolt",chat:"chat_bubble",folder:"folder",box:"deployed_code",image:"image",sparkle:"auto_awesome",plug:"power",gear:"settings",half:"contrast",trash:"delete",key:"key",plus:"add",check:"check",x:"close",up:"arrow_upward",play:"play_arrow",expand:"open_in_full",download:"download",wrench:"build",file:"description",hourglass:"hourglass_top",warn:"warning",globe:"language",menu:"menu",users:"groups",error:"error",package:"inventory_2",calculator:"calculate",link:"link",robot:"smart_toy",down:"arrow_downward",stop:"stop",search:"search",user:"person",shield:"shield",lock:"lock",send:"send",bell:"notifications",mail:"mail",heart:"favorite",star:"star",home:"home",edit:"edit",refresh:"refresh",calendar:"calendar_month",clock:"schedule",upload:"upload",filter:"filter_list",more:"more_horiz",info:"info",visibility:"visibility",verified:"verified",security:"security",groupAdd:"group_add",personAdd:"person_add",logout:"logout",dashboard:"dashboard",apps:"apps",bookmark:"bookmark",bug:"bug_report",cloud:"cloud",code:"code",database:"database",downloadDone:"download_done",event:"event",extension:"extension",favorite:"favorite",fileOpen:"file_open",folderOpen:"folder_open",history:"history",language:"language",linkOff:"link_off",list:"list",notifications:"notifications",palette:"palette",public:"public",rocket:"rocket_launch",save:"save",schedule:"schedule",share:"share",sort:"sort",support:"support",terminal:"terminal",thumbUp:"thumb_up",visibilityOff:"visibility_off",warning:"warning",wifi:"wifi",work:"work"};
 function pxSvg(name) {
     if(localStorage.getItem("lt_icon_mode")==="google"){
         const span=document.createElement("span");
