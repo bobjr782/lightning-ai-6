@@ -33,6 +33,15 @@ main{flex:1;min-height:0;display:flex;flex-direction:column}
 #captcha strong{display:block;font-size:20px;margin-bottom:4px}#captcha button{margin-left:10px;background:#fff;color:#61220e;border:0;font-weight:800;padding:10px 16px}#captcha .verify-note{display:block;font-size:13px;font-weight:500;margin-top:4px}
 #shot{display:none;position:absolute;right:12px;bottom:12px;max-width:min(420px,40vw);max-height:38vh;border:1px solid #596273;border-radius:8px;box-shadow:0 8px 28px #0009}
 @media(max-width:700px){header{gap:6px;padding:0 8px}.brand{font-size:13px}#status{display:none}.toolbar{flex-wrap:wrap}.toolbar input{flex-basis:100%;order:2}.toolbar button{padding:8px}.toolbar #go{order:3}}
+
+/* Embedded mode is deliberately just the remote website viewport. */
+body.embedded{display:block;background:#fff}
+body.embedded header,body.embedded .toolbar,body.embedded #bottom,body.embedded #log,body.embedded #captcha{display:none!important}
+body.embedded main{display:flex;width:100%;height:100%;min-height:0}
+body.embedded #viewer-wrap{position:absolute;inset:0;width:100%;height:100%;background:#fff}
+body.embedded #live-view{display:block;width:100%;height:100%;border:0}
+body.embedded #empty{display:none!important}
+body.embedded #cursor-puppet,body.embedded #shot{display:none!important}
 </style>
 </head>
 <body>
@@ -127,7 +136,8 @@ $("check-captcha").onclick=async()=>{try{const r=await command("CAPTCHA");if(r.d
 $("resume-banner").onclick=()=> $("resume").click();\n$("resume").onclick=async()=>{try{const r=await api("/api/browser/resume",{});paused=false;$("captcha").style.display="none";$("resume").disabled=true;status("Live session");log(r.message);}catch(e){log(e.message);alert(e.message);}};
 $("stop").onclick=async()=>{try{await api("/api/browser/stop",{});}catch(e){log(e.message);}running=false;paused=false;liveViewUrl="";$("live-view").src="about:blank";$("live-view").style.display="none";$("empty").style.display="flex";$("captcha").style.display="none";$("resume").disabled=true;status("Stopped");log("Browser session stopped.");};
 $("open-viewer").onclick=()=>{if(liveViewUrl)window.open(liveViewUrl,"_blank","noopener");};
-const embedded=new URLSearchParams(location.search).has("embedded");\nif(embedded){document.body.classList.add("embedded");try{const theme=getComputedStyle(parent.document.body);const root=document.documentElement;root.style.setProperty("--browser-accent",theme.getPropertyValue("--accent").trim()||"#d97757");root.style.setProperty("--browser-bg",theme.getPropertyValue("--bg-main").trim()||"#262624");root.style.setProperty("--browser-surface",theme.getPropertyValue("--surface").trim()||"#30302e");root.style.setProperty("--browser-border",theme.getPropertyValue("--border-color").trim()||"#43413d");root.style.setProperty("--browser-text",theme.getPropertyValue("--text-primary").trim()||"#faf9f5");root.style.setProperty("--browser-muted",theme.getPropertyValue("--text-secondary").trim()||"#a6a39a");}catch(e){}}\nasync function pollVerification(){if(!running||paused)return;try{const r=await command("CAPTCHA");if(r.detected){paused=true;$("captcha").style.display="block";$("resume").disabled=false;status("Human verification needed");log("Verification detected. Automation paused; user control is active.");}}catch(e){/* transient polling errors are shown in the log only when useful */}}\nsetInterval(pollVerification,4500);\nwindow.LightningBrowser={
+const embedded=new URLSearchParams(location.search).has("embedded");\nif(embedded){document.body.classList.add("embedded");try{const theme=getComputedStyle(parent.document.body);const root=document.documentElement;root.style.setProperty("--browser-accent",theme.getPropertyValue("--accent").trim()||"#d97757");root.style.setProperty("--browser-bg",theme.getPropertyValue("--bg-main").trim()||"#262624");root.style.setProperty("--browser-surface",theme.getPropertyValue("--surface").trim()||"#30302e");root.style.setProperty("--browser-border",theme.getPropertyValue("--border-color").trim()||"#43413d");root.style.setProperty("--browser-text",theme.getPropertyValue("--text-primary").trim()||"#faf9f5");root.style.setProperty("--browser-muted",theme.getPropertyValue("--text-secondary").trim()||"#a6a39a");}catch(e){}}\nasync function pollVerification(){if(!running)return;try{const r=await command("CAPTCHA");if(r.detected&&!paused){paused=true;log("Verification detected. Automation paused; user can interact with the website.");}else if(!r.detected&&paused){await api("/api/browser/resume",{});paused=false;log("Verification cleared. Lightning automation resumed.");}}catch(e){/* transient polling errors are ignored */}}\nif(embedded){start("https://scratch.mit.edu/");}
+setInterval(pollVerification,4500);\nwindow.LightningBrowser={
   navigate:url=>command("navigate",{url}),
   simulate:(action,x,y,extra={})=>command("simulate",{action,x,y,...extra}).then(r=>{if(action==="move"||action==="click")showCursor(x,y);return r;}),
   CAPTCHA:()=>command("CAPTCHA"),
