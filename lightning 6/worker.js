@@ -437,10 +437,12 @@ async function imageReferencesRoute(request,env) {
   IMAGE_REFERENCE_RATE.set(account.id,now);
   let input; try{input=await body(request);}catch{return json({error:"Invalid image search request."},400);}
   const prompt=String(input.prompt||"").trim().slice(0,240);
+  const requestedCount=Number(input.count||20);
+  const count=Number.isFinite(requestedCount)?Math.max(8,Math.min(20,Math.round(requestedCount))):20;
   if(prompt.length<2) return json({error:"Describe what images you want to find."},400);
   try{
     const params=new URLSearchParams({
-      action:"query",generator:"search",gsrsearch:prompt,gsrnamespace:"6",gsrlimit:"20",
+      action:"query",generator:"search",gsrsearch:prompt,gsrnamespace:"6",gsrlimit:String(count),
       prop:"imageinfo",iiprop:"url|extmetadata",iiurlwidth:"720",format:"json",origin:"*"
     });
     const response=await fetch("https://commons.wikimedia.org/w/api.php?"+params.toString(),{
@@ -456,7 +458,7 @@ async function imageReferencesRoute(request,env) {
       if(!/\.(jpe?g|png|webp|gif)(?:$|\?)/i.test(url)) return null;
       const meta=info.extmetadata||{};
       return {title:String(page.title||"").replace(/^File:/,""),url,source:info.descriptionurl||"",width:info.width||null,height:info.height||null,license:String(meta.LicenseShortName?.value||"").replace(/<[^>]*>/g,"").slice(0,100),artist:String(meta.Artist?.value||"").replace(/<[^>]*>/g,"").slice(0,180)};
-    }).filter(Boolean).slice(0,20);
+    }).filter(Boolean).slice(0,count);
     return json({ok:true,query:prompt,source:"Wikimedia Commons",count:results.length,results});
   }catch(error){
     console.error("Lightning image reference search failed:",error?.message||error);
