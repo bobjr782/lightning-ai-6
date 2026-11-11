@@ -459,13 +459,16 @@ async function imageReferencesRoute(request,env) {
   if(prior&&now-prior<15000) return json({error:"Please wait a few seconds before searching again."},429,{"retry-after":"15"});
   IMAGE_REFERENCE_RATE.set(account.id,now);
   let input; try{input=await body(request);}catch{return json({error:"Invalid image search request."},400);}
-  const prompt=String(input.prompt||"").trim().slice(0,240);
+  const rawPrompt=String(input.prompt||"").trim().slice(0,240);
+  const noBackground=/#no-background\s*$/i.test(rawPrompt);
+  const prompt=rawPrompt.replace(/\s*#no-background\s*$/i,"").trim();
+  const searchPrompt=noBackground?prompt+" transparent background PNG":prompt;
   const requestedCount=Number(input.count||20);
   const count=Number.isFinite(requestedCount)?Math.max(8,Math.min(20,Math.round(requestedCount))):20;
   if(prompt.length<2) return json({error:"Describe what images you want to find."},400);
   try{
     // Search Google Images directly. No chatbot or intermediate AI prompt is involved.
-    const searchUrl="https://www.google.com/search?tbm=isch&hl=en&safe=active&q="+encodeURIComponent(prompt);
+    const searchUrl="https://www.google.com/search?tbm=isch&hl=en&safe=active"+(noBackground?"&tbs=ic:trans":"")+"&q="+encodeURIComponent(searchPrompt);
     const response=await fetch(searchUrl,{headers:{
       "Accept":"text/html,application/xhtml+xml",
       "Accept-Language":"en-AU,en;q=0.9",
@@ -507,7 +510,7 @@ async function imageReferencesRoute(request,env) {
     let source="Google Images";
     if(results.length<count){
       try{
-        const libraryResults=await openverseImageReferences(prompt,count-results.length);
+        const libraryResults=await openverseImageReferences(searchPrompt,count-results.length);
         const seen=new Set(results.map(item=>item.url));
         for(const item of libraryResults){
           if(results.length>=count)break;
@@ -518,12 +521,12 @@ async function imageReferencesRoute(request,env) {
         console.warn("Openverse top-up unavailable:",libraryError?.message||libraryError);
       }
     }
-    return json({ok:true,query:prompt,source,count:results.length,requested:count,results,searchUrl});
+    return json({ok:true,query:prompt,searchQuery:searchPrompt,noBackground,source,count:results.length,requested:count,results,searchUrl});
   }catch(error){
     console.warn("Google Images unavailable; trying Openverse:",error?.message||error);
     try{
-      const results=await openverseImageReferences(prompt,count);
-      return json({ok:true,query:prompt,source:"Openverse image library",count:results.length,requested:count,results,fallback:true});
+      const results=await openverseImageReferences(searchPrompt,count);
+      return json({ok:true,query:prompt,searchQuery:searchPrompt,noBackground,source:"Openverse image library",count:results.length,requested:count,results,fallback:true});
     }catch(libraryError){
       console.error("Both image sources failed:",error?.message||error,libraryError?.message||libraryError);
       return json({error:"Google Images and the Openverse image library are temporarily unavailable. "+String(libraryError?.message||error?.message||"Try again later.")},502);
