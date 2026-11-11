@@ -42,11 +42,13 @@ main{flex:1;min-height:0;display:flex;flex-direction:column}
 <main>
   <div class="toolbar">
     <button id="back-page" title="Back">←</button>
+    <button id="forward-page" title="Forward">→</button>
     <button id="reload" title="Reload">↻</button>
     <input id="address" value="https://scratch.mit.edu/" aria-label="Website address" spellcheck="false">
     <button id="go">Go</button>
     <button id="scratch">Open Scratch</button>
     <button id="check-captcha">CAPTCHA()</button>
+    <button id="take-shot">Screenshot</button>
   </div>
   <div id="viewer-wrap">
     <div id="empty">
@@ -115,7 +117,9 @@ $("scratch").onclick=()=>{$("address").value="https://scratch.mit.edu/";start($(
 $("go").onclick=async()=>{if(!running)return start($("address").value.trim());try{const r=await command("navigate",{url:$("address").value.trim()});log("Navigated to "+r.url);}catch(e){log(e.message);alert(e.message);}};
 $("address").addEventListener("keydown",e=>{if(e.key==="Enter")$("go").click();});
 $("reload").onclick=async()=>{try{await command("reload");log("Reloaded page.");}catch(e){log(e.message);}};
-$("back-page").onclick=()=>log("Use the remote browser's own back control for history navigation.");
+$("back-page").onclick=async()=>{try{const r=await command("back");if(r.moved)log("Back to "+r.url);else log("No previous page.");}catch(e){log(e.message);}};
+$("forward-page").onclick=async()=>{try{const r=await command("forward");if(r.moved)log("Forward to "+r.url);else log("No next page.");}catch(e){log(e.message);}};
+$("take-shot").onclick=async()=>{try{const r=await command("screenshot");$("shot").src=r.dataUrl;$("shot").style.display="block";log("Screenshot captured.");}catch(e){log(e.message);}};
 $("check-captcha").onclick=async()=>{try{const r=await command("CAPTCHA");if(r.detected){paused=true;$("captcha").style.display="block";$("resume").disabled=false;status("Human verification needed");log("CAPTCHA detected. Automation paused.");}else log("No CAPTCHA detected.");}catch(e){log(e.message);}};
 $("resume").onclick=async()=>{try{const r=await api("/api/browser/resume",{});paused=false;$("captcha").style.display="none";$("resume").disabled=true;status("Live session");log(r.message);}catch(e){log(e.message);alert(e.message);}};
 $("stop").onclick=async()=>{try{await api("/api/browser/stop",{});}catch(e){log(e.message);}running=false;paused=false;liveViewUrl="";$("live-view").src="about:blank";$("live-view").style.display="none";$("empty").style.display="flex";$("captcha").style.display="none";$("resume").disabled=true;status("Stopped");log("Browser session stopped.");};
