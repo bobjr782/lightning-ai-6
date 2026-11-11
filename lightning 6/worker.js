@@ -256,6 +256,7 @@ async function imageRoute(request, env) {
         seed
       });
     } catch (qualityError) {
+      console.warn("Lightning FLUX.2 Dev failed:", qualityError?.message || qualityError);
       // Lower-cost fallback if FLUX.2 Dev is unavailable.
       try {
         const form = new FormData();
@@ -281,6 +282,7 @@ async function imageRoute(request, env) {
           seed
         });
       } catch (backupError) {
+        console.warn("Lightning FLUX.2 Klein 9B failed:", backupError?.message || backupError);
         // Last-resort compatibility fallback.
         const form = new FormData();
         form.append("prompt", prompt);
@@ -308,12 +310,20 @@ async function imageRoute(request, env) {
     }
 
   } catch (error) {
-    const detail = String(error?.message || error || "");
-    const status = /quota|limit|neuron|billing|paid plan/i.test(detail) ? 429 : 502;
+    const detail = String(error?.message || error || "Unknown Workers AI error");
+    console.error("Lightning image generation failed on all FLUX models:", detail);
+    // A failed Cloudflare inference must not consume the user's Lightning trial credit.
+    try { await refundTrialUse(account,env,"image"); }
+    catch (refundError) { console.error("Could not refund failed image trial use:", refundError?.message || refundError); }
+    const quota = /4006|quota|daily.*(limit|allocation)|limit.*(reached|exceeded)|neuron|billing|payment|paid plan/i.test(detail);
+    const capacity = /3040|capacity|overloaded|temporarily unavailable/i.test(detail);
+    const status = quota ? 429 : 502;
     return json({
-      error: status === 429
-        ? "The free image-generation allowance may be used up. Try again after the daily reset."
-        : "The image model is temporarily unavailable. Please try again in a moment."
+      error: quota
+        ? "Cloudflare Workers AI has reached its free daily allowance. Your Lightning image credit has been returned. Try again after Cloudflare's daily reset."
+        : capacity
+          ? "Cloudflare's image models are currently out of capacity. Your Lightning image credit has been returned. Please try again shortly."
+          : "Cloudflare's image models all failed. Your Lightning image credit has been returned. Check the Worker logs for the exact error, then try again."
     }, status);
   }
 }
