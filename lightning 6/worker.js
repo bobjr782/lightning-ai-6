@@ -436,7 +436,7 @@ async function openverseImageReferences(prompt,count) {
   const data=await response.json();
   return (data?.results||[]).map(item=>{
     const url=String(item.url||item.thumbnail||"");
-    if(!/^https:\/\//i.test(url))return null;
+      if(!/^https:\/\//i.test(url))return;
     return {
       title:String(item.title||"Untitled image").slice(0,180),
       url,
