@@ -147,6 +147,29 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
 .about-profile-key{font-size:12px;color:var(--mute);margin-top:4px}
 @media(max-width:760px){.about-profile-link{padding:5px}.about-profile-link span{display:none}}
 
+ 
+/* Image Forge developer test workspace */
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.dev-test-panel{margin-top:26px;padding:22px;border:1px solid var(--line);border-radius:16px;background:var(--panel,rgba(127,127,127,.055))}
+.dev-test-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}
+.dev-test-heading h4{font-size:18px;margin:0 0 5px}
+.dev-test-heading p{margin:0;color:var(--mute);font-size:13px}
+.dev-test-count{white-space:nowrap;border:1px solid var(--line);border-radius:30px;padding:6px 10px;font-size:11px;color:var(--mute)}
+.dev-test-form{display:grid;grid-template-columns:minmax(180px,1fr) auto auto;gap:10px}
+.dev-test-form input,.dev-test-form select{min-width:0;width:100%;border:1px solid var(--line);border-radius:9px;padding:12px 13px;background:var(--bg);color:var(--text);font:inherit}
+.dev-test-form .btn{white-space:nowrap;cursor:pointer}
+.dev-test-status{font-size:13px;color:var(--mute);margin:15px 0}
+.dev-test-results{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:12px}
+.dev-test-card{min-width:0;overflow:hidden;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.dev-test-card a{display:block;color:inherit;text-decoration:none}
+.dev-test-card img{display:block;width:100%;height:125px;object-fit:cover;background:var(--panel)}
+.dev-test-card-title{padding:8px 9px 4px;font-size:11px;line-height:1.35;max-height:44px;overflow:hidden;word-break:break-word}
+.dev-test-card-credit{padding:0 9px 9px;color:var(--mute);font-size:10px;line-height:1.35;max-height:34px;overflow:hidden}
+.dev-test-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:16px;color:var(--mute);font-size:11px}
+.dev-test-footer .btn{flex:none}
+.dev-section{padding-bottom:90px}
+@media(max-width:760px){.dev-test-form{grid-template-columns:1fr}.dev-test-footer{align-items:flex-start;flex-direction:column}.dev-test-heading{flex-direction:column}}
+
 </style>
 </head>
 <body>
@@ -226,33 +249,7 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
   </div>
 </section>
 
-<section id="dev" class="dev-section">
-  <div class="wrap">
-    <div class="eyebrow reveal">Development workspace</div>
-    <h2 class="serif reveal">Dev</h2>
-    <p class="lead reveal">A home for experimental Lightning tools and projects that are still being built.</p>
-    <div class="dev-project reveal" id="dev-image-forge">
-      <div class="dev-project-head">
-        <div>
-          <div class="dev-kicker">Experimental project</div>
-          <h3 class="serif">Image Forge</h3>
-        </div>
-        <span class="dev-status">In development</span>
-      </div>
-      <p class="dev-description">A lightweight image compositor that analyses reference images, finds useful colour regions and shapes, then combines selected pieces into one new composition.</p>
-      <div class="dev-pipeline" aria-label="Image Forge planned workflow">
-        <div><b>01</b><span>Find 8–20 images</span></div>
-        <div><b>02</b><span>Analyse colour and shapes</span></div>
-        <div><b>03</b><span>Extract useful regions</span></div>
-        <div><b>04</b><span>Build one image</span></div>
-      </div>
-      <div class="dev-slot" id="image-forge-mount">
-        <span class="dev-slot-mark" aria-hidden="true">+</span>
-        <div><strong>Image Forge will live here</strong><span>The generator interface will be added to this workspace when it is ready.</span></div>
-      </div>
-    </div>
-  </div>
-</section>
+
 
 <section id="providers">
   <div class="wrap">
@@ -467,6 +464,87 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
     document.querySelectorAll(".reveal").forEach(function (el) { io.observe(el); });
   } else document.querySelectorAll(".reveal").forEach(function (el) { el.classList.add("in"); });
 })();
+
+// Image Forge reference finder test panel
+(function(){
+  const form=document.getElementById("image-forge-test-form");
+  if(!form)return;
+  const prompt=document.getElementById("image-forge-prompt");
+  const count=document.getElementById("image-forge-count");
+  const status=document.getElementById("image-forge-test-status");
+  const results=document.getElementById("image-forge-test-results");
+  const search=document.getElementById("image-forge-search");
+  const copy=document.getElementById("image-forge-copy-urls");
+  let latest=[];
+  form.addEventListener("submit",async function(event){
+    event.preventDefault();
+    const query=prompt.value.trim();
+    if(query.length<2){status.textContent="Please enter a more detailed image description.";return;}
+    search.disabled=true;search.textContent="Searching…";copy.disabled=true;
+    status.textContent="Searching Wikimedia Commons for reference images…";results.replaceChildren();latest=[];
+    try{
+      const response=await fetch("/api/image-references",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:query,count:Number(count.value)})});
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.error||("Search failed (HTTP "+response.status+")."));
+      latest=Array.isArray(data.results)?data.results:[];
+      status.textContent=latest.length?"Found "+latest.length+" reference image"+(latest.length===1?"":"s")+" for “"+data.query+"”.":"No images found. Try a broader description.";
+      latest.forEach(function(item,index){
+        const card=document.createElement("article");card.className="dev-test-card";
+        const link=document.createElement("a");link.href=item.source||item.url;link.target="_blank";link.rel="noopener noreferrer";
+        const img=document.createElement("img");img.src=item.url;img.alt=item.title||("Reference "+(index+1));img.loading="lazy";img.referrerPolicy="no-referrer";
+        const title=document.createElement("div");title.className="dev-test-card-title";title.textContent=item.title||"Untitled image";
+        link.append(img,title);card.append(link);
+        const credit=document.createElement("div");credit.className="dev-test-card-credit";credit.textContent=[item.artist,item.license].filter(Boolean).join(" · ")||"Open source page for details";card.append(credit);
+        results.append(card);
+      });
+      copy.disabled=!latest.length;
+      try{localStorage.setItem("image_forge_references",JSON.stringify({query:data.query,savedAt:Date.now(),results:latest}));}catch(_){}
+    }catch(error){status.textContent="Image Forge test failed: "+error.message;}
+    finally{search.disabled=false;search.textContent="Find reference images";}
+  });
+  copy.addEventListener("click",async function(){
+    if(!latest.length)return;
+    try{await navigator.clipboard.writeText(latest.map(item=>item.url).join("\n"));status.textContent="Copied "+latest.length+" image URLs.";copy.textContent="Copied";setTimeout(function(){copy.textContent="Copy image URLs";},1800);}
+    catch(_){status.textContent="Clipboard access is unavailable in this browser.";}
+  });
+})();
+
 </script>
+<section id="dev" class="dev-section">
+  <div class="wrap">
+    <div class="eyebrow reveal">Development workspace</div>
+    <h2 class="serif reveal">Dev</h2>
+    <p class="lead reveal">A home for experimental Lightning tools and projects that are still being built.</p>
+    <div class="dev-project reveal" id="dev-image-forge">
+      <div class="dev-project-head">
+        <div>
+          <div class="dev-kicker">Experimental project</div>
+          <h3 class="serif">Image Forge</h3>
+        </div>
+        <span class="dev-status">Test workspace</span>
+      </div>
+      <p class="dev-description">A lightweight image compositor that analyses reference images, finds useful colour regions and shapes, then combines selected pieces into one new composition.</p>
+      <div class="dev-pipeline" aria-label="Image Forge planned workflow">
+        <div><b>01</b><span>Find 8–20 images</span></div>
+        <div><b>02</b><span>Analyse colour and shapes</span></div>
+        <div><b>03</b><span>Extract useful regions</span></div>
+        <div><b>04</b><span>Build one image</span></div>
+      </div>
+      <div class="dev-test-panel" id="image-forge-mount">
+        <div class="dev-test-heading"><div><h4>Reference image test</h4><p>Describe the subject you want Image Forge to study.</p></div><span class="dev-test-count">8–20 images</span></div>
+        <form id="image-forge-test-form" class="dev-test-form">
+          <label class="sr-only" for="image-forge-prompt">Image search prompt</label>
+          <input id="image-forge-prompt" type="text" maxlength="240" placeholder="e.g. red fox in a snowy forest" autocomplete="off" required>
+          <label class="sr-only" for="image-forge-count">Number of reference images</label>
+          <select id="image-forge-count"><option value="8">8 images</option><option value="12" selected>12 images</option><option value="16">16 images</option><option value="20">20 images</option></select>
+          <button class="btn" id="image-forge-search" type="submit">Find reference images</button>
+        </form>
+        <div id="image-forge-test-status" class="dev-test-status" role="status" aria-live="polite">Sign in to Lightning, then run a search to test the reference finder.</div>
+        <div id="image-forge-test-results" class="dev-test-results"></div>
+        <div class="dev-test-footer"><span>Images are sourced from Wikimedia Commons. Check each source and licence before reuse.</span><button type="button" class="btn ghost" id="image-forge-copy-urls" disabled>Copy image URLs</button></div>
+      </div>
+    </div>
+  </div>
+</section>
 </body>
 </html>
