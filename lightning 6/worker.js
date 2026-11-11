@@ -174,14 +174,16 @@ async function refundTrialUse(user,env,kind) {
 }
 
 const IMAGE_RATE = new Map();
-function imageRateLimit(request) {
-  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+function imageRateLimit(accountId) {
+  // Rate-limit per Lightning account, not public IP. Friends on the same
+  // school/home network should not consume one another's image allowance.
+  const key = String(accountId || "unknown");
   const now = Date.now();
-  const row = IMAGE_RATE.get(ip);
+  const row = IMAGE_RATE.get(key);
   if (!row || now - row.start > 60000) {
-    IMAGE_RATE.set(ip, { start: now, count: 1 });
-    if (IMAGE_RATE.size > 2000) {
-      for (const [key, value] of IMAGE_RATE) if (now - value.start > 60000) IMAGE_RATE.delete(key);
+    IMAGE_RATE.set(key, { start: now, count: 1 });
+    if (IMAGE_RATE.size > 5000) {
+      for (const [id, value] of IMAGE_RATE) if (now - value.start > 60000) IMAGE_RATE.delete(id);
     }
     return { ok: true };
   }
@@ -197,7 +199,7 @@ async function imageRoute(request, env) {
   if (!env.AI || typeof env.AI.run !== "function") {
     return json({ error: "Image generation is not enabled. Add the Workers AI binding named AI in Cloudflare." }, 503);
   }
-  const limit = imageRateLimit(request);
+  const limit = imageRateLimit(account.id);
   if (!limit.ok) return json({ error: "Too many images requested. Please wait a minute and try again.", retryAfter: limit.retryAfter }, 429, { "retry-after": String(limit.retryAfter) });
   let input;
   try { input = await body(request); } catch { return json({ error: "Invalid image request." }, 400); }
@@ -246,6 +248,7 @@ async function imageRoute(request, env) {
       }
       return json({
         image: "data:image/png;base64," + result.image,
+        entitlement: entitlement(await ensureUsage(account,env)),
         promptUsed: prompt,
         model: "FLUX.2 Dev · 25 steps",
         width,
@@ -270,6 +273,7 @@ async function imageRoute(request, env) {
         }
         return json({
           image: "data:image/png;base64," + backup.image,
+          entitlement: entitlement(await ensureUsage(account,env)),
           promptUsed: prompt,
           model: "FLUX.2 Klein 9B (backup)",
           width,
@@ -293,6 +297,7 @@ async function imageRoute(request, env) {
         }
         return json({
           image: "data:image/png;base64," + last.image,
+          entitlement: entitlement(await ensureUsage(account,env)),
           promptUsed: prompt,
           model: "FLUX.2 Klein 4B (last-resort backup)",
           width,
