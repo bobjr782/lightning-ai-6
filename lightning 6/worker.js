@@ -687,6 +687,17 @@ async function browserCommandRoute(request, env) {
       await withBrowserSocket(env,row.session_id,row.target_id,socket => browserCdp(socket,"Page.reload",{ignoreCache:false}));
       return json({ok:true});
     }
+    if (command === "back" || command === "forward") {
+      const result = await withBrowserSocket(env,row.session_id,row.target_id,async socket => {
+        const history = await browserCdp(socket,"Page.getNavigationHistory");
+        const offset = command === "back" ? -1 : 1;
+        const entry = (history.entries || [])[Number(history.currentIndex) + offset];
+        if (!entry) return { moved:false };
+        await browserCdp(socket,"Page.navigateToHistoryEntry",{entryId:entry.id});
+        return { moved:true, url:entry.url };
+      });
+      return json({ok:true,...result});
+    }
     if (command === "stop-loading") {
       await withBrowserSocket(env,row.session_id,row.target_id,socket => browserCdp(socket,"Page.stopLoading"));
       return json({ok:true});
