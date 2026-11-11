@@ -111,7 +111,7 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
 .dev-project h3{font-size:clamp(1.8rem,4vw,2.5rem);margin:5px 0 0}
 .dev-status{border:1px solid var(--line);border-radius:999px;padding:6px 11px;color:var(--mute);font-size:.78rem;font-weight:700;white-space:nowrap}
 .dev-description{color:var(--mute);max-width:66ch;margin:18px 0 25px}
-.dev-pipeline{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.dev-pipeline{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
 .dev-pipeline>div{display:flex;flex-direction:column;gap:8px;padding:15px;border:1px solid var(--line);border-radius:11px;background:var(--bg);min-height:92px}
 .dev-pipeline b{font:600 .78rem 'DM Sans',sans-serif;color:var(--accent)}
 .dev-pipeline span{font-size:.88rem;line-height:1.35}
@@ -338,12 +338,13 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
         </div>
         <span class="dev-status">Test workspace</span>
       </div>
-      <p class="dev-description">A lightweight image compositor that analyses reference images, finds useful colour regions and shapes, then combines selected pieces into one new composition.</p>
+      <p class="dev-description">A lightweight image compositor that finds 8–20 reference images, checks which ones accurately match the prompt, analyses their colours and shapes, extracts useful regions, and combines them into a realistic composition.</p>
       <div class="dev-pipeline" aria-label="Image Forge planned workflow">
-        <div><b>01</b><span>Find 8–20 images</span></div>
-        <div><b>02</b><span>Analyse colour and shapes</span></div>
-        <div><b>03</b><span>Extract useful regions</span></div>
-        <div><b>04</b><span>Build one image</span></div>
+        <div><b>01</b><span>Find 8–20 reference images</span></div>
+        <div><b>02</b><span>Analyse colour, shapes and details</span></div>
+        <div><b>03</b><span>Check accuracy: identify which images genuinely match the prompt and reject inaccurate references</span></div>
+        <div><b>04</b><span>Extract useful regions</span></div>
+        <div><b>05</b><span>Compose the final image</span></div>
       </div>
       <div class="dev-test-panel" id="image-forge-mount">
         <div class="dev-test-heading"><div><h4>Reference image test</h4><p>Describe the subject you want Image Forge to study.</p></div><span class="dev-test-count">8–20 images</span></div>
