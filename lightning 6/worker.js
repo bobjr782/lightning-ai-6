@@ -441,42 +441,50 @@ async function imageReferencesRoute(request,env) {
   const count=Number.isFinite(requestedCount)?Math.max(8,Math.min(20,Math.round(requestedCount))):20;
   if(prompt.length<2) return json({error:"Describe what images you want to find."},400);
   try{
-    // Run several complementary Commons searches. A single exact-phrase search
-    // often returns only one file even when many useful images exist.
-    const words=prompt.toLowerCase().replace(/[^a-z0-9\s-]/g," ").split(/\s+/).filter(w=>w.length>2);
-    const uniqueWords=[...new Set(words)];
-    const searches=[prompt];
-    if(uniqueWords.length>=2) searches.push(uniqueWords.slice(0,5).join(" "));
-    if(uniqueWords.length>=3) searches.push(uniqueWords.slice(0,3).join(" "));
-    if(uniqueWords.length>=2) searches.push(uniqueWords.slice(-3).join(" "));
-    const searchTerms=[...new Set(searches)].slice(0,4);
-    const headers={"Accept":"application/json","User-Agent":"LightningImageForge/1.0 (image reference discovery)"};
-    const searchResults=await Promise.all(searchTerms.map(async term=>{
-      const params=new URLSearchParams({action:"query",list:"search",srsearch:term,srnamespace:"6",srlimit:"50",srwhat:"text",format:"json",origin:"*"});
-      const response=await fetch("https://commons.wikimedia.org/w/api.php?"+params.toString(),{headers});
-      if(!response.ok) throw new Error("Wikimedia Commons search returned HTTP "+response.status);
-      const data=await response.json();
-      return (data?.query?.search||[]).map(item=>item.title).filter(Boolean);
+    // Search Google Images directly. No chatbot or intermediate AI prompt is involved.
+    const searchUrl="https://www.google.com/search?tbm=isch&hl=en&safe=active&q="+encodeURIComponent(prompt);
+    const response=await fetch(searchUrl,{headers:{
+      "Accept":"text/html,application/xhtml+xml",
+      "Accept-Language":"en-AU,en;q=0.9",
+      "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    },redirect:"follow"});
+    if(!response.ok) throw new Error("Google Images returned HTTP "+response.status+". Google may be blocking automated searches.");
+    const html=await response.text();
+    if(/unusual traffic|sorry\/|consent\.google\.com|before you continue to google/i.test(html.slice(0,180000)))
+      throw new Error("Google showed a verification or consent page instead of image results.");
+    const found=[];
+    const addUrl=value=>{
+      if(!value)return;
+      let url=String(value).replace(/\\u003d/g,"=").replace(/\\u0026/g,"&").replace(/\\u003c/g,"<").replace(/\\u003e/g,">").replace(/\\\\\//g,"/");
+      try{url=decodeURIComponent(url);}catch(_){}
+      url=url.replace(/&amp;/g,"&").replace(/\\u0026/g,"&");
+      if(!/^https:\/\//i.test(url))return;
+      if(/(^|\.)google\.(com|com\.au)$|gstatic\.com|googleusercontent\.com/i.test(new URL(url).hostname))return;
+      if(!/\.(jpe?g|png|webp|gif|avif)(?:$|[?#])/i.test(url))return;
+      if(!found.includes(url))found.push(url);
+    };
+    // Google embeds original image URLs in its image-result JSON ("ou") and
+    // sometimes as an encoded imgurl query parameter.
+    let match;
+    const originalPattern=/"ou"\s*:\s*"((?:\\\\.|[^"\\\\])+)"/g;
+    while((match=originalPattern.exec(html))&&found.length<count*4){
+      try{addUrl(JSON.parse('"'+match[1]+'"'));}catch(_){addUrl(match[1]);}
+    }
+    const encodedPattern=/imgurl=(https?%3A%2F%2F[^&"\\s]+)/gi;
+    while((match=encodedPattern.exec(html))&&found.length<count*4)addUrl(match[1]);
+    const plainPattern=/imgurl=(https?:\/\/[^&"\\s]+)/gi;
+    while((match=plainPattern.exec(html))&&found.length<count*4)addUrl(match[1]);
+    const results=found.slice(0,count).map((url,index)=>({
+      title:"Google Images result "+(index+1),
+      url,
+      source:searchUrl,
+      license:"Check original source for usage rights",
+      artist:""
     }));
-    const titles=[...new Set(searchResults.flat())].slice(0,100);
-    if(!titles.length) return json({ok:true,query:prompt,source:"Wikimedia Commons",count:0,results:[]});
-    const imageParams=new URLSearchParams({action:"query",titles:titles.join("|"),prop:"imageinfo",iiprop:"url|extmetadata",iiurlwidth:"720",format:"json",origin:"*"});
-    const imageResponse=await fetch("https://commons.wikimedia.org/w/api.php?"+imageParams.toString(),{headers});
-    if(!imageResponse.ok) throw new Error("Wikimedia Commons image details returned HTTP "+imageResponse.status);
-    const imageData=await imageResponse.json();
-    const pages=Object.values(imageData?.query?.pages||{});
-    const results=pages.map(page=>{
-      const info=page.imageinfo?.[0]||{};
-      const url=info.thumburl||info.url||"";
-      if(!/^https:\/\/upload\.wikimedia\.org\//i.test(url)) return null;
-      if(!/\.(jpe?g|png|webp|gif|svg)(?:$|\?)/i.test(url)) return null;
-      const meta=info.extmetadata||{};
-      return {title:String(page.title||"").replace(/^File:/,""),url,source:info.descriptionurl||"",width:info.width||null,height:info.height||null,license:String(meta.LicenseShortName?.value||"").replace(/<[^>]*>/g,"").slice(0,100),artist:String(meta.Artist?.value||"").replace(/<[^>]*>/g,"").slice(0,180)};
-    }).filter(Boolean).slice(0,count);
-    return json({ok:true,query:prompt,source:"Wikimedia Commons",count:results.length,requested:count,searches:searchTerms.length,results});
+    return json({ok:true,query:prompt,source:"Google Images",count:results.length,requested:count,results,searchUrl});
   }catch(error){
-    console.error("Lightning image reference search failed:",error?.message||error);
-    return json({error:"Image search is temporarily unavailable. Please try again.",detail:env.ENVIRONMENT==="development"?String(error?.message||error):undefined},502);
+    console.error("Lightning Google Images search failed:",error?.message||error);
+    return json({error:"Google Images could not provide image links. "+String(error?.message||"Try again later.")},502);
   }
 }
 
