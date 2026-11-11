@@ -436,7 +436,7 @@ async function openverseImageReferences(prompt,count) {
   const data=await response.json();
   return (data?.results||[]).map(item=>{
     const url=String(item.url||item.thumbnail||"");
-      if(!/^https:\/\//i.test(url))return;
+    if(!/^https:\/\//i.test(url))return null;
     return {
       title:String(item.title||"Untitled image").slice(0,180),
       url,
@@ -479,7 +479,7 @@ async function imageReferencesRoute(request,env) {
       let url=String(value).replace(/\\u003d/g,"=").replace(/\\u0026/g,"&").replace(/\\u003c/g,"<").replace(/\\u003e/g,">").replace(/\\\\\\//g,"/");
       try{url=decodeURIComponent(url);}catch(_){}
       url=url.replace(/&amp;/g,"&").replace(/\\u0026/g,"&");
-      if(!/^https:\\/\\//i.test(url))return;
+      if(!/^https:\/\//i.test(url))return;
       if(/(^|\\.)google\\.(com|com\\.au)$|gstatic\\.com|googleusercontent\\.com/i.test(new URL(url).hostname))return;
       if(!/\\.(jpe?g|png|webp|gif|avif)(?:$|[?#])/i.test(url))return;
       if(!found.includes(url))found.push(url);
