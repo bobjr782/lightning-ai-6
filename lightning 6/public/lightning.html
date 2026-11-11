@@ -1176,9 +1176,9 @@ async function findImageReferences(prompt, box) {
                     });
                     const w=img.naturalWidth,h=img.naturalHeight;
                     if(!w||!h||w*h>24000000)throw new Error("Image dimensions unsuitable");
-                    const sw=128,sh=Math.max(1,Math.round(h*sw/w));
+                    const scale=128/Math.max(w,h),sw=Math.max(1,Math.round(w*scale)),sh=Math.max(1,Math.round(h*scale));
                     const sample=document.createElement("canvas");
-                    sample.width=sw;sample.height=Math.min(128,sh);
+                    sample.width=sw;sample.height=sh;
                     const ctx=sample.getContext("2d",{willReadFrequently:true});
                     ctx.drawImage(img,0,0,sample.width,sample.height);
                     const pixels=ctx.getImageData(0,0,sample.width,sample.height);
