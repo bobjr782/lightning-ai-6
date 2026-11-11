@@ -466,7 +466,7 @@ async function imageReferencesRoute(request,env) {
     // Google embeds original image URLs in its image-result JSON ("ou") and
     // sometimes as an encoded imgurl query parameter.
     let match;
-    const originalPattern=/"ou"\s*:\s*"((?:\\\\.|[^"\\\\])+)"/g;
+    const originalPattern=/"ou"\\s*:\\s*"([^"]+)"/g;
     while((match=originalPattern.exec(html))&&found.length<count*4){
       try{addUrl(JSON.parse('"'+match[1]+'"'));}catch(_){addUrl(match[1]);}
     }
