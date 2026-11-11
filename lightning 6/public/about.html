@@ -539,12 +539,13 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
     const query=prompt.value.trim();
     if(query.length<2){status.textContent="Please enter a more detailed image description.";return;}
     search.disabled=true;search.textContent="Searching…";copy.disabled=true;
-    status.textContent="Searching Google Images directly…";results.replaceChildren();latest=[];
+    status.textContent=query.toLowerCase().endsWith("#no-background")?"Searching for transparent images…":"Searching Google Images directly…";results.replaceChildren();latest=[];
     try{
       const response=await fetch("/api/image-references",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:query,count:Number(count.value)})});
       const data=await response.json();
       if(!response.ok)throw new Error(data.error||("Search failed (HTTP "+response.status+")."));
       latest=Array.isArray(data.results)?data.results:[];
+      const transparentOnly=!!data.noBackground;
       status.textContent=latest.length?"Found "+latest.length+" reference image"+(latest.length===1?"":"s")+" for “"+data.query+"”.":"No images found. Try a broader description.";
       // Image Forge cut-out v3:
       // Build a small palette from the whole image border (not one average colour),
@@ -564,6 +565,17 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
           const sample=document.createElement("canvas");sample.width=sw;sample.height=sh;
           const sc=sample.getContext("2d",{willReadFrequently:true});sc.drawImage(img,0,0,sw,sh);
           const pixels=sc.getImageData(0,0,sw,sh).data,total=sw*sh;
+          if(transparentOnly){
+            let transparentPixels=0;
+            for(let p=3;p<pixels.length;p+=4)if(pixels[p]<245)transparentPixels++;
+            if(transparentPixels<Math.max(12,total*.002))throw new Error("Rejected: image has no real transparent pixels (likely a fake white/checkerboard background)");
+            const card=document.createElement("article");card.className="dev-test-card";
+            const preview=document.createElement("img");preview.src=img.src;preview.alt="Verified transparent source image";
+            preview.style.cssText="width:100%;height:190px;object-fit:contain;background-color:#fff;background-image:repeating-conic-gradient(#aaa 0% 25%,#fff 0% 50%);background-size:16px 16px";
+            const title=document.createElement("div");title.className="dev-test-card-title";title.textContent="Verified transparency · "+Math.round(transparentPixels/total*100)+"% alpha pixels";
+            card.append(preview,title);results.append(card);cropped++;
+            continue;
+          }
           const edge=[];
           for(let x=0;x<sw;x++){edge.push(x,(sh-1)*sw+x);}
           for(let y=1;y<sh-1;y++){edge.push(y*sw,y*sw+sw-1);}
