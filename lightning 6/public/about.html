@@ -546,16 +546,54 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
       if(!response.ok)throw new Error(data.error||("Search failed (HTTP "+response.status+")."));
       latest=Array.isArray(data.results)?data.results:[];
       status.textContent=latest.length?"Found "+latest.length+" reference image"+(latest.length===1?"":"s")+" for “"+data.query+"”.":"No images found. Try a broader description.";
-      latest.forEach(function(item,index){
-        const card=document.createElement("article");card.className="dev-test-card";
-        const link=document.createElement("a");link.href=item.source||item.url;link.target="_blank";link.rel="noopener noreferrer";
-        const img=document.createElement("img");img.src=item.url;img.alt=item.title||("Reference "+(index+1));img.loading="lazy";img.referrerPolicy="no-referrer";
-        const title=document.createElement("div");title.className="dev-test-card-title";title.textContent=item.title||"Untitled image";
-        link.append(img,title);card.append(link);
-        const credit=document.createElement("div");credit.className="dev-test-card-credit";credit.textContent=[item.artist,item.license].filter(Boolean).join(" · ")||"Open source page for details";card.append(credit);
-        results.append(card);
-      });
-      copy.disabled=!latest.length;
+      // Show extracted object crops directly in Devs; do not show the source-image grid.
+      let cropped=0,failed=0;
+      for(let index=0;index<latest.length;index++){
+        const item=latest[index];
+        try{
+          const img=await new Promise(function(resolve,reject){
+            const image=new Image();image.crossOrigin="anonymous";image.referrerPolicy="no-referrer";
+            image.onload=function(){resolve(image);};image.onerror=function(){reject(new Error("Image could not be read"));};image.src=item.url;
+          });
+          const w=img.naturalWidth,h=img.naturalHeight;
+          if(!w||!h||w*h>24000000)throw new Error("Image too large");
+          const scale=128/Math.max(w,h),sw=Math.max(1,Math.round(w*scale)),sh=Math.max(1,Math.round(h*scale));
+          const sample=document.createElement("canvas");sample.width=sw;sample.height=sh;
+          const ctx=sample.getContext("2d",{willReadFrequently:true});ctx.drawImage(img,0,0,sw,sh);
+          const data=ctx.getImageData(0,0,sw,sh).data,border=[];
+          for(let x=0;x<sw;x++){border.push(x*4,((sh-1)*sw+x)*4);}
+          for(let y=1;y<sh-1;y++){border.push((y*sw)*4,(y*sw+sw-1)*4);}
+          let r=0,g=0,bl=0;border.forEach(function(p){r+=data[p];g+=data[p+1];bl+=data[p+2];});
+          r/=border.length;g/=border.length;bl/=border.length;
+          const mask=new Uint8Array(sw*sh),seen=new Uint8Array(sw*sh);
+          for(let p=0;p<mask.length;p++){const q=p*4,dr=data[q]-r,dg=data[q+1]-g,db=data[q+2]-bl;if(Math.sqrt(dr*dr+dg*dg+db*db)>48)mask[p]=1;}
+          let best=null;
+          for(let p=0;p<mask.length;p++){
+            if(!mask[p]||seen[p])continue;
+            const queue=[p];seen[p]=1;let head=0,minX=p%sw,maxX=minX,minY=Math.floor(p/sw),maxY=minY,area=0;
+            while(head<queue.length){
+              const n=queue[head++],x=n%sw,y=Math.floor(n/sw);area++;
+              minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);
+              const ns=[x?n-1:-1,x<sw-1?n+1:-1,y?n-sw:-1,y<sh-1?n+sw:-1];
+              ns.forEach(function(z){if(z>=0&&mask[z]&&!seen[z]){seen[z]=1;queue.push(z);}});
+            }
+            if(area>Math.max(18,sw*sh*.012)&&(!best||area>best.area))best={minX:minX,maxX:maxX,minY:minY,maxY:maxY,area:area};
+          }
+          if(!best)throw new Error("No clear foreground object found");
+          const left=Math.max(0,Math.floor((best.minX-5)/sw*w)),top=Math.max(0,Math.floor((best.minY-5)/sh*h));
+          const right=Math.min(w,Math.ceil((best.maxX+6)/sw*w)),bottom=Math.min(h,Math.ceil((best.maxY+6)/sh*h));
+          const out=document.createElement("canvas");out.width=Math.max(1,right-left);out.height=Math.max(1,bottom-top);
+          out.getContext("2d").drawImage(img,left,top,out.width,out.height,0,0,out.width,out.height);
+          const card=document.createElement("article");card.className="dev-test-card";
+          const preview=document.createElement("img");preview.src=out.toDataURL("image/png");preview.alt="Cropped foreground object "+(index+1);
+          preview.style.cssText="width:100%;height:190px;object-fit:contain;background:repeating-conic-gradient(#8882 0% 25%,transparent 0% 50%) 50%/16px 16px";
+          const title=document.createElement("div");title.className="dev-test-card-title";title.textContent="Object crop "+(cropped+1);
+          card.append(preview,title);results.append(card);cropped++;
+        }catch(error){failed++;}
+        status.textContent="Extracting objects: "+(index+1)+" / "+latest.length;
+      }
+      status.textContent="Displayed "+cropped+" cropped object"+(cropped===1?"":"s")+". "+failed+" image"+(failed===1?" was":"s were")+" skipped because the image could not be processed or no clear object was detected.";
+            copy.disabled=!latest.length;
       try{localStorage.setItem("image_forge_references",JSON.stringify({query:data.query,savedAt:Date.now(),results:latest}));}catch(_){}
     }catch(error){status.textContent="Image Forge test failed: "+error.message;}
     finally{search.disabled=false;search.textContent="Find reference images";}
