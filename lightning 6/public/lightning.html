@@ -3501,7 +3501,7 @@ finishOpenRouter().catch(e => startupError("openrouter", e));
 (function(){
  async function heartbeat(){
   try{
-   if(!window.lightningAccount)return;
+   if(typeof lightningAccount==="undefined" || !lightningAccount)return;
    await fetch("/api/presence",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({page:document.title||"Lightning"})});
   }catch(_){}
  }
