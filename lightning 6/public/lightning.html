@@ -759,6 +759,37 @@ body.img-mode .img-opts { display: flex; }
 .material-symbols-outlined.px { width:20px; height:20px; font-size:20px; line-height:1; font-weight:400; font-style:normal; letter-spacing:normal; text-transform:none; white-space:nowrap; direction:ltr; display:inline-flex; align-items:center; justify-content:center; vertical-align:-4px; font-feature-settings:'liga'; -webkit-font-feature-settings:'liga'; -webkit-font-smoothing:antialiased; }
 .friends-pixel-icon { flex:0 0 20px; }
 
+/* Artifacts gallery: make the actual card grid the scrolling flex child. */
+.art-page {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+.art-page.open {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+.art-page > .art-page-head {
+    flex: 0 0 auto !important;
+    min-height: 0;
+}
+.art-page > .art-grid {
+    display: grid !important;
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    height: 0 !important;
+    max-height: none !important;
+    overflow-y: scroll !important;
+    overflow-x: hidden !important;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable;
+    align-content: start;
+}
+
 /* Browser Run: the chat contains only the live website iframe. */
 .lightning-browser-chat-card{width:100%;height:min(76vh,900px);min-height:480px;margin:14px 0;padding:0;overflow:hidden;background:#fff}
 .lightning-browser-chat-card iframe{display:block;width:100%;height:100%;min-height:480px;border:0;background:#fff}
