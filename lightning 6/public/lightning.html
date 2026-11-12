@@ -2841,7 +2841,27 @@ function openProfileEditor(){
     addAppearanceSwitch("Light theme","Switch between Lightning's dark and light appearance",document.body.classList.contains("light-mode"),enabled=>{
         document.body.classList.toggle("light-mode",enabled);
         localStorage.setItem("lt_theme",enabled?"light":"dark");
+        applyLightningAccentHue(localStorage.getItem("lt_accent_hue") || 14, false);
     });
+
+    const accentRow=el("div","appearance-setting accent-setting");
+    const accentCopy=el("div","appearance-setting-copy");
+    accentCopy.append(el("strong","","Lightning colour"),el("small","","Adjust the colour used for buttons, highlights and accents"));
+    const accentControls=el("div","accent-controls");
+    const accentSlider=el("input","accent-hue-slider");
+    accentSlider.type="range";accentSlider.min="0";accentSlider.max="359";accentSlider.step="1";
+    accentSlider.value=localStorage.getItem("lt_accent_hue")||"14";
+    accentSlider.setAttribute("aria-label","Lightning accent colour");
+    const accentSwatch=el("span","accent-swatch");
+    accentSlider.addEventListener("input",()=>{
+        applyLightningAccentHue(accentSlider.value,true);
+        accentSwatch.style.background=getComputedStyle(document.body).getPropertyValue("--accent").trim();
+    });
+    accentControls.append(accentSlider,accentSwatch);
+    accentRow.append(accentCopy,accentControls);
+    body.append(accentRow);
+    accentSwatch.style.background=getComputedStyle(document.body).getPropertyValue("--accent").trim();
+
     addAppearanceSwitch("Google Fonts icons","Use Google Material Symbols instead of Lightning's default pixel icons",localStorage.getItem("lt_icon_mode")==="google",enabled=>{
         setIconMode(enabled?"google":"default");
     });
@@ -3336,6 +3356,35 @@ safe("mode", syncMode);
 finishOpenRouter().catch(e => startupError("openrouter", e));
 })();
 
+</script>
+
+<style>
+.accent-setting { align-items: center; }
+.accent-controls { display:flex; align-items:center; gap:12px; flex:0 1 220px; min-width:140px; }
+.accent-hue-slider { width:100%; min-width:90px; height:8px; margin:0; cursor:pointer; accent-color:var(--accent); }
+.accent-swatch { width:26px; height:26px; flex:0 0 26px; border:2px solid var(--border-color); border-radius:8px; box-sizing:border-box; }
+@media(max-width:600px){ .accent-setting { align-items:flex-start; flex-direction:column; gap:12px; } .accent-controls { width:100%; flex-basis:auto; } }
+</style>
+<script>
+(function(){
+  function applyLightningAccentHue(value,save){
+    var hue=Math.max(0,Math.min(359,Number(value)||0));
+    var light=document.body.classList.contains("light-mode");
+    var accent="hsl("+hue+" 62% "+(light?"49%":"60%")+")";
+    var hover="hsl("+hue+" 62% "+(light?"41%":"51%")+")";
+    [document.documentElement,document.body].forEach(function(node){
+      node.style.setProperty("--accent",accent);
+      node.style.setProperty("--accent-blue",accent);
+      node.style.setProperty("--accent-blue-hover",hover);
+    });
+    if(save)try{localStorage.setItem("lt_accent_hue",String(hue));}catch(_){}
+    return accent;
+  }
+  window.applyLightningAccentHue=applyLightningAccentHue;
+  var saved=14;
+  try{var raw=localStorage.getItem("lt_accent_hue");if(raw!==null&&Number.isFinite(Number(raw)))saved=Number(raw);}catch(_){}
+  applyLightningAccentHue(saved,false);
+})();
 </script>
 
 <div id="lightning-cookie-prank" hidden aria-live="polite"></div>
