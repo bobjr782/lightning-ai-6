@@ -3497,3 +3497,16 @@ finishOpenRouter().catch(e => startupError("openrouter", e));
  check();window.addEventListener("lightning-account-ready",check);
 })();
 </script>
+<script>
+(function(){
+ async function heartbeat(){
+  try{
+   if(!window.lightningAccount)return;
+   await fetch("/api/presence",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({page:document.title||"Lightning"})});
+  }catch(_){}
+ }
+ heartbeat();
+ setInterval(heartbeat,45000);
+ window.addEventListener("focus",heartbeat);
+})();
+</script>
