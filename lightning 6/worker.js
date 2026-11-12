@@ -950,11 +950,18 @@ async function route(request, env) {
     await env.DB.prepare("INSERT INTO moderation_consents(user_id,accepted_at) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET accepted_at=excluded.accepted_at").bind(user.id,Math.floor(Date.now()/1000)).run();
     return json({ok:true,accepted:true});
   }
-  if(path==="/api/moderation/chats" && (request.method==="POST" || request.method==="GET")) {
+  if(path==="/api/moderation/chats" && (request.method==="POST" || request.method==="GET" || request.method==="DELETE")) {
     if(!user)return json({error:"Sign in required."},401);
     await ensureModerationTables(env);
     const consent=await env.DB.prepare("SELECT user_id FROM moderation_consents WHERE user_id=?").bind(user.id).first();
     if(!consent)return json({error:"Accept the chat moderation notice before syncing chats."},403);
+    if(request.method==="DELETE") {
+      const id=String(url.searchParams.get("id")||"");
+      const result=id
+        ? await env.DB.prepare("DELETE FROM chat_conversations WHERE user_id=? AND id=?").bind(user.id,id).run()
+        : await env.DB.prepare("DELETE FROM chat_conversations WHERE user_id=?").bind(user.id).run();
+      return json({ok:true,deleted:Number(result.meta?.changes||0)});
+    }
     if(request.method==="GET") {
       const rows=await env.DB.prepare("SELECT id,title,messages_json,created_at,updated_at FROM chat_conversations WHERE user_id=? ORDER BY updated_at DESC").bind(user.id).all();
       return json({chats:(rows.results||[]).map(r=>({id:r.id,title:r.title,messages:JSON.parse(r.messages_json||"[]"),createdAt:r.created_at,updatedAt:r.updated_at}))});
