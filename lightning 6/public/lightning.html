@@ -2667,6 +2667,7 @@ window.store = function () {
     if (!c) { curId = chatId(); c = { id: curId, title: "New chat", t: Date.now(), project: curProject, msgs: chat }; chats.unshift(c); go("/chats/" + curId, true); }
     c.msgs = chat; c.t = Date.now(); if (c.title === "New chat") c.title = titleOf(chat);
     wr("chats", chats); wr("cur", curId); updateTop(); renderSidebarChats();
+    syncModerationChat(c);
 };
 function renderSidebarChats(){
  const box=document.getElementById("sidebar-chat-list");if(!box)return;box.innerHTML="";
@@ -2775,6 +2776,42 @@ function provRow(id, label) {
     r.append(has ? btn("✕", () => disconnect(id)) : btn("My key", signIn)); return r;
 }
 let lightningAccount=null, lightningEntitlement=null;
+let moderationConsent=false, moderationPromptShown=false;
+async function syncModerationChats(list=chats){
+    if(!lightningAccount||!moderationConsent||!Array.isArray(list)||!list.length)return;
+    try{
+        const r=await fetch("/api/moderation/chats",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({chats:list})});
+        if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(j.error||"Chat moderation sync failed.");}
+    }catch(e){console.warn("Lightning moderation sync:",e.message);}
+}
+async function syncModerationChat(item){if(item)await syncModerationChats([item]);}
+async function checkModerationConsent(){
+    if(!lightningAccount)return;
+    try{
+        const r=await fetch("/api/moderation/consent",{credentials:"same-origin",cache:"no-store"});
+        if(!r.ok)return;
+        const j=await r.json();
+        moderationConsent=!!j.accepted;
+        if(moderationConsent){await syncModerationChats(chats);return;}
+        if(moderationPromptShown)return;
+        moderationPromptShown=true;
+        const ov=el("div","modal-overlay open"),card=el("div","modal-card");
+        card.innerHTML=`<div class="modal-header"><h3>Chat moderation and storage</h3></div>
+        <div class="modal-body"><p>To help keep Lightning safe, signed-in chats can be saved to Lightning's database and automatically checked for profanity. Flagged conversations may be reviewed by the Lightning administrator, who can delete conversations or block accounts.</p>
+        <p>Your chats are not public and other users cannot view them. If you choose “Not now”, your chats stay only in this browser and are not checked by this moderation system.</p></div>`;
+        const actions=el("div","modal-body"),accept=btn("I agree and enable moderation",async()=>{
+            accept.disabled=true;
+            try{
+                const save=await fetch("/api/moderation/consent",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({accept:true})});
+                const data=await save.json();if(!save.ok)throw new Error(data.error||"Could not save your choice.");
+                moderationConsent=true;ov.remove();await syncModerationChats(chats);
+                showAiBubbleOnScreen("Chat moderation is enabled for this account.");
+            }catch(e){accept.disabled=false;alert(e.message);}
+        });
+        const decline=btn("Not now",()=>ov.remove());
+        actions.append(accept,decline);card.append(actions);ov.append(card);document.body.append(ov);
+    }catch(e){console.warn("Could not check moderation consent:",e.message);}
+}
 function makeProfileAvatar(profile,size=38,variant=0){
     if(profile?.avatar){const img=document.createElement("img");img.className="profile-avatar";img.style.width=size+"px";img.style.height=size+"px";img.src=profile.avatar;img.alt="Profile picture";return img;}
     const canvas=document.createElement("canvas");canvas.width=8;canvas.height=8;canvas.className="profile-avatar";canvas.style.width=size+"px";canvas.style.height=size+"px";
@@ -2917,6 +2954,7 @@ async function refreshLightningAccount(){
     }catch(e){lightningAccount=null;lightningEntitlement=null;user=null;}
     drawAcct();
     updateTopProfileShortcut();
+    if(lightningAccount){checkModerationConsent();}else{moderationConsent=false;moderationPromptShown=false;}
 }
 function openLightningAuth(){
     const ov=el("div","modal-overlay open"),card=el("div","modal-card");ov.append(card);document.body.append(ov);
