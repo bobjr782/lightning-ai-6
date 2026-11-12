@@ -121,6 +121,36 @@ async function ensureAccountTables(env) {
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS shares_recipient_idx ON shares(recipient_id,created_at)").run();
 }
 
+
+async function ensureModerationTables(env) {
+  await env.DB.prepare(\`CREATE TABLE IF NOT EXISTS moderation_consents (
+    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    accepted_at INTEGER NOT NULL
+  )\`).run();
+  await env.DB.prepare(\`CREATE TABLE IF NOT EXISTS chat_conversations (
+    id TEXT NOT NULL,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL DEFAULT 'New chat',
+    messages_json TEXT NOT NULL,
+    flagged_terms_json TEXT NOT NULL DEFAULT '[]',
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY(user_id,id)
+  )\`).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS chat_conversations_flagged_idx ON chat_conversations(updated_at DESC)").run();
+  await env.DB.prepare(\`CREATE TABLE IF NOT EXISTS blocked_users (
+    username_norm TEXT PRIMARY KEY,
+    username TEXT NOT NULL,
+    reason TEXT NOT NULL DEFAULT '',
+    blocked_at INTEGER NOT NULL
+  )\`).run();
+}
+const PROFANITY_TERMS = ["fuck","fucking","fucked","shit","bullshit","bitch","bastard","asshole","arsehole","cunt","dickhead","motherfucker","piss off","crap"];
+function findProfanity(messages) {
+  const textValue=(Array.isArray(messages)?messages:[]).map(m=>[m?.text,m?.content,m?.message].filter(x=>typeof x==="string").join(" ")).join(" ").toLowerCase();
+  return PROFANITY_TERMS.filter(term=>new RegExp("(^|[^a-z0-9])"+term.replace(/ /g,"\\\\s+")+"($|[^a-z0-9])","i").test(textValue));
+}
+
 async function ensurePublishedTable(env) {
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS published_artifacts (
     id TEXT PRIMARY KEY,
@@ -851,6 +881,9 @@ async function route(request, env) {
       if(!/^[A-Za-z0-9_]{3,24}$/.test(username)) return json({error:"Username must be 3–24 characters and use only letters, numbers or underscores."},400);
       if(password.length<10 || password.length>128) return json({error:"Password must be 10–128 characters."},400);
       stage="check-username";
+      await ensureModerationTables(env);
+      const blocked=await env.DB.prepare("SELECT username FROM blocked_users WHERE username_norm=?").bind(norm).first();
+      if(blocked)return json({error:"This account name is blocked from Lightning."},403);
       const exists=await env.DB.prepare("SELECT id FROM users WHERE username_norm=?").bind(norm).first();
       if(exists) {
         await env.DB.prepare("INSERT INTO auth_attempts(ip_hash,attempted_at) VALUES(?,?)").bind(limit.key,limit.now).run();
@@ -875,6 +908,9 @@ async function route(request, env) {
     const limit=await authLimit(request,env);
     if(limit.blocked) return json({error:"Too many sign-in attempts. Wait 15 minutes and try again."},429);
     const norm=String(b.username||"").trim().toLowerCase(), password=String(b.password||"");
+    await ensureModerationTables(env);
+    const blocked=await env.DB.prepare("SELECT username FROM blocked_users WHERE username_norm=?").bind(norm).first();
+    if(blocked)return json({error:"This account has been blocked from Lightning."},403);
     const row=await env.DB.prepare("SELECT id,username,salt,password_hash FROM users WHERE username_norm=?").bind(norm).first();
     const candidate=row ? await passwordHash(password,row.salt) : await passwordHash(password||"invalid-password",b64(new Uint8Array(16)));
     if(!row || candidate!==row.password_hash) {
@@ -902,6 +938,43 @@ async function route(request, env) {
     await env.DB.prepare("INSERT INTO user_presence(user_id,last_seen,last_page) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET last_seen=excluded.last_seen,last_page=excluded.last_page").bind(user.id,Math.floor(Date.now()/1000),page).run();
     return json({ok:true});
   }
+  if(path==="/api/moderation/consent" && (request.method==="GET" || request.method==="POST")) {
+    if(!user)return json({error:"Sign in required."},401);
+    await ensureModerationTables(env);
+    if(request.method==="GET") {
+      const row=await env.DB.prepare("SELECT accepted_at FROM moderation_consents WHERE user_id=?").bind(user.id).first();
+      return json({accepted:!!row,acceptedAt:row?.accepted_at||null});
+    }
+    let b;try{b=await body(request)}catch{return json({error:"Invalid request."},400)}
+    if(b.accept!==true)return json({error:"You must explicitly accept chat moderation storage."},400);
+    await env.DB.prepare("INSERT INTO moderation_consents(user_id,accepted_at) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET accepted_at=excluded.accepted_at").bind(user.id,Math.floor(Date.now()/1000)).run();
+    return json({ok:true,accepted:true});
+  }
+  if(path==="/api/moderation/chats" && (request.method==="POST" || request.method==="GET")) {
+    if(!user)return json({error:"Sign in required."},401);
+    await ensureModerationTables(env);
+    const consent=await env.DB.prepare("SELECT user_id FROM moderation_consents WHERE user_id=?").bind(user.id).first();
+    if(!consent)return json({error:"Accept the chat moderation notice before syncing chats."},403);
+    if(request.method==="GET") {
+      const rows=await env.DB.prepare("SELECT id,title,messages_json,created_at,updated_at FROM chat_conversations WHERE user_id=? ORDER BY updated_at DESC").bind(user.id).all();
+      return json({chats:(rows.results||[]).map(r=>({id:r.id,title:r.title,messages:JSON.parse(r.messages_json||"[]"),createdAt:r.created_at,updatedAt:r.updated_at}))});
+    }
+    let b;try{b=await body(request)}catch{return json({error:"Invalid or oversized chat data."},400)}
+    const list=Array.isArray(b.chats)?b.chats:[];
+    if(list.length>300)return json({error:"Too many conversations in one sync."},413);
+    const now=Math.floor(Date.now()/1000);
+    for(const c of list) {
+      const id=String(c?.id||"").slice(0,100);
+      if(!id)continue;
+      const messages=Array.isArray(c.msgs)?c.msgs:[];
+      const packed=JSON.stringify(messages);
+      if(encoder.encode(packed).length>1500000)continue;
+      const title=String(c.title||"New chat").slice(0,180);
+      const terms=findProfanity(messages);
+      await env.DB.prepare("INSERT INTO chat_conversations(id,user_id,title,messages_json,flagged_terms_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(user_id,id) DO UPDATE SET title=excluded.title,messages_json=excluded.messages_json,flagged_terms_json=excluded.flagged_terms_json,updated_at=excluded.updated_at").bind(id,user.id,title,packed,JSON.stringify(terms),Number(c.t)>0?Math.floor(Number(c.t)/1000):now,now).run();
+    }
+    return json({ok:true,saved:list.length});
+  }
   if(path.startsWith("/api/admin/")) {
     const adminName=String(env.ADMIN_USERNAME||"").trim().toLowerCase();
     if(!adminName)return json({error:"Admin access is not configured. Set the ADMIN_USERNAME Worker secret."},503);
@@ -910,6 +983,47 @@ async function route(request, env) {
     await ensureAccountTables(env);
     await ensurePublishedTable(env);
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS feature_usage (user_id TEXT PRIMARY KEY,trial_started_at INTEGER NOT NULL,text_used INTEGER NOT NULL DEFAULT 0,images_used INTEGER NOT NULL DEFAULT 0,updated_at INTEGER NOT NULL)").run();
+    await ensureModerationTables(env);
+    if(path==="/api/admin/moderation/flagged" && request.method==="GET") {
+      const rows=await env.DB.prepare("SELECT c.id,c.title,c.flagged_terms_json,c.updated_at,u.id AS user_id,u.username FROM chat_conversations c JOIN users u ON u.id=c.user_id WHERE c.flagged_terms_json<>'[]' ORDER BY c.updated_at DESC LIMIT 250").all();
+      return json({items:(rows.results||[]).map(r=>({id:r.id,title:r.title,terms:JSON.parse(r.flagged_terms_json||"[]"),updatedAt:r.updated_at,userId:r.user_id,username:r.username}))});
+    }
+    if(path==="/api/admin/moderation/chat" && request.method==="GET") {
+      const id=String(url.searchParams.get("id")||"");
+      const row=await env.DB.prepare("SELECT c.id,c.title,c.messages_json,c.flagged_terms_json,c.updated_at,u.id AS user_id,u.username FROM chat_conversations c JOIN users u ON u.id=c.user_id WHERE c.id=? ORDER BY c.updated_at DESC LIMIT 1").bind(id).first();
+      if(!row)return json({error:"Conversation not found."},404);
+      return json({chat:{id:row.id,title:row.title,username:row.username,userId:row.user_id,messages:JSON.parse(row.messages_json||"[]"),terms:JSON.parse(row.flagged_terms_json||"[]"),updatedAt:row.updated_at}});
+    }
+    if(path==="/api/admin/moderation/chat" && request.method==="DELETE") {
+      const id=String(url.searchParams.get("id")||"");
+      const result=await env.DB.prepare("DELETE FROM chat_conversations WHERE id=?").bind(id).run();
+      return json({ok:true,deleted:Number(result.meta?.changes||0)});
+    }
+    if(path==="/api/admin/moderation/ban" && request.method==="POST") {
+      let b;try{b=await body(request)}catch{return json({error:"Invalid request."},400)}
+      const id=String(b.userId||"");
+      if(!id||id===user.id)return json({error:"Invalid account."},400);
+      const target=await env.DB.prepare("SELECT id,username,username_norm FROM users WHERE id=?").bind(id).first();
+      if(!target)return json({error:"Account not found."},404);
+      const reason=String(b.reason||"Profanity in chat").slice(0,300);
+      const now=Math.floor(Date.now()/1000);
+      await env.DB.batch([
+        env.DB.prepare("INSERT INTO blocked_users(username_norm,username,reason,blocked_at) VALUES(?,?,?,?) ON CONFLICT(username_norm) DO UPDATE SET username=excluded.username,reason=excluded.reason,blocked_at=excluded.blocked_at").bind(target.username_norm,target.username,reason,now),
+        env.DB.prepare("DELETE FROM users WHERE id=?").bind(id)
+      ]);
+      return json({ok:true,username:target.username});
+    }
+    if(path==="/api/admin/moderation/blocked" && request.method==="GET") {
+      const rows=await env.DB.prepare("SELECT username,reason,blocked_at FROM blocked_users ORDER BY blocked_at DESC LIMIT 200").all();
+      return json({blocked:rows.results||[]});
+    }
+    if(path==="/api/admin/moderation/unblock" && request.method==="POST") {
+      let b;try{b=await body(request)}catch{return json({error:"Invalid request."},400)}
+      const norm=String(b.username||"").trim().toLowerCase();
+      if(!norm)return json({error:"Missing username."},400);
+      await env.DB.prepare("DELETE FROM blocked_users WHERE username_norm=?").bind(norm).run();
+      return json({ok:true});
+    }
     if(path==="/api/admin/overview" && request.method==="GET") {
       const [users,sessions,artifacts,workspaces]=await Promise.all([
         env.DB.prepare("SELECT COUNT(*) AS n FROM users").first(),
