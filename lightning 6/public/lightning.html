@@ -2465,7 +2465,7 @@ button, .sidebar-chat-item, .gal-card, .row-item, .modal-card, .artifact-panel, 
 .message-row { animation: lightningMessageIn .24s cubic-bezier(.2,.75,.25,1) both; }
 @keyframes lightningMessageIn { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
 .pixel-art-frame { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 12px; padding: 10px; max-width: min(100%, 420px); background: var(--surface-2, #202633); border: 1px solid var(--border-color); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
-.pixel-art-canvas { display: block; width: min(100%, 384px); height: auto; aspect-ratio: attr(width) / attr(height); image-rendering: pixelated; image-rendering: crisp-edges; background: #fff; border-radius: 2px; }
+.pixel-art-canvas { display: block; width: min(100%, 384px); height: auto; image-rendering: pixelated; image-rendering: crisp-edges; background: #fff; border-radius: 2px; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
 </style>` + doc;
     if (js) doc = /<\/body>/i.test(doc) ? doc.replace(/<\/body>/i, () => `<script>\n${js}\n<\/script><\/body>`) : doc + `<script>\n${js}\n<\/script>`;
