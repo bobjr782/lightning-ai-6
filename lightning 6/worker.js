@@ -559,17 +559,65 @@ async function chatRoute(request,env) {
   const cleanMessages=messages.map(m=>({role:["system","user","assistant"].includes(m.role)?m.role:"user",content:typeof m.content==="string"?m.content:JSON.stringify(m.content)}));
   const max_tokens=Math.max(128,Math.min(4096,Number(input.max_tokens)||1800));
   const temperature=Math.max(0,Math.min(1.5,Number(input.temperature)||0.7));
-  let cloudflareError="";
+
+  // Guest/no-personal-key default: JarvisClaw's free-only router.
+  // The secret stays on the Worker and is never sent to browser code.
+  let jarvisError="";
+  if(env.JARVISCLAW_API_KEY) {
+    try {
+      const response=await fetch("https://api.jarvisclaw.ai/v1/chat/completions",{
+        method:"POST",
+        headers:{
+          "Authorization":"Bearer "+env.JARVISCLAW_API_KEY,
+          "Content-Type":"application/json",
+          "Accept":"application/json"
+        },
+        body:JSON.stringify({
+          model:"auto/free",
+          messages:cleanMessages,
+          max_tokens,
+          temperature,
+          stream:false
+        }),
+        signal:AbortSignal.timeout(55000)
+      });
+      const data=await response.json().catch(()=>null);
+      const content=data?.choices?.[0]?.message?.content;
+      if(response.ok && typeof content==="string" && content.trim()) {
+        return json({
+          choices:[{message:{role:"assistant",content}}],
+          model:data.model||"JarvisClaw · Auto Free",
+          provider:"jarvisclaw"
+        });
+      }
+      jarvisError=data?.error?.message||data?.message||("JarvisClaw returned HTTP "+response.status);
+      console.warn("Lightning JarvisClaw request failed:",jarvisError);
+    } catch(error) {
+      jarvisError=String(error?.message||error||"JarvisClaw unavailable.");
+      console.warn("Lightning JarvisClaw request failed:",jarvisError);
+    }
+  } else {
+    jarvisError="JarvisClaw is not configured. Add the JARVISCLAW_API_KEY Worker secret.";
+  }
+
+  // Keep the existing Cloudflare model as a backup if JarvisClaw is down,
+  // rate-limited, or the free model pool is temporarily unavailable.
   if(env.AI&&typeof env.AI.run==="function") {
     try {
       const result=await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast",{messages:cleanMessages,max_tokens,temperature});
       const content=result?.response||result?.choices?.[0]?.message?.content||"";
-      if(content)return json({choices:[{message:{role:"assistant",content}}],model:"Lightning Free · Llama 3.3"});
-      cloudflareError="Cloudflare returned an empty answer.";
-    } catch(error) { cloudflareError=String(error?.message||error||"Cloudflare AI unavailable."); }
-  } else cloudflareError="Cloudflare Workers AI is not enabled.";
-  // No external text fallback: Lightning chat uses Cloudflare AI only.
-  return json({error:{message:"Lightning chat is temporarily unavailable because its Cloudflare AI model could not respond. Please try again shortly."}},503);
+      if(content)return json({
+        choices:[{message:{role:"assistant",content}}],
+        model:"Lightning Backup · Llama 3.3",
+        provider:"cloudflare"
+      });
+    } catch(error) {
+      console.warn("Lightning Cloudflare chat backup failed:",String(error?.message||error||""));
+    }
+  }
+  return json({error:{message:env.JARVISCLAW_API_KEY
+    ?"Lightning's free AI providers are temporarily unavailable. Please try again shortly."
+    :"Lightning's free AI is not configured yet. The site owner needs to add the JARVISCLAW_API_KEY secret in Cloudflare."}},503);
 }
 
 
