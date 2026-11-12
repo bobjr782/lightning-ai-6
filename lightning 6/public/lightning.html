@@ -1588,7 +1588,10 @@ function finalizeAiBubble(bubbleNode, finalizedText) {
 
     scrollToLatestMessage();
     chat.push({ text: finalizedText, alignment: "ai-align", type: "aiBox", isImage: false, imgData: "" });
-    store(KEY);
+    // This renderer is defined outside the account-scoped features closure.
+    // Keep the legacy renderer's storage call here; askAI separately stores
+    // the active account-scoped conversation.
+    try { store("bob_chat_history"); } catch (_) {}
 }
 
 
