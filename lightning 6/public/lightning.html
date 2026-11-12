@@ -869,6 +869,7 @@ body.img-mode .img-opts { display: flex; }
                 <button class="sidebar-btn" onclick="imgMode()">🎨 Image mode</button>
                 <button class="sidebar-btn" onclick="openSettings()">⚙️ Model settings</button>
                 <button class="sidebar-btn" onclick="openPlugins()">🔌 Plugins</button>
+                <button class="sidebar-btn" id="lightning-admin-nav" onclick="openLightningAdmin()" hidden>Admin panel</button>
                 <button class="sidebar-btn" onclick="clearHistory()">🗑 Clear all chats</button>
                 <div class="sidebar-chat-heading">Your chats</div><div id="sidebar-chat-list" class="sidebar-chat-list"></div>
             </div>
@@ -3460,3 +3461,39 @@ finishOpenRouter().catch(e => startupError("openrouter", e));
 
 </body>
 </html>
+
+<style>
+#lightning-admin-overlay{position:fixed;inset:0;z-index:12000;background:var(--bg-main);color:var(--text-primary);display:none;flex-direction:column}
+#lightning-admin-overlay.open{display:flex}.admin-top{display:flex;align-items:center;gap:14px;padding:18px 24px;border-bottom:1px solid var(--border-color)}
+.admin-top h2{margin:0;font-size:20px;flex:1}.admin-content{padding:22px;overflow:auto;min-height:0}
+.admin-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px}
+.admin-stat{background:var(--surface);border:1px solid var(--border-color);border-radius:12px;padding:16px}
+.admin-stat strong{display:block;font-size:26px;margin-top:8px}.admin-table-wrap{overflow:auto;border:1px solid var(--border-color);border-radius:10px}
+.admin-table{width:100%;border-collapse:collapse;min-width:650px}.admin-table th,.admin-table td{text-align:left;padding:12px;border-bottom:1px solid var(--border-color);font-size:13px}
+.admin-table th{color:var(--text-secondary);font-weight:600;background:var(--surface)}.admin-tools{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.admin-tools input{background:var(--surface);color:var(--text-primary);border:1px solid var(--border-color);border-radius:8px;padding:10px;min-width:220px}
+.admin-danger{color:#ff7777!important;border-color:#8d3434!important}.admin-muted{color:var(--text-secondary);font-size:13px}
+</style>
+<div id="lightning-admin-overlay" aria-hidden="true">
+ <div class="admin-top"><button class="mini-btn" type="button" onclick="closeLightningAdmin()">Back</button><h2>Lightning administration</h2><span class="admin-muted" id="admin-who"></span></div>
+ <div class="admin-content"><div id="admin-message" class="admin-muted">Loading administration data…</div><div class="admin-stats" id="admin-stats"></div>
+  <h3>Accounts</h3><div class="admin-tools"><input id="admin-search" placeholder="Search usernames…" autocomplete="off"><button class="mini-btn" onclick="loadLightningAdminUsers()">Search</button><button class="mini-btn" onclick="loadLightningAdmin()">Refresh</button></div>
+  <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Username</th><th>Created</th><th>Chat use</th><th>Image use</th><th>Actions</th></tr></thead><tbody id="admin-users"><tr><td colspan="5">Loading…</td></tr></tbody></table></div>
+  <p class="admin-muted">Account deletion is permanent and removes saved data, sessions, shared items and published artifacts.</p>
+ </div>
+</div>
+<script>
+(function(){
+ const overlay=document.getElementById("lightning-admin-overlay"),msg=document.getElementById("admin-message");
+ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+ async function api(path,options){const r=await fetch(path,{credentials:"same-origin",cache:"no-store",...options,headers:{"content-type":"application/json",...(options&&options.headers||{})}});const j=await r.json().catch(()=>({error:"Invalid server response"}));if(!r.ok)throw new Error(j.error||"Admin request failed");return j;}
+ async function check(){try{const j=await api("/api/admin/overview");document.getElementById("lightning-admin-nav").hidden=false;document.getElementById("admin-who").textContent=j.admin.username;}catch(_){document.getElementById("lightning-admin-nav").hidden=true;}}
+ window.openLightningAdmin=async()=>{overlay.classList.add("open");overlay.setAttribute("aria-hidden","false");await loadLightningAdmin();};
+ window.closeLightningAdmin=()=>{overlay.classList.remove("open");overlay.setAttribute("aria-hidden","true");};
+ window.loadLightningAdmin=async()=>{msg.textContent="Loading administration data…";try{const j=await api("/api/admin/overview");document.getElementById("admin-who").textContent=j.admin.username;document.getElementById("admin-stats").innerHTML=[["Accounts",j.stats.users],["Active sessions",j.stats.sessions],["Published artifacts",j.stats.artifacts],["Saved workspaces",j.stats.workspaces]].map(x=>'<div class="admin-stat"><span class="admin-muted">'+esc(x[0])+'</span><strong>'+esc(x[1])+'</strong></div>').join("");msg.textContent="System overview loaded.";await loadLightningAdminUsers();}catch(e){msg.textContent=e.message;document.getElementById("admin-stats").innerHTML="";}};
+ window.loadLightningAdminUsers=async()=>{const body=document.getElementById("admin-users");body.innerHTML='<tr><td colspan="5">Loading…</td></tr>';try{const q=document.getElementById("admin-search").value.trim(),j=await api("/api/admin/users?q="+encodeURIComponent(q));body.innerHTML=j.users.length?j.users.map(u=>'<tr><td><strong>'+esc(u.username)+'</strong></td><td>'+esc(new Date(u.createdAt*1000).toLocaleDateString())+'</td><td>'+esc(u.textUsed)+' / 40</td><td>'+esc(u.imagesUsed)+' / 5</td><td><button class="mini-btn" data-reset="'+esc(u.id)+'">Reset trial</button> <button class="mini-btn admin-danger" data-delete="'+esc(u.id)+'" data-name="'+esc(u.username)+'">Delete</button></td></tr>').join(""):'<tr><td colspan="5">No accounts found.</td></tr>';}catch(e){body.innerHTML='<tr><td colspan="5">'+esc(e.message)+'</td></tr>';}}
+ document.getElementById("admin-users").addEventListener("click",async e=>{const del=e.target.closest("[data-delete]"),reset=e.target.closest("[data-reset]");try{if(del){if(!confirm('Permanently delete "'+del.dataset.name+'"? This cannot be undone.'))return;await api("/api/admin/users?id="+encodeURIComponent(del.dataset.delete),{method:"DELETE"});}if(reset){if(!confirm("Reset this account’s free-trial usage and restart its 7-day trial?"))return;await api("/api/admin/users/reset",{method:"POST",body:JSON.stringify({id:reset.dataset.reset})});}await loadLightningAdmin();}catch(e){msg.textContent=e.message;}});
+ document.getElementById("admin-search").addEventListener("keydown",e=>{if(e.key==="Enter")loadLightningAdminUsers();});
+ check();window.addEventListener("lightning-account-ready",check);
+})();
+</script>
