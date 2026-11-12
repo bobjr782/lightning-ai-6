@@ -893,6 +893,15 @@ async function route(request, env) {
   }
 
   const user=await userFor(request,env);
+
+  if(path==="/api/presence" && request.method==="POST") {
+    if(!user)return json({error:"Sign in required."},401);
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS user_presence (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,last_seen INTEGER NOT NULL,last_page TEXT NOT NULL DEFAULT 'Lightning')").run();
+    let b={};try{b=await body(request)}catch{}
+    const page=String(b.page||"Lightning").slice(0,40).replace(/[<>]/g,"");
+    await env.DB.prepare("INSERT INTO user_presence(user_id,last_seen,last_page) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET last_seen=excluded.last_seen,last_page=excluded.last_page").bind(user.id,Math.floor(Date.now()/1000),page).run();
+    return json({ok:true});
+  }
   if(path.startsWith("/api/admin/")) {
     const adminName=String(env.ADMIN_USERNAME||"").trim().toLowerCase();
     if(!adminName)return json({error:"Admin access is not configured. Set the ADMIN_USERNAME Worker secret."},503);
@@ -909,6 +918,14 @@ async function route(request, env) {
         env.DB.prepare("SELECT COUNT(*) AS n FROM user_data").first()
       ]);
       return json({admin:{username:user.username},stats:{users:Number(users?.n||0),sessions:Number(sessions?.n||0),artifacts:Number(artifacts?.n||0),workspaces:Number(workspaces?.n||0)}});
+    }
+
+    if(path==="/api/admin/friends-activity" && request.method==="GET") {
+      await ensureSocialTables(env);
+      await env.DB.prepare("CREATE TABLE IF NOT EXISTS user_presence (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,last_seen INTEGER NOT NULL,last_page TEXT NOT NULL DEFAULT 'Lightning')").run();
+      const rows=await env.DB.prepare("SELECT users.id,users.username,friendships.created_at AS friend_since,user_presence.last_seen,user_presence.last_page FROM friendships JOIN users ON users.id=CASE WHEN friendships.user_low=? THEN friendships.user_high ELSE friendships.user_low END LEFT JOIN user_presence ON user_presence.user_id=users.id WHERE friendships.user_low=? OR friendships.user_high=? ORDER BY COALESCE(user_presence.last_seen,0) DESC,users.username COLLATE NOCASE").bind(user.id,user.id,user.id).all();
+      const now=Math.floor(Date.now()/1000);
+      return json({friends:(rows.results||[]).map(r=>({id:r.id,username:r.username,lastSeen:r.last_seen||null,lastPage:r.last_page||"Unknown",online:!!r.last_seen&&now-r.last_seen<120,friendSince:r.friend_since}))});
     }
     if(path==="/api/admin/users" && request.method==="GET") {
       const q=String(url.searchParams.get("q")||"").trim().slice(0,40);
