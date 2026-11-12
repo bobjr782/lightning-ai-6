@@ -1528,59 +1528,67 @@ function injectThinkingPlaceholderBubble() {
 
 function finalizeAiBubble(bubbleNode, finalizedText) {
     bubbleNode.classList.remove("thinking-bubble");
-    bubbleNode.innerHTML = "";
-
+    bubbleNode.replaceChildren();
     const textContainer = document.createElement("div");
     textContainer.style.whiteSpace = "pre-wrap";
 
-    // 🔍 Regular expression to find our custom color grid block
-    // Syntax format: %@GRID[width,height]{#color1,#color2,...}%@GRID
-    const gridRegex = /%@GRID\[(\d+),(\d+)\]\{([^}]+)\}%@GRID/i;
-    const match = finalizedText.match(gridRegex);
-
+    // Accept whitespace/newlines from the model, but validate the whole grid
+    // before drawing so malformed dimensions or colours cannot break layout.
+    const gridRegex = /%@GRID\s*\[\s*(\d{1,2})\s*,\s*(\d{1,2})\s*\]\s*\{([\s\S]*?)\}\s*%@GRID/i;
+    const match = String(finalizedText).replace(/```(?:text)?/gi, "").match(gridRegex);
     if (match) {
-        // Separate the text message from the grid block data
-        const cleanText = finalizedText.replace(gridRegex, "").trim();
-        textContainer.textContent = cleanText || "🎨 Custom Canvas Rendered:";
-        bubbleNode.appendChild(textContainer);
+        const width = Number(match[1]), height = Number(match[2]);
+        const colors = match[3].split(",").map(c => c.trim());
+        const validColor = c => /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(c);
+        const validSize = width >= 8 && height >= 8 && width <= 32 && height <= 32;
+        if (validSize && colors.length === width * height && colors.every(validColor)) {
+            const cleanText = String(finalizedText).replace(gridRegex, "").trim();
+            textContainer.textContent = cleanText || "Pixel art";
+            bubbleNode.appendChild(textContainer);
 
-        const width = parseInt(match[1]);
-        const height = parseInt(match[2]);
-        // Clean up formatting and turn color strings into an array
-        const colors = match[3].replace(/[\s\n\(\r\)"']/g, "").split(",");
-
-        // --- Custom Renderer Engine ---
-        const canvasContainer = document.createElement("div");
-        canvasContainer.style.display = "grid";
-        canvasContainer.style.gridTemplateColumns = `repeat(${width}, 1fr)`;
-        canvasContainer.style.gap = "1px"; // Gives a beautiful grid-line mosaic look
-        canvasContainer.style.backgroundColor = "#2d2d2d"; // Border color between pixels
-        canvasContainer.style.padding = "4px";
-        canvasContainer.style.borderRadius = "8px";
-        canvasContainer.style.marginTop = "12px";
-        canvasContainer.style.maxWidth = "300px";
-        canvasContainer.style.boxShadow = "0 4px 15px rgba(0,0,0,0.5)";
-
-        // Draw each colored pixel cell onto the canvas block
-        for (let i = 0; i < width * height; i++) {
-            const pixel = document.createElement("div");
-            pixel.style.aspectRatio = "1 / 1";
-            // Use the AI color code, or fall back to black if missing
-            pixel.style.backgroundColor = colors[i] || "#000000"; 
-            pixel.style.borderRadius = "2px"; // Subtly softens pixel edges
-            canvasContainer.appendChild(pixel);
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            canvas.className = "pixel-art-canvas";
+            canvas.setAttribute("role", "img");
+            canvas.setAttribute("aria-label", `Pixel art, ${width} by ${height} pixels`);
+            const ctx = canvas.getContext("2d", { alpha: false });
+            if (ctx) {
+                colors.forEach((color, i) => {
+                    ctx.fillStyle = color;
+                    ctx.fillRect(i % width, Math.floor(i / width), 1, 1);
+                });
+                const frame = document.createElement("div");
+                frame.className = "pixel-art-frame";
+                frame.appendChild(canvas);
+                const download = document.createElement("button");
+                download.type = "button";
+                download.className = "mini-btn";
+                download.textContent = "Download PNG";
+                download.addEventListener("click", () => {
+                    const a = document.createElement("a");
+                    a.download = "lightning-pixel-art.png";
+                    a.href = canvas.toDataURL("image/png");
+                    a.click();
+                });
+                frame.appendChild(download);
+                bubbleNode.appendChild(frame);
+            } else {
+                textContainer.textContent += "\nPixel art canvas is not supported by this browser.";
+                bubbleNode.appendChild(textContainer);
+            }
+        } else {
+            textContainer.textContent = "I received a pixel-art grid, but its dimensions or colour list were invalid. Please ask me to regenerate it.";
+            bubbleNode.appendChild(textContainer);
         }
-
-        bubbleNode.appendChild(canvasContainer);
     } else {
-        // Fallback for normal text messages
         textContainer.textContent = finalizedText;
         bubbleNode.appendChild(textContainer);
     }
 
     scrollToLatestMessage();
-    chat.push({ text: finalizedText, alignment: 'ai-align', type: 'aiBox', isImage: false, imgData: "" });
-    store("bob_chat_history");
+    chat.push({ text: finalizedText, alignment: "ai-align", type: "aiBox", isImage: false, imgData: "" });
+    store(KEY);
 }
 
 
@@ -1732,7 +1740,7 @@ code here
 2. Anything substantial the user can preview (web page, app, game, chart, UI, document): ARTIFACT@Short Title{
 <complete single-file HTML with inline CSS and JS>
 }$ARTIFACT
-3. Pixel art: %@GRID[width,height]{#hex,#hex,...}%@GRID
+3. Pixel art: output EXACTLY this format, with no code fence and no extra text inside the block: %@GRID[width,height]{#RRGGBB,#RRGGBB,...}%@GRID. Use dimensions from 8x8 to 32x32, provide exactly width*height comma-separated 6-digit hex colours in row-major order (left-to-right, top-to-bottom), and use no labels or line numbers.
 4. A file the user can download (csv, json, txt, md, html, code, svg...): FILE@filename.ext{
 file contents
 }$FILE
@@ -2180,7 +2188,7 @@ async function askAI(apiText, images, names, force, reuse, tried) {
         const hasAlt = ["openrouter", "groq", "google"].some(p => p !== cfg.id && !(tried || []).includes(p) && provAvail(p));
         const cands = trialNoKey ? ["lightning-free"] : (await candidates(cfg, apiText, images)).slice(0, hasAlt ? 2 : 6);
         const viaServer = trialNoKey || (SERVER.on && cfg.id !== "custom");
-        const attempt = (m, s) => fetch(viaServer ? "/api/chat" : cfg.endpoint, { method: "POST", headers: viaServer ? { "Content-Type": "application/json", "x-provider": cfg.id, ...(cfg.key ? { "x-user-key": cfg.key } : {}) } : hdr, body: JSON.stringify({ model: m, temperature: m === CODE_MODEL || currentSelectedMode === "coder" ? 0.2 : 0.7, max_tokens: 1800, messages, ...(s && !trialNoKey ? { stream: true } : {}) }) });
+        const attempt = (m, s) => fetch(viaServer ? "/api/chat" : cfg.endpoint, { method: "POST", headers: viaServer ? { "Content-Type": "application/json", "x-provider": cfg.id, ...(cfg.key ? { "x-user-key": cfg.key } : {}) } : hdr, body: JSON.stringify({ model: m, temperature: m === CODE_MODEL || currentSelectedMode === "coder" ? 0.2 : 0.7, max_tokens: 1800, messages, ...(!viaServer && s && !trialNoKey ? { stream: true } : {}) }), signal: AbortSignal.timeout(30000) });
         let res = null, streaming = !trialNoKey, full = "", usedModel = "", status = 0, retryAfter = 5;
         for (let round = 0; round < 2; round++) {
             if (cands.every(m => (cool[m] || 0) > Date.now())) Object.keys(cool).forEach(k => delete cool[k]);
@@ -2238,6 +2246,44 @@ async function askAI(apiText, images, names, force, reuse, tried) {
         }
     } catch (err) {
         console.error(err);
+        // If the user's Groq key/provider stops responding, retry the same
+        // conversation through Lightning's server-side JarvisClaw fallback.
+        if (getCfg(force).id === "groq" && !(tried || []).includes("jarvisclaw")) {
+            try {
+                live(box, "", "Groq didn't respond — switching to JarvisClaw…");
+                const backupResponse = await fetch("/api/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "x-provider": "jarvisclaw" },
+                    body: JSON.stringify({
+                        model: "auto/free",
+                        messages,
+                        temperature: currentSelectedMode === "coder" ? 0.2 : 0.7,
+                        max_tokens: 1800,
+                        stream: false
+                    }),
+                    signal: AbortSignal.timeout(60000)
+                });
+                const backupData = await backupResponse.json();
+                const backupText = backupData?.choices?.[0]?.message?.content;
+                if (!backupResponse.ok || typeof backupText !== "string" || !backupText.trim()) {
+                    throw new Error(backupData?.error?.message || "JarvisClaw did not return a reply.");
+                }
+                if (/%@GRID/i.test(backupText)) {
+                    finalizeAiBubble(box, backupText);
+                } else {
+                    const backupArt = renderRich(box, backupText);
+                    chat.push({ text: backupText, alignment: "ai-align", type: "aiBox", isImage: false, imgData: "" });
+                    try { store(KEY); } catch (_) {}
+                    if (backupArt >= 0) openArtifact(backupArt);
+                }
+                box.append(el("div", "status-done", "✓ Replied using " + (backupData.provider === "jarvisclaw" ? "JarvisClaw backup" : "Lightning backup")));
+                scrollToLatestMessage();
+                busy = false;
+                return;
+            } catch (backupError) {
+                console.warn("Lightning JarvisClaw backup failed:", backupError);
+            }
+        }
         if (err.rate) {
             const cur = getCfg(force).id, used = [...(tried || []), cur], nxt = ["openrouter", "groq", "google"].find(p => !used.includes(p) && provAvail(p));
             if (nxt) { busy = false; live(box, "", `${PRESETS[cur].name.split(" (")[0]} is rate-limited — switching to ${PRESETS[nxt].name.split(" (")[0]}…`); return askAI(apiText, images, names, nxt, box, used); }
@@ -2412,6 +2458,15 @@ button.send-btn {
     }
 }
 
+
+/* Smooth Lightning motion and crisp pixel-art rendering */
+html { scroll-behavior: smooth; }
+button, .sidebar-chat-item, .gal-card, .row-item, .modal-card, .artifact-panel, .art-page, .message-row { transition: background-color .18s ease, border-color .18s ease, color .18s ease, opacity .2s ease, transform .22s cubic-bezier(.2,.7,.2,1), box-shadow .22s ease; }
+.message-row { animation: lightningMessageIn .24s cubic-bezier(.2,.75,.25,1) both; }
+@keyframes lightningMessageIn { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
+.pixel-art-frame { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 12px; padding: 10px; max-width: min(100%, 420px); background: var(--surface-2, #202633); border: 1px solid var(--border-color); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+.pixel-art-canvas { display: block; width: min(100%, 384px); height: auto; aspect-ratio: attr(width) / attr(height); image-rendering: pixelated; image-rendering: crisp-edges; background: #fff; border-radius: 2px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
 </style>` + doc;
     if (js) doc = /<\/body>/i.test(doc) ? doc.replace(/<\/body>/i, () => `<script>\n${js}\n<\/script><\/body>`) : doc + `<script>\n${js}\n<\/script>`;
     const title = ((doc.match(/<title>([^<]*)/i) || [])[1] || "Web app").trim();
@@ -2646,16 +2701,24 @@ window.clearHistory = () => {
     chat = [];
     curId = null;
     curProject = null;
+    // Clear every legacy and account-scoped chat key. The marker prevents
+    // the startup migration from importing an old history after deletion.
+    try {
+        localStorage.setItem("lt:chats:cleared", "1");
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const key = localStorage.key(i);
+            if (key === "bob_chat_history" || key === "cur" || /^lt:.*:(chats|cur)$/.test(key || "")) {
+                localStorage.removeItem(key);
+            }
+        }
+    } catch (_) {}
     wr("chats", []);
     wr("cur", null);
-    try {
-        localStorage.removeItem("bob_chat_history");
-        localStorage.removeItem("cur");
-    } catch (_) {}
     clearAttachedFile();
-    const messages = document.getElementById("enject");
-    if (messages) messages.innerHTML = "";
+    const messages = document.querySelector(".messages-container");
+    if (messages) messages.replaceChildren();
     renderChat();
+    renderSidebarChats();
     go("/", true);
 };
 function updateTop() {
@@ -3102,7 +3165,7 @@ function startupError(label, e) {
 const safe = (label, fn) => { try { fn(); } catch (e) { console.error(label, e); startupError(label, e); } };
 window.addEventListener("error", ev => startupError("script", ev.error || ev.message));
 safe("migrate", () => {
-    if (!chats.length && uid() === "guest") {
+    if (!chats.length && uid() === "guest" && localStorage.getItem("lt:chats:cleared") !== "1") {
         const old = JSON.parse(localStorage.getItem(KEY) || "[]"); if (old.length) { chats.push({ id: nid(), title: titleOf(old), t: Date.now(), project: null, msgs: old }); wr("chats", chats); }
     }
     if (!rd("img_bf", false)) { chats.forEach(c => (c.msgs || []).forEach(m => m.genUrl && addImage(m.prompt || "image", m.genUrl, ""))); wr("img_bf", true); }
