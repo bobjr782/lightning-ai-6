@@ -759,8 +759,10 @@ body.img-mode .img-opts { display: flex; }
 .material-symbols-outlined.px { width:20px; height:20px; font-size:20px; line-height:1; font-weight:400; font-style:normal; letter-spacing:normal; text-transform:none; white-space:nowrap; direction:ltr; display:inline-flex; align-items:center; justify-content:center; vertical-align:-4px; font-feature-settings:'liga'; -webkit-font-feature-settings:'liga'; -webkit-font-smoothing:antialiased; }
 .friends-pixel-icon { flex:0 0 20px; }
 
-/* Artifacts gallery: make the actual card grid the scrolling flex child. */
+/* Artifacts gallery: scroll the gallery, never compress the artifact cards. */
 .art-page {
+    position: fixed;
+    inset: 0;
     height: 100vh;
     height: 100dvh;
     min-height: 0 !important;
@@ -774,20 +776,37 @@ body.img-mode .img-opts { display: flex; }
 }
 .art-page > .art-page-head {
     flex: 0 0 auto !important;
-    min-height: 0;
 }
 .art-page > .art-grid {
     display: grid !important;
-    flex: 1 1 0% !important;
+    grid-template-columns: repeat(auto-fill, 300px) !important;
+    grid-auto-rows: max-content;
+    align-items: start;
+    justify-content: center;
+    align-content: start;
+    flex: 1 1 auto !important;
     min-height: 0 !important;
-    height: 0 !important;
+    height: auto !important;
     max-height: none !important;
-    overflow-y: scroll !important;
+    overflow-y: auto !important;
     overflow-x: hidden !important;
     overscroll-behavior-y: contain;
     -webkit-overflow-scrolling: touch;
     scrollbar-gutter: stable;
-    align-content: start;
+}
+.art-page .gal-card {
+    width: 300px !important;
+    min-width: 300px !important;
+    max-width: 300px !important;
+    min-height: 0;
+    flex: 0 0 300px !important;
+    align-self: start;
+}
+.art-page .gal-thumb {
+    height: 190px !important;
+    min-height: 190px !important;
+    max-height: 190px !important;
+    flex: 0 0 190px !important;
 }
 
 /* Browser Run: the chat contains only the live website iframe. */
