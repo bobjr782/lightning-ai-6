@@ -891,7 +891,48 @@ async function route(request, env) {
     if(token) await env.DB.prepare("DELETE FROM sessions WHERE token_hash=?").bind(await sha(token)).run();
     return json({ok:true},200,{"set-cookie":cookie("",0)});
   }
+
   const user=await userFor(request,env);
+  if(path.startsWith("/api/admin/")) {
+    const adminName=String(env.ADMIN_USERNAME||"").trim().toLowerCase();
+    if(!adminName)return json({error:"Admin access is not configured. Set the ADMIN_USERNAME Worker secret."},503);
+    if(!user)return json({error:"Sign in required."},401);
+    if(user.username.toLowerCase()!==adminName)return json({error:"Administrator access denied."},403);
+    await ensureAccountTables(env);
+    await ensurePublishedTable(env);
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS feature_usage (user_id TEXT PRIMARY KEY,trial_started_at INTEGER NOT NULL,text_used INTEGER NOT NULL DEFAULT 0,images_used INTEGER NOT NULL DEFAULT 0,updated_at INTEGER NOT NULL)").run();
+    if(path==="/api/admin/overview" && request.method==="GET") {
+      const [users,sessions,artifacts,workspaces]=await Promise.all([
+        env.DB.prepare("SELECT COUNT(*) AS n FROM users").first(),
+        env.DB.prepare("SELECT COUNT(*) AS n FROM sessions WHERE expires_at>?").bind(Math.floor(Date.now()/1000)).first(),
+        env.DB.prepare("SELECT COUNT(*) AS n FROM published_artifacts").first(),
+        env.DB.prepare("SELECT COUNT(*) AS n FROM user_data").first()
+      ]);
+      return json({admin:{username:user.username},stats:{users:Number(users?.n||0),sessions:Number(sessions?.n||0),artifacts:Number(artifacts?.n||0),workspaces:Number(workspaces?.n||0)}});
+    }
+    if(path==="/api/admin/users" && request.method==="GET") {
+      const q=String(url.searchParams.get("q")||"").trim().slice(0,40);
+      const rows=await env.DB.prepare("SELECT users.id,users.username,users.created_at,COALESCE(feature_usage.text_used,0) AS text_used,COALESCE(feature_usage.images_used,0) AS images_used FROM users LEFT JOIN feature_usage ON feature_usage.user_id=users.id WHERE (?='' OR instr(lower(users.username),lower(?))>0) ORDER BY users.created_at DESC LIMIT 200").bind(q,q).all();
+      return json({users:(rows.results||[]).map(r=>({id:r.id,username:r.username,createdAt:r.created_at,textUsed:Number(r.text_used||0),imagesUsed:Number(r.images_used||0)}))});
+    }
+    if(path==="/api/admin/users/reset" && request.method==="POST") {
+      let b;try{b=await body(request)}catch{return json({error:"Invalid request."},400)}
+      const id=String(b.id||"");if(!id)return json({error:"Missing account ID."},400);
+      const now=Math.floor(Date.now()/1000),exists=await env.DB.prepare("SELECT id FROM users WHERE id=?").bind(id).first();
+      if(!exists)return json({error:"Account not found."},404);
+      await env.DB.prepare("INSERT INTO feature_usage(user_id,trial_started_at,text_used,images_used,updated_at) VALUES(?,?,0,0,?) ON CONFLICT(user_id) DO UPDATE SET trial_started_at=excluded.trial_started_at,text_used=0,images_used=0,updated_at=excluded.updated_at").bind(id,now,now).run();
+      return json({ok:true});
+    }
+    if(path==="/api/admin/users" && request.method==="DELETE") {
+      const id=String(url.searchParams.get("id")||"");if(!id)return json({error:"Missing account ID."},400);
+      if(id===user.id)return json({error:"You cannot delete the administrator account while signed in."},400);
+      const result=await env.DB.prepare("DELETE FROM users WHERE id=?").bind(id).run();
+      if(!result.meta?.changes)return json({error:"Account not found."},404);
+      return json({ok:true});
+    }
+    return json({error:"Admin endpoint not found."},404);
+  }
+
   if(path==="/api/me" && request.method==="GET") {
     if(!user)return json({user:null},401);
     const [usage,profile]=await Promise.all([ensureUsage(user,env),ensureProfile(user,env)]);
