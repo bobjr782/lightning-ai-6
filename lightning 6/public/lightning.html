@@ -2902,7 +2902,15 @@ function openProfileEditor(){
         const file=el("input","field");file.type="file";file.accept="image/png,image/jpeg,image/webp";
         file.onchange=async()=>{const f=file.files?.[0];if(!f)return;try{const src=await new Promise((res,rej)=>{const reader=new FileReader();reader.onload=()=>res(reader.result);reader.onerror=rej;reader.readAsDataURL(f);});chosen=await compactProfileImage(src);paint();}catch(e){alert(e.message);}};
         const promptInput=el("input","field");promptInput.placeholder="Describe your profile picture for FLUX…";promptInput.value="A crisp, friendly pixel-art lightning bolt emblem, centered, bold simple shapes, dark background";
-        const generate=btn("Generate with FLUX",async()=>{if(!promptInput.value.trim())return;generate.disabled=true;generate.textContent="Generating…";try{const r=await fetch("/api/image",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({prompt:promptInput.value.trim(),width:512,height:512})});const j=await r.json();if(!r.ok)throw new Error(j.error||"FLUX could not generate your picture.");chosen=await compactProfileImage(j.image);paint();showAiBubbleOnScreen("Profile picture generated with "+(j.model||"FLUX")+".");}catch(e){alert(e.message);}finally{generate.disabled=false;generate.textContent="Generate with FLUX";}});
+        const generate=btn("Open FreeGen for profile picture",()=>{
+            const prompt=promptInput.value.trim();
+            if(!prompt){alert("Describe your profile picture first.");return;}
+            const profilePrompt=prompt.replace(/\\s*#profile-picture\\s*$/i,"").trim()+" #profile-picture";
+            const target="https://freegen.app/?prompt="+encodeURIComponent(profilePrompt);
+            window.open(target,"_blank","noopener,noreferrer");
+            note.textContent="FreeGen opened in a new tab with #profile-picture added automatically. Generate a square image, download it, then choose it here using Add image to finish saving your Lightning avatar.";
+        });
+        generate.title="Opens FreeGen with the profile-picture prompt tag added automatically.";
         const reset=btn("Use default pixel avatar",()=>{chosen=null;selectedPixel=0;pixelChoices.querySelectorAll("button").forEach((b,k)=>b.classList.toggle("selected",k===0));paint();});
         const save=btn("Save profile picture",async()=>{save.disabled=true;save.textContent="Saving…";try{const r=await fetch("/api/profile",{method:"PUT",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({avatar:chosen})});const j=await r.json();if(!r.ok)throw new Error(j.error||"Could not save profile.");ov.remove();await refreshLightningAccount();showAiBubbleOnScreen("Lightning profile saved.");}catch(e){alert(e.message);}finally{save.disabled=false;save.textContent="Save profile picture";}});
         body.append(preview,note,pixelChoices,file,promptInput,generate,reset,save);
