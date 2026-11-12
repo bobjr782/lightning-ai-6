@@ -123,11 +123,11 @@ async function ensureAccountTables(env) {
 
 
 async function ensureModerationTables(env) {
-  await env.DB.prepare(\`CREATE TABLE IF NOT EXISTS moderation_consents (
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS moderation_consents (
     user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     accepted_at INTEGER NOT NULL
-  )\`).run();
-  await env.DB.prepare(\`CREATE TABLE IF NOT EXISTS chat_conversations (
+  )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS chat_conversations (
     id TEXT NOT NULL,
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title TEXT NOT NULL DEFAULT 'New chat',
@@ -136,19 +136,20 @@ async function ensureModerationTables(env) {
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     PRIMARY KEY(user_id,id)
-  )\`).run();
+  )`).run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS chat_conversations_flagged_idx ON chat_conversations(updated_at DESC)").run();
-  await env.DB.prepare(\`CREATE TABLE IF NOT EXISTS blocked_users (
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS blocked_users (
     username_norm TEXT PRIMARY KEY,
     username TEXT NOT NULL,
     reason TEXT NOT NULL DEFAULT '',
     blocked_at INTEGER NOT NULL
-  )\`).run();
+  )`).run();
 }
 const PROFANITY_TERMS = ["fuck","fucking","fucked","shit","bullshit","bitch","bastard","asshole","arsehole","cunt","dickhead","motherfucker","piss off","crap"];
 function findProfanity(messages) {
   const textValue=(Array.isArray(messages)?messages:[]).map(m=>[m?.text,m?.content,m?.message].filter(x=>typeof x==="string").join(" ")).join(" ").toLowerCase();
-  return PROFANITY_TERMS.filter(term=>new RegExp("(^|[^a-z0-9])"+term.replace(/ /g,"\\\\s+")+"($|[^a-z0-9])","i").test(textValue));
+  const normalized=" "+textValue.replace(/[^a-z0-9]+/g," ")+" ";
+  return PROFANITY_TERMS.filter(term=>normalized.includes(" "+term+" "));
 }
 
 async function ensurePublishedTable(env) {
