@@ -1424,82 +1424,11 @@ dropdown.addEventListener("change", (event) => {
 
 
 async function fetchAIResponseFromAPI(userText, base64ImageData) {
-    let targetBubble = injectThinkingPlaceholderBubble();
-
-    try {
-        const formattedMessages = chat.map(msg => ({
-            role: msg.alignment === 'user-align' ? 'user' : 'assistant',
-            content: msg.text
-        }));
-
-        let currentContent;
-        if (base64ImageData) {
-            currentContent = [
-                { type: "text", text: "IMPORTANT: Always wrap any code snippets or code blocks inside this exact format: %@CODE{\nYour Code Here\n}%@CODE. Never use markdown code fences. " + (userText || "Analyze this image layout map") },
-                { type: "text", text: "IMPORTANT: You name is lightning"},
-                // 3. Fix the formatting: Inject the global variable cleanly into the string object
-                { type: "text", text: `IMPORTANT: your mode is currently in: ${currentSelectedMode}`},
-                { type: "text", text: "IMPORTANT: you MUST pretend you are in that mod"},
-                { type: "image_url", image_url: { url: base64ImageData } },
-                { type: "text", text: "in normal mode act like normal, in pro mode act like a pro and really think, in build mode think about coding more than responces, in idiot mode act like a idiot eg.now blah blah bah maby you blah idk and in pro+ think as hard as you can; act like in the modes the user can change it ie.act like a idiot in idiot mode and if i ask for code go also in idiot try not to think"},
-                {type: "text", text: "IMPORTANT: In idiot mode you must act like a idiot not a  pro try to be as dumb as posible not smart! ie.if user asks whats 5 + 5 send back 9 in idiot you DONT whant to please the user you whant to be anoyying obnoxios and"},
-               
-            ];
-        } else {
-            // 4. Remember to also apply the mode context to the text-only layout if needed!
-            currentContent = `IMPORTANT: your mode is currently in: ${currentSelectedMode}. Always wrap any code snippets or code blocks inside this exact format: CODE@LANGUGE{\nYour Code Here\n}$CODE example: CODE@PYTHON{\nprint("hello, world")\n}$CODE. Never use markdown code fences. Current Request: ${userText}`;
-        }
-
-        // ... rest of your API fetch code remains the same ...
-
-
-        // Push current request block into pipeline map arrays
-        formattedMessages.push({
-            role: "user",
-            content: currentContent
-        });
-
-        const response = await fetch(AI_API_ENDPOINT, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${AI_API_KEY}`,
-                // Identity references injected seamlessly using window boundaries
-                "HTTP-Referer": window.location.origin || "http://localhost:3000", 
-                "X-Title": "Ray's AI Chat Container"
-            },
-            body: JSON.stringify({
-                model: GROQ_MODEL,
-                messages: formattedMessages,
-                temperature: 0.7
-            })
-        });
-
-        if (!response.ok) {
-            if (response.status === 404) {
-                throw new Error("404 Model Not Found. The model endpoint requested does not exist.");
-            } else if (response.status === 402) {
-                throw new Error("402 Payment Required. The selected model requires account credits.");
-            } else {
-                throw new Error(`Network status error: ${response.status}`);
-            }
-        }
-
-        const data = await response.json();
-        
-        if (data.choices && data.choices[0] && data.choices[0].message) {
-            const aiReply = data.choices[0].message.content;
-            finalizeAiBubble(targetBubble, aiReply);
-        } else if (data.error) {
-            throw new Error(data.error.message || "OpenRouter operational routing error.");
-        } else {
-            throw new Error("Malformed system response signature layout.");
-        }
-
-    } catch (error) {
-        console.error("API Call failed:", error);
-        finalizeAiBubble(targetBubble, `⚠️ Connection Error: ${error.message}`);
-    }
+    // Keep the legacy send button compatible, but route image attachments
+    // through Lightning's current model selection, server proxy and fallbacks.
+    const images = base64ImageData ? [base64ImageData] : [];
+    const names = images.length ? ["image attachment"] : [];
+    return askAI(userText || (images.length ? "Please analyze this image." : ""), images, names);
 }
 
 // ==========================================
