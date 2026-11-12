@@ -2698,6 +2698,7 @@ window.clearHistory = () => {
     } catch (_) {}
     wr("chats", []);
     wr("cur", null);
+    if(lightningAccount&&moderationConsent)fetch("/api/moderation/chats",{method:"DELETE",credentials:"same-origin"}).catch(()=>{});
     clearAttachedFile();
     const messages = document.querySelector(".messages-container");
     if (messages) messages.replaceChildren();
@@ -2726,7 +2727,7 @@ function chatList(box) {
         g.append(el("b", "", c.title), el("small", "", new Date(c.t).toLocaleString() + (pj ? " · 📁 " + pj.name : "")));
         sel.append(new Option("No project", "")); projects.forEach(p => sel.append(new Option(p.name, p.id))); sel.value = c.project || "";
         sel.onchange = () => { c.project = sel.value || null; wr("chats", chats); chatList(box); };
-        r.append(g, sel, btn("Open", () => openChat(c.id)), btn("Delete", () => { if (confirm("Delete this chat?")) { chats = chats.filter(x => x !== c); wr("chats", chats); if (curId === c.id) newChat(); chatList(box); } }));
+        r.append(g, sel, btn("Open", () => openChat(c.id)), btn("Delete", () => { if (confirm("Delete this chat?")) { chats = chats.filter(x => x !== c); wr("chats", chats); if(lightningAccount&&moderationConsent)fetch("/api/moderation/chats?id="+encodeURIComponent(c.id),{method:"DELETE",credentials:"same-origin"}).catch(()=>{}); if (curId === c.id) newChat(); chatList(box); } }));
         box.append(r);
     });
 }
