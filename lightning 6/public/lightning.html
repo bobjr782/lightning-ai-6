@@ -2315,6 +2315,11 @@ async function askAI(apiText, images, names, force, reuse, tried) {
         }
     } catch (err) {
         console.error(err);
+        if (dedicatedOpenRouterCoder && groqOverviewKey && !(tried || []).includes("groq")) {
+            busy = false;
+            live(box, "", "OpenRouter coding models failed — switching to Groq Coder…");
+            return askAI(apiText, images, names, "groq", box, [...(tried || []), "openrouter"]);
+        }
         // If the user's Groq key/provider stops responding, retry the same
         // conversation through Lightning's server-side JarvisClaw fallback.
         if ((dedicatedGroqCoder || dedicatedOpenRouterCoder || getCfg(force).id === "groq") && !(tried || []).includes("jarvisclaw")) {
