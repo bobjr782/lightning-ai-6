@@ -1700,6 +1700,8 @@ const rd = (k, d) => { try { const v = JSON.parse(localStorage.getItem(K(k))); r
 const wr = (k, v) => { try { localStorage.setItem(K(k), JSON.stringify(v)); } catch (e) { showAiBubbleOnScreen("⚠️ Browser storage is full — delete old chats, images or artifacts."); } };
 let curProject = null, curId = null;
 const CODE_MODEL = "qwen/qwen3-coder:free";
+const CODER_GROQ_MODEL = "qwen/qwen3.8-27b";
+const GROQ_OVERVIEW_MODEL = "openai/gpt-oss-120b";
 const CODE_RE = /\b(code|coding|function|bug|debug|script|html|css|javascript|typescript|python|react|api|regex|sql|refactor|compile|algorithm|website|web ?app|game|snake|calculator|component|class)\b/i;
 function pickModel(text, images) {
     if (images.length || currentSelectedMode === "idiot") return GROQ_MODEL;
@@ -1716,6 +1718,7 @@ const MODES = {
     "pro+": "Think as hard as you can. Be exhaustive and double-check your work."
 };
 const SYSTEM = () => `You are lightning, an AI assistant. Always reply in the language the user writes in (English unless they write in another language). Current mode: ${currentSelectedMode}. ${MODES[currentSelectedMode] || MODES.normal}
+${currentSelectedMode === "coder" && localStorage.getItem("lt_use_pixellab") === "true" && localStorage.getItem("lt_pixellab_key") ? "PIXELLAB GAME-ASSET TOOL: When a game or visual app needs real pixel-art assets, request one asset with exactly this marker: $INVOKE{assets_generator: detailed description}. In the ARTIFACT HTML, put the exact placeholder PIXELLAB_ASSET_1 in the image src where the generated PNG belongs. Lightning embeds the transparent PNG automatically. Use this for real sprites, props or a coherent sprite sheet; do not draw a rough SVG substitute. Only request an asset when it materially improves the result. Maximum one invocation per response." : ""}
 OUTPUT FORMATS (never use markdown code fences):
 1. Code snippet: CODE@LANG{
 code here
@@ -2152,6 +2155,36 @@ function live(box, text, status) {
     const s = el("div", "status-line"); s.append(el("span", "pulse"), el("span", "", status)); box.append(s);
     scrollToLatestMessage();
 }
+async function generatePixelLabAsset(description) {
+    const key = localStorage.getItem("lt_pixellab_key") || "";
+    if (localStorage.getItem("lt_use_pixellab") !== "true" || !key) throw new Error("Enable Use PixelLab and connect your PixelLab API key in Account settings.");
+    const response = await fetch("/api/pixellab", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "x-pixellab-key": key },
+        body: JSON.stringify({ description, image_size: { width: 256, height: 256 }, no_background: true, detail: "highly detailed", outline: "single color black outline", enhance_prompt: true }),
+        signal: AbortSignal.timeout(90000)
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || data.detail || `PixelLab returned HTTP ${response.status}.`);
+    const image = data.image?.base64 || data.image?.url || data.image;
+    if (typeof image !== "string" || !image) throw new Error("PixelLab did not return an image.");
+    return image.startsWith("data:") ? image : "data:image/png;base64," + image;
+}
+
+async function groqCoderOverview(apiKey, source) {
+    const safeSource = String(source || "").replace(/data:image\\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+/gi, "[PixelLab image embedded]").slice(0, 26000);
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
+        body: JSON.stringify({ model: GROQ_OVERVIEW_MODEL, temperature: 0.2, max_tokens: 420, messages: [
+            { role: "system", content: "You are the independent code reviewer for Lightning. Review the supplied finished code and provide a concise user-facing overview, not a rewrite. Cover what was built, important features, how generated assets are used, and any concrete issue or limitation you can actually identify. Use 3-5 short bullet points. Do not invent tests or claim you ran the code." },
+            { role: "user", content: safeSource }
+        ] }), signal: AbortSignal.timeout(30000)
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error?.message || `Groq overview returned HTTP ${response.status}.`);
+    return data.choices?.[0]?.message?.content?.trim() || "";
+}
+
 async function askAI(apiText, images, names, force, reuse, tried) {
     busy = true; const t0 = performance.now();
     const box = reuse || injectThinkingPlaceholderBubble();
@@ -2162,16 +2195,19 @@ async function askAI(apiText, images, names, force, reuse, tried) {
         const content = images.length
             ? [{ type: "text", text: apiText || "Describe this image." }, ...images.map(u => ({ type: "image_url", image_url: { url: u } }))]
             : apiText;
-        const cfg = getCfg(force), messages = [{ role: "system", content: SYSTEM() }, ...hist, { role: "user", content: withHint(content, apiText) }];
+        const groqKeyForCoder = (rawCfg().keys || {}).groq || "";
+        const dedicatedGroqCoder = currentSelectedMode === "coder" && (!force || force === "groq") && !!groqKeyForCoder;
+        const cfg = dedicatedGroqCoder ? { ...getCfg("groq"), key: groqKeyForCoder, model: CODER_GROQ_MODEL } : getCfg(force);
+        const messages = [{ role: "system", content: SYSTEM() }, ...hist, { role: "user", content: withHint(content, apiText) }];
         const trialNoKey = !cfg.key && !(SERVER.on && SERVER[cfg.id] && cfg.id !== "custom") && cfg.id !== "custom";
         if (cfg.id === "custom" && !cfg.key) { finalizeAiBubble(box, "Add your custom API key in Model settings, or switch to Lightning Free Trial."); busy = false; return; }
         const hdr = { "Content-Type": "application/json", ...(cfg.key ? { "Authorization": `Bearer ${cfg.key}` } : {}) };
         if (cfg.id === "openrouter") hdr["X-Title"] = "lightning";
         if (cfg.id === "openrouter" && /^https?:/.test(location.origin)) hdr["HTTP-Referer"] = location.origin;
         const hasAlt = ["openrouter", "groq", "google"].some(p => p !== cfg.id && !(tried || []).includes(p) && provAvail(p));
-        const cands = trialNoKey ? ["lightning-free"] : (await candidates(cfg, apiText, images)).slice(0, hasAlt ? 2 : 6);
-        const viaServer = trialNoKey || (SERVER.on && cfg.id !== "custom");
-        const attempt = (m, s) => fetch(viaServer ? "/api/chat" : cfg.endpoint, { method: "POST", headers: viaServer ? { "Content-Type": "application/json", "x-provider": cfg.id, ...(cfg.key ? { "x-user-key": cfg.key } : {}) } : hdr, body: JSON.stringify({ model: m, temperature: m === CODE_MODEL || currentSelectedMode === "coder" ? 0.2 : 0.7, max_tokens: 1800, messages, ...(!viaServer && s && !trialNoKey ? { stream: true } : {}) }), signal: AbortSignal.timeout(30000) });
+        const cands = dedicatedGroqCoder ? [CODER_GROQ_MODEL] : (trialNoKey ? ["lightning-free"] : (await candidates(cfg, apiText, images)).slice(0, hasAlt ? 2 : 6));
+        const viaServer = !dedicatedGroqCoder && (trialNoKey || (SERVER.on && cfg.id !== "custom"));
+        const attempt = (m, s) => fetch(viaServer ? "/api/chat" : cfg.endpoint, { method: "POST", headers: viaServer ? { "Content-Type": "application/json", "x-provider": cfg.id, ...(cfg.key ? { "x-user-key": cfg.key } : {}) } : hdr, body: JSON.stringify({ model: m, temperature: dedicatedGroqCoder ? 1.0 : (m === CODE_MODEL || currentSelectedMode === "coder" ? 0.2 : 0.7), max_tokens: currentSelectedMode === "coder" ? 8192 : 1800, ...(dedicatedGroqCoder ? { reasoning_effort: "default" } : {}), messages, ...(!viaServer && s && !trialNoKey ? { stream: true } : {}) }), signal: AbortSignal.timeout(90000) });
         let res = null, streaming = !trialNoKey, full = "", usedModel = "", status = 0, retryAfter = 5;
         for (let round = 0; round < 2; round++) {
             if (cands.every(m => (cool[m] || 0) > Date.now())) Object.keys(cool).forEach(k => delete cool[k]);
@@ -2206,7 +2242,7 @@ async function askAI(apiText, images, names, force, reuse, tried) {
                     if (j.error) { const er = new Error(j.error.message || "Model error"); er.rate = j.error.code === 429 || /rate|quota|limit|credits|per-day/i.test(er.message); throw er; }
                     full += j.choices?.[0]?.delta?.content || "";
                 }
-                const cut = full.search(/ARTIFACT@|CODE@|FILE@|%@CODE|%@GRID|```/), n = full.split("\n").length;
+                const cut = full.search(/\\$INVOKE\\{|ARTIFACT@|CODE@|FILE@|%@CODE|%@GRID|```/), n = full.split("\n").length;
                 live(box, (cut < 0 ? full : full.slice(0, cut)).trim(),
                     cut < 0 ? "Writing…" : /ARTIFACT@/.test(full) ? `Building artifact… ${n} lines` : `Writing code… ${n} lines`);
             }
@@ -2217,9 +2253,39 @@ async function askAI(apiText, images, names, force, reuse, tried) {
             if (data.entitlement) { lightningEntitlement = data.entitlement; drawAcct(); }
         }
         if (!full.trim()) throw new Error("The model sent an empty reply. Try again.");
+        const invokePattern = /\$INVOKE\{\s*assets_generator\s*:\s*([^}]+)\}/gi;
+        const assetRequests = [...full.matchAll(invokePattern)];
+        let generatedAssetCount = 0;
+        if (assetRequests.length) {
+            if (localStorage.getItem("lt_use_pixellab") !== "true" || !localStorage.getItem("lt_pixellab_key")) {
+                full = full.replace(invokePattern, "");
+                full += "\n\nPixelLab asset request skipped: connect PixelLab and turn on Use PixelLab in Account settings.";
+            } else {
+                for (let i = 0; i < Math.min(assetRequests.length, 1); i++) {
+                    live(box, "", "PixelLab is generating your game asset…");
+                    const imageData = await generatePixelLabAsset(assetRequests[i][1].trim());
+                    full = full.replace(assetRequests[i][0], "").replaceAll(`PIXELLAB_ASSET_${i + 1}`, imageData);
+                    generatedAssetCount++;
+                }
+                full = full.replace(invokePattern, "");
+            }
+        }
         if (/%@GRID/i.test(full)) finalizeAiBubble(box, full);
         else {
             const art = renderRich(box, full);
+            if (generatedAssetCount) box.append(el("div", "status-done", `PixelLab generated ${generatedAssetCount} game asset and embedded it in the artifact.`));
+            if (dedicatedGroqCoder) {
+                const overview = el("div", "coder-overview");
+                overview.style.cssText = "margin-top:12px;padding:12px 14px;border:1px solid var(--border-color);border-radius:10px;background:var(--surface);white-space:pre-wrap;line-height:1.5";
+                overview.textContent = "Groq is reviewing the finished code…";
+                box.append(overview);
+                try {
+                    const summary = await groqCoderOverview(groqKeyForCoder, full);
+                    overview.textContent = summary ? "Groq overview\n" + summary : "Groq could not produce an overview for this response.";
+                } catch (reviewError) {
+                    overview.textContent = "Groq overview unavailable: " + reviewError.message;
+                }
+            }
             const secs = ((performance.now() - t0) / 1000).toFixed(1);
             box.append(el("div", "status-done", `✓ ${secs}s · ${full.trim().split(/\s+/).length} words · ${usedModel.split("/").pop().replace(":free", "")}`));
             chat.push({ text: full, alignment: "ai-align", type: "aiBox", isImage: false, imgData: "" });
@@ -2916,6 +2982,31 @@ function openProfileEditor(){
         body.append(preview,note,pixelChoices,file,promptInput,generate,reset,save);
     }
     body.append(el("h3","settings-section-title","AI providers"),provRow("openrouter","OpenRouter"),provRow("groq","Groq"),provRow("google","Google"));
+    body.append(el("h3","settings-section-title","Game asset generation"));
+    addAppearanceSwitch("Use PixelLab","Let Coder Mode generate real transparent pixel-art game assets. PixelLab usage may consume credits on your PixelLab account.",localStorage.getItem("lt_use_pixellab")==="true",enabled=>{
+        localStorage.setItem("lt_use_pixellab",enabled?"true":"false");
+        pixelLabNote.textContent=enabled?"PixelLab is enabled for Coder Mode.":"PixelLab is disabled.";
+    });
+    const pixelLabKey=el("input","field");pixelLabKey.type="password";pixelLabKey.autocomplete="off";pixelLabKey.placeholder="Paste your PixelLab API key";pixelLabKey.value=localStorage.getItem("lt_pixellab_key")||"";
+    const pixelLabNote=el("small","auth-note",localStorage.getItem("lt_pixellab_key")?"PixelLab key saved in this browser.":"Get your API token from pixellab.ai/account, then connect it here.");
+    const pixelLabActions=el("div","row-item");
+    const pixelLabConnect=btn("Connect PixelLab",async()=>{
+        const token=pixelLabKey.value.trim();if(!token){pixelLabNote.textContent="Paste your PixelLab API key first.";return;}
+        pixelLabConnect.disabled=true;pixelLabConnect.textContent="Checking…";pixelLabNote.textContent="Checking your PixelLab account…";
+        try{
+            const response=await fetch("/api/pixellab",{method:"GET",credentials:"same-origin",headers:{"x-pixellab-key":token}});
+            const result=await response.json().catch(()=>({}));
+            if(!response.ok)throw new Error(result.error||"PixelLab rejected that API key.");
+            localStorage.setItem("lt_pixellab_key",token);
+            const balance=result.balance??result.credits??result.remaining_generations;
+            pixelLabNote.textContent="Connected to PixelLab."+(balance!==undefined?" Account balance: "+JSON.stringify(balance):"");
+            showAiBubbleOnScreen("PixelLab connected. Turn on Use PixelLab to enable game asset generation in Coder Mode.");
+        }catch(error){pixelLabNote.textContent=error.message==="Failed to fetch"?"Could not reach PixelLab through Lightning. Check your connection.":error.message;}
+        finally{pixelLabConnect.disabled=false;pixelLabConnect.textContent="Connect PixelLab";}
+    });
+    const pixelLabDisconnect=btn("Disconnect",()=>{localStorage.removeItem("lt_pixellab_key");pixelLabKey.value="";localStorage.setItem("lt_use_pixellab","false");pixelLabNote.textContent="PixelLab disconnected and disabled.";});
+    pixelLabActions.append(pixelLabConnect,pixelLabDisconnect);
+    body.append(pixelLabKey,pixelLabActions,pixelLabNote);
     card.append(head,body);ov.append(card);
     ov.onclick=e=>{if(e.target===ov)ov.remove();};
     document.body.append(ov);
