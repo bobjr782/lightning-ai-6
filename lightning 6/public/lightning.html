@@ -2201,7 +2201,18 @@ async function askAI(apiText, images, names, force, reuse, tried) {
         dedicatedGroqCoder = currentSelectedMode === "coder" && (!force || force === "groq") && !!groqKeyForCoder;
         dedicatedOpenRouterCoder = currentSelectedMode === "coder" && (!force || force === "openrouter") && !!((rawCfg().keys || {}).openrouter || (SERVER.on && SERVER.openrouter));
         const cfg = dedicatedOpenRouterCoder ? getCfg("openrouter") : dedicatedGroqCoder ? { ...getCfg("groq"), key: groqKeyForCoder, model: CODER_GROQ_MODEL } : getCfg(force);
-        messages = [{ role: "system", content: SYSTEM() }, ...hist, { role: "user", content: withHint(content, apiText) }];
+        const gameBuildRules = currentSelectedMode === "coder" && /\\b(game|platformer|mario|sonic|gameplay|level|side.?scroller|rpg|arcade)\\b/i.test(apiText || "") ? `
+GAME BUILD QUALITY GATE (apply to this request):
+- Treat this as a request for a complete PLAYABLE GAME, not a picture, mock-up, landing page, or static scene. Build the actual game now.
+- Deliver one complete self-contained ARTIFACT HTML with inline CSS and JavaScript. No placeholders, TODOs, fake controls, or unfinished systems.
+- Implement a real game loop, player state, gravity, acceleration, jumping, ground/platform collision, camera/level scrolling where appropriate, enemy or obstacle interactions, collectibles/score where appropriate, win/lose states, restart, and clear keyboard/touch controls. Make every visible control work.
+- Make the visual result polished and coherent: deliberate palette, layered background, readable foreground, detailed tiles/platforms, animated character, parallax/decorations, HUD and start/restart UI. Never substitute a plain coloured rectangle for the requested game world.
+- For a Mario-style platform game, create an original cheerful platforming adventure with a red-capped hero, grassy platforms, brick blocks, pipes, coins, simple roaming enemies, a flag/goal and multiple scrolling sections. Include responsive controls (arrows/A-D to move, Space/W/Up to jump), collisions, score, lives, camera follow and a reachable level goal. Do not merely draw these objects; make them interactive game objects.
+- If PixelLab is enabled, call $INVOKE{assets_generator: one transparent, crisp 16-bit pixel-art sprite sheet for this game: a consistent original red-capped platform hero with idle, run and jump poses, plus small matching coin and enemy sprites arranged in a clean evenly spaced grid with transparent gaps, no text, no scenery, no shadows outside sprites}. Put PIXELLAB_ASSET_1 in the HTML and actually render/crop the generated sprite sheet in the game. If PixelLab is disabled, still build the complete game using crisp pixel-art canvas/CSS primitives; never block game creation.
+- Before finishing, mentally check that the game starts, controls respond, the player can land on platforms, camera follows, collectibles update the HUD, and the win/restart flow works. Do not claim you executed tests.
+- The first visible screen must show an inviting playable game scene, not a blank page or a lone rectangle.
+` : "";
+        messages = [{ role: "system", content: SYSTEM() + gameBuildRules }, ...hist, { role: "user", content: withHint(content, apiText) }];
         const trialNoKey = !cfg.key && !(SERVER.on && SERVER[cfg.id] && cfg.id !== "custom") && cfg.id !== "custom";
         if (cfg.id === "custom" && !cfg.key) { finalizeAiBubble(box, "Add your custom API key in Model settings, or switch to Lightning Free Trial."); busy = false; return; }
         const hdr = { "Content-Type": "application/json", ...(cfg.key ? { "Authorization": `Bearer ${cfg.key}` } : {}) };
