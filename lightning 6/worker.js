@@ -845,6 +845,41 @@ async function browserStopRoute(request, env) {
   return json({ok:true});
 }
 
+async function pixelLabRoute(request) {
+  const token=String(request.headers.get("x-pixellab-key")||"").trim();
+  if(!token || token.length>512) return json({error:"Add your PixelLab API key in Account settings."},401);
+  const headers={Authorization:"Bearer "+token,Accept:"application/json"};
+  if(request.method==="GET") {
+    const response=await fetch("https://api.pixellab.ai/v2/balance",{headers,signal:AbortSignal.timeout(20000)});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok) return json({error:data.detail||data.message||"PixelLab rejected that API key.",status:response.status},response.status);
+    return json(data);
+  }
+  if(request.method==="POST") {
+    let input;try{input=await body(request);}catch{return json({error:"Invalid PixelLab generation request."},400);}
+    const description=String(input.description||"").trim().slice(0,1800);
+    if(!description)return json({error:"Describe the game asset to generate."},400);
+    const size=input.image_size||{};
+    const width=Math.max(16,Math.min(256,Math.floor(Number(size.width)||256)));
+    const height=Math.max(16,Math.min(256,Math.floor(Number(size.height)||256)));
+    if(width%4||height%4||((width<32||height<32)&&width!==height))return json({error:"PixelLab image dimensions must be divisible by 4; sizes below 32 must be square."},400);
+    const payload={
+      description,image_size:{width,height},no_background:input.no_background!==false,
+      detail:["low detail","medium detail","highly detailed"].includes(input.detail)?input.detail:"highly detailed",
+      outline:["single color black outline","single color outline","selective outline","lineless"].includes(input.outline)?input.outline:"single color black outline",
+      enhance_prompt:input.enhance_prompt!==false
+    };
+    const response=await fetch("https://api.pixellab.ai/v2/create-image-pixen",{
+      method:"POST",headers:{...headers,"Content-Type":"application/json"},
+      body:JSON.stringify(payload),signal:AbortSignal.timeout(90000)
+    });
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)return json({error:data.detail||data.message||"PixelLab image generation failed.",status:response.status},response.status);
+    return json(data);
+  }
+  return json({error:"Method not allowed."},405);
+}
+
 async function route(request, env) {
   const url=new URL(request.url), path=url.pathname;
   if(path.startsWith("/api/") && !sameOrigin(request)) return json({error:"Origin not allowed."},403);
@@ -866,6 +901,7 @@ async function route(request, env) {
   if(path==="/api/browser/resume" && request.method==="POST") return browserResumeRoute(request,env);
   if(path==="/api/browser/stop" && request.method==="POST") return browserStopRoute(request,env);
   if(path==="/api/config" && request.method==="GET") return json({server:null});
+  if(path==="/api/pixellab" && (request.method==="GET" || request.method==="POST")) return pixelLabRoute(request);
   if(path==="/api/image-references" && request.method==="POST") return imageReferencesRoute(request,env);
   if(path==="/api/image" && request.method==="POST") return imageRoute(request, env);
   if(path==="/api/chat" && request.method==="POST") return chatRoute(request,env);
