@@ -2187,6 +2187,7 @@ async function groqCoderOverview(apiKey, source) {
 
 async function askAI(apiText, images, names, force, reuse, tried) {
     busy = true; const t0 = performance.now();
+    let dedicatedGroqCoder = false, messages = [];
     const box = reuse || injectThinkingPlaceholderBubble();
     live(box, "", names.length ? `Reading ${names.length} file${names.length > 1 ? "s" : ""}…` : "Thinking…");
     try {
@@ -2196,16 +2197,28 @@ async function askAI(apiText, images, names, force, reuse, tried) {
             ? [{ type: "text", text: apiText || "Describe this image." }, ...images.map(u => ({ type: "image_url", image_url: { url: u } }))]
             : apiText;
         const groqKeyForCoder = (rawCfg().keys || {}).groq || "";
-        const dedicatedGroqCoder = currentSelectedMode === "coder" && (!force || force === "groq") && !!groqKeyForCoder;
-        const cfg = dedicatedGroqCoder ? { ...getCfg("groq"), key: groqKeyForCoder, model: CODER_GROQ_MODEL } : getCfg(force);
-        const messages = [{ role: "system", content: SYSTEM() }, ...hist, { role: "user", content: withHint(content, apiText) }];
+        dedicatedGroqCoder = currentSelectedMode === "coder" && (!force || force === "groq") && !!groqKeyForCoder;
+        const dedicatedOpenRouterCoder = currentSelectedMode === "coder" && (!force || force === "openrouter") && !!((rawCfg().keys || {}).openrouter || (SERVER.on && SERVER.openrouter));
+        const cfg = dedicatedOpenRouterCoder ? getCfg("openrouter") : dedicatedGroqCoder ? { ...getCfg("groq"), key: groqKeyForCoder, model: CODER_GROQ_MODEL } : getCfg(force);
+        messages = [{ role: "system", content: SYSTEM() }, ...hist, { role: "user", content: withHint(content, apiText) }];
         const trialNoKey = !cfg.key && !(SERVER.on && SERVER[cfg.id] && cfg.id !== "custom") && cfg.id !== "custom";
         if (cfg.id === "custom" && !cfg.key) { finalizeAiBubble(box, "Add your custom API key in Model settings, or switch to Lightning Free Trial."); busy = false; return; }
         const hdr = { "Content-Type": "application/json", ...(cfg.key ? { "Authorization": `Bearer ${cfg.key}` } : {}) };
         if (cfg.id === "openrouter") hdr["X-Title"] = "lightning";
         if (cfg.id === "openrouter" && /^https?:/.test(location.origin)) hdr["HTTP-Referer"] = location.origin;
         const hasAlt = ["openrouter", "groq", "google"].some(p => p !== cfg.id && !(tried || []).includes(p) && provAvail(p));
-        const cands = dedicatedGroqCoder ? [CODER_GROQ_MODEL] : (trialNoKey ? ["lightning-free"] : (await candidates(cfg, apiText, images)).slice(0, hasAlt ? 2 : 6));
+        let cands;
+        if (dedicatedOpenRouterCoder) {
+            const pool = await openRouterCoderModels(cfg.key);
+            const start = coderPoolCursor % pool.length;
+            const rotated = [...pool.slice(start), ...pool.slice(0, start)];
+            cands = rotated.slice(0, 6);
+        } else if (dedicatedGroqCoder) {
+            const liveCoderModels = await groqModels(groqKeyForCoder);
+            cands = [...new Set([...liveCoderModels.filter(m => /qwen|gpt-oss|llama-3\\.3-70b/i.test(m)), ...liveCoderModels])].slice(0, 12);
+        } else {
+            cands = trialNoKey ? ["lightning-free"] : (await candidates(cfg, apiText, images)).slice(0, hasAlt ? 2 : 6);
+        }
         const viaServer = !dedicatedGroqCoder && (trialNoKey || (SERVER.on && cfg.id !== "custom"));
         const attempt = (m, s) => fetch(viaServer ? "/api/chat" : cfg.endpoint, { method: "POST", headers: viaServer ? { "Content-Type": "application/json", "x-provider": cfg.id, ...(cfg.key ? { "x-user-key": cfg.key } : {}) } : hdr, body: JSON.stringify({ model: m, temperature: dedicatedGroqCoder ? 1.0 : (m === CODE_MODEL || currentSelectedMode === "coder" ? 0.2 : 0.7), max_tokens: currentSelectedMode === "coder" ? 8192 : 1800, ...(dedicatedGroqCoder ? { reasoning_effort: "default", reasoning_format: "hidden" } : {}), messages, ...(!viaServer && s && !trialNoKey ? { stream: true } : {}) }), signal: AbortSignal.timeout(90000) });
         let res = null, streaming = !trialNoKey, full = "", usedModel = "", status = 0, retryAfter = 5;
@@ -2216,7 +2229,7 @@ async function askAI(apiText, images, names, force, reuse, tried) {
                 usedModel = m; streaming = true;
                 try { res = await attempt(m, true); }
                 catch (e) { try { res = await attempt(m, false); streaming = false; } catch (e2) { throw new Error("Failed to fetch — couldn't reach " + cfg.name + ". Check your internet/VPN/ad blocker, and run the file with Live Server instead of double-clicking."); } }
-                if (res.ok) { lastGood[cfg.id] = m; if (trialNoKey) streaming = false; break; }
+                if (res.ok) { lastGood[cfg.id] = m; if (dedicatedOpenRouterCoder) { const pool = await openRouterCoderModels(cfg.key); coderPoolCursor = (pool.indexOf(m) + 1) % Math.max(1, pool.length); } if (trialNoKey) streaming = false; break; }
                 status = res.status;
                 if (status === 401 || status === 403) throw new Error(`${status} — ${cfg.name} rejected the API key. Check it in ⚙️ Model settings.`);
                 if (status === 429) { cool[m] = Date.now() + 60000; retryAfter = Math.min(+res.headers.get("retry-after") || 5, 10); }
@@ -3169,6 +3182,8 @@ async function googleModels(key) {
     return googleCache.list;
 }
 let groqCache = null;
+let openRouterCoderCache = null;
+let coderPoolCursor = 0;
 async function groqModels(key) {
     const def = [PRESETS.groq.model, ...PRESETS.groq.fallback];
     if (!key && !(SERVER.on && SERVER.groq)) return def;
@@ -3181,7 +3196,44 @@ async function groqModels(key) {
     } catch (e) { groqCache = { key, list: def }; }
     return groqCache.list;
 }
+async function openRouterCoderModels(key) {
+    if (openRouterCoderCache && openRouterCoderCache.key === key) return openRouterCoderCache.list;
+    const curated = [
+        "qwen/qwen3-coder-next","qwen/qwen3-coder-plus","qwen/qwen3-coder-flash","qwen/qwen3-coder",
+        "qwen/qwen3-coder-30b-a3b-instruct","qwen/qwen2.5-coder-32b-instruct","openai/gpt-5.2-codex",
+        "openai/gpt-5.1-codex-max","openai/gpt-5.1-codex","openai/gpt-5-codex",
+        "anthropic/claude-sonnet-4.6","anthropic/claude-sonnet-4.5","anthropic/claude-opus-4.6",
+        "deepseek/deepseek-v3.2","deepseek/deepseek-v3.1-terminus","deepseek/deepseek-v3.1",
+        "mistralai/codestral-2508","mistralai/devstral-2512","mistralai/devstral-medium","mistralai/devstral-small",
+        "z-ai/glm-4.7","z-ai/glm-4.6","moonshotai/kimi-k2.5","moonshotai/kimi-k2",
+        "x-ai/grok-code-fast-1","minimax/minimax-m2.5","kwaipilot/kat-coder-pro",
+        "arcee-ai/coder-large","inception/mercury-coder","openai/gpt-oss-120b","openai/gpt-oss-20b"
+    ];
+    try {
+        const response = await fetch("https://openrouter.ai/api/v1/models", { headers: key ? { Authorization: "Bearer " + key } : {} });
+        if (!response.ok) throw new Error("OpenRouter model catalogue unavailable");
+        const data = await response.json();
+        const models = Array.isArray(data.data) ? data.data : [];
+        const byId = new Map(models.map(m => [m.id, m]));
+        const ordered = curated.filter(id => byId.has(id));
+        const isCoder = id => /coder|codex|codestral|devstral|deepseek-v[34]|claude-(sonnet|opus)|gpt-5|gpt-oss|glm-4|glm-5|kimi-k2|grok-code|minimax-m2|kat-coder|mercury-coder/i.test(id);
+        const extras = models.filter(m => isCoder(m.id) && /text->text|text\+image->text/.test(m.architecture?.modality || "text->text") && !ordered.includes(m.id)).map(m => m.id);
+        const free = id => /:free$/.test(id);
+        const list = [...ordered, ...extras.sort((a,b) => Number(free(b))-Number(free(a)))];
+        if (list.length < 20) {
+            const liveFree = models.filter(m => /:free$/.test(m.id) && /text->text/.test(m.architecture?.modality || "text->text")).map(m=>m.id);
+            for (const id of liveFree) if (!list.includes(id)) list.push(id);
+        }
+        if (!list.length) throw new Error("No coding models found");
+        openRouterCoderCache = { key, list };
+    } catch (error) {
+        const fallback = curated.slice();
+        openRouterCoderCache = { key, list: fallback };
+    }
+    return openRouterCoderCache.list;
+}
 async function candidates(cfg, text, images) {
+    if (cfg.id === "openrouter" && currentSelectedMode === "coder" && !images.length) return openRouterCoderModels(cfg.key);
     if (cfg.id === "google") return [...new Set([cfg.model, ...cfg.p.fallback, ...(await googleModels(cfg.key)).slice(0, 2)])].filter(Boolean);
     if (cfg.id === "groq") { if (images.length) return [cfg.p.vision]; const live = await groqModels(cfg.key), pick = currentSelectedMode === "coder" && !(rawCfg().models || {}).groq ? live.filter(m => /qwen3|gpt-oss-120b/.test(m)).slice(0, 1) : []; return [...new Set([...pick, cfg.model, ...cfg.p.fallback, ...live.slice(0, 3)])].filter(Boolean); }
     if (cfg.id === "custom") { if (!cfg.endpoint || !cfg.model) throw new Error("Set the endpoint and model in ⚙️ Model settings."); return [cfg.model]; }
