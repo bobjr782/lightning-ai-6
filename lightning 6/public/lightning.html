@@ -2187,7 +2187,8 @@ async function groqCoderOverview(apiKey, source) {
 
 async function askAI(apiText, images, names, force, reuse, tried) {
     busy = true; const t0 = performance.now();
-    let dedicatedGroqCoder = false, messages = [];
+    let dedicatedGroqCoder = false, dedicatedOpenRouterCoder = false, messages = [];
+    const groqOverviewKey = (rawCfg().keys || {}).groq || "";
     const box = reuse || injectThinkingPlaceholderBubble();
     live(box, "", names.length ? `Reading ${names.length} file${names.length > 1 ? "s" : ""}…` : "Thinking…");
     try {
@@ -2198,7 +2199,7 @@ async function askAI(apiText, images, names, force, reuse, tried) {
             : apiText;
         const groqKeyForCoder = (rawCfg().keys || {}).groq || "";
         dedicatedGroqCoder = currentSelectedMode === "coder" && (!force || force === "groq") && !!groqKeyForCoder;
-        const dedicatedOpenRouterCoder = currentSelectedMode === "coder" && (!force || force === "openrouter") && !!((rawCfg().keys || {}).openrouter || (SERVER.on && SERVER.openrouter));
+        dedicatedOpenRouterCoder = currentSelectedMode === "coder" && (!force || force === "openrouter") && !!((rawCfg().keys || {}).openrouter || (SERVER.on && SERVER.openrouter));
         const cfg = dedicatedOpenRouterCoder ? getCfg("openrouter") : dedicatedGroqCoder ? { ...getCfg("groq"), key: groqKeyForCoder, model: CODER_GROQ_MODEL } : getCfg(force);
         messages = [{ role: "system", content: SYSTEM() }, ...hist, { role: "user", content: withHint(content, apiText) }];
         const trialNoKey = !cfg.key && !(SERVER.on && SERVER[cfg.id] && cfg.id !== "custom") && cfg.id !== "custom";
@@ -2293,13 +2294,13 @@ async function askAI(apiText, images, names, force, reuse, tried) {
             const art = renderRich(box, full);
             if (generatedAssetCount) box.append(el("div", "status-done", `PixelLab generated ${generatedAssetCount} game asset and embedded it in the artifact.`));
             if (assetGenerationError) box.append(el("div", "status-done", "PixelLab could not generate the asset: " + assetGenerationError + ". The rest of the artifact is still available."));
-            if (dedicatedGroqCoder) {
+            if (currentSelectedMode === "coder" && groqOverviewKey) {
                 const overview = el("div", "coder-overview");
                 overview.style.cssText = "margin-top:12px;padding:12px 14px;border:1px solid var(--border-color);border-radius:10px;background:var(--surface);white-space:pre-wrap;line-height:1.5";
                 overview.textContent = "Groq is reviewing the finished code…";
                 box.append(overview);
                 try {
-                    const summary = await groqCoderOverview(groqKeyForCoder, full);
+                    const summary = await groqCoderOverview(groqOverviewKey, full);
                     overview.textContent = summary ? "Groq overview\n" + summary : "Groq could not produce an overview for this response.";
                 } catch (reviewError) {
                     overview.textContent = "Groq overview unavailable: " + reviewError.message;
@@ -2316,7 +2317,7 @@ async function askAI(apiText, images, names, force, reuse, tried) {
         console.error(err);
         // If the user's Groq key/provider stops responding, retry the same
         // conversation through Lightning's server-side JarvisClaw fallback.
-        if ((dedicatedGroqCoder || getCfg(force).id === "groq") && !(tried || []).includes("jarvisclaw")) {
+        if ((dedicatedGroqCoder || dedicatedOpenRouterCoder || getCfg(force).id === "groq") && !(tried || []).includes("jarvisclaw")) {
             try {
                 live(box, "", "Groq didn't respond — switching to JarvisClaw…");
                 const backupResponse = await fetch("/api/chat", {
