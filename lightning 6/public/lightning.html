@@ -2201,7 +2201,7 @@ async function askAI(apiText, images, names, force, reuse, tried) {
         dedicatedGroqCoder = currentSelectedMode === "coder" && (!force || force === "groq") && !!groqKeyForCoder;
         dedicatedOpenRouterCoder = currentSelectedMode === "coder" && (!force || force === "openrouter") && !!((rawCfg().keys || {}).openrouter || (SERVER.on && SERVER.openrouter));
         const cfg = dedicatedOpenRouterCoder ? getCfg("openrouter") : dedicatedGroqCoder ? { ...getCfg("groq"), key: groqKeyForCoder, model: CODER_GROQ_MODEL } : getCfg(force);
-        const gameBuildRules = currentSelectedMode === "coder" && /\\b(game|platformer|mario|sonic|gameplay|level|side.?scroller|rpg|arcade)\\b/i.test(apiText || "") ? `
+        const gameBuildRules = currentSelectedMode === "coder" && /\b(game|platformer|mario|sonic|gameplay|level|side.?scroller|rpg|arcade)\b/i.test(apiText || "") ? `
 GAME BUILD QUALITY GATE (apply to this request):
 - Treat this as a request for a complete PLAYABLE GAME, not a picture, mock-up, landing page, or static scene. Build the actual game now.
 - Deliver one complete self-contained ARTIFACT HTML with inline CSS and JavaScript. No placeholders, TODOs, fake controls, or unfinished systems.
