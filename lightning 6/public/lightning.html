@@ -2941,13 +2941,9 @@ async function checkModerationConsent(){
 }
 function makeProfileAvatar(profile,size=38,variant=0){
     if(profile?.avatar){const img=document.createElement("img");img.className="profile-avatar";img.style.width=size+"px";img.style.height=size+"px";img.src=profile.avatar;img.alt="Profile picture";return img;}
-    const canvas=document.createElement("canvas");canvas.width=8;canvas.height=8;canvas.className="profile-avatar";canvas.style.width=size+"px";canvas.style.height=size+"px";
-    const ctx=canvas.getContext("2d"),code=String(profile?.friendCode||profile?.username||"LIGHT")+":"+variant;let hash=2166136261;
+    const code=String(profile?.friendCode||profile?.username||"LIGHT")+":"+variant;let hash=2166136261;
     for(let i=0;i<code.length;i++){hash^=code.charCodeAt(i);hash=Math.imul(hash,16777619);}
-    const palettes=["#2f80ed","#8250df","#1a7f37","#bf8700","#cf4b4b","#0969da","#6639ba","#0f766e","#d97757","#0e7490","#be185d","#64748b"],color=palettes[(hash>>>0)%palettes.length];
-    ctx.fillStyle="#e6edf3";ctx.fillRect(0,0,8,8);
-    for(let y=0;y<8;y++)for(let x=0;x<4;x++){hash^=hash<<13;hash^=hash>>>17;hash^=hash<<5;if(((hash>>>0)&1)||((x===1||x===2)&&y===3)){ctx.fillStyle=color;ctx.fillRect(x,y,1,1);ctx.fillRect(7-x,y,1,1);}}
-    canvas.title="Lightning pixel avatar "+(variant+1);return canvas;
+    const img=document.createElement("img");img.className="profile-avatar";img.style.width=size+"px";img.style.height=size+"px";img.src=avatarSvgData((hash>>>0)%240);img.alt="Lightning illustrated avatar";img.title="Lightning illustrated avatar";return img;
 }
 
 const AVATAR_CATEGORIES=["Animals","Space","Nature","Portraits","Abstract","Fantasy","Ocean","Architecture","Food","Retro"];
@@ -2987,7 +2983,7 @@ function openAvatarGallery(onChoose){
  const key=e=>{if(e.key==="Escape"){overlay.remove();document.removeEventListener("keydown",key);}};document.addEventListener("keydown",key);
 }
 
-function compactProfileImage(source){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{try{const c=document.createElement("canvas");c.width=256;c.height=256;const ctx=c.getContext("2d"),side=Math.min(img.naturalWidth,img.naturalHeight),sx=(img.naturalWidth-side)/2,sy=(img.naturalHeight-side)/2;ctx.drawImage(img,sx,sy,side,side,0,0,256,256);let q=.78,data=c.toDataURL("image/webp",q);while(data.length>95000&&q>.3){q-=.08;data=c.toDataURL("image/webp",q);}if(data.length>100000)throw new Error("That picture is too large. Try a smaller image.");resolve(data);}catch(e){reject(e);}};img.onerror=()=>reject(new Error("Could not read that image."));img.src=source;});}
+function compactProfileImage(source){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{try{const size=512,c=document.createElement("canvas");c.width=size;c.height=size;const ctx=c.getContext("2d",{alpha:false});ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";const side=Math.min(img.naturalWidth,img.naturalHeight),sx=(img.naturalWidth-side)/2,sy=(img.naturalHeight-side)/2;ctx.fillStyle="#111827";ctx.fillRect(0,0,size,size);ctx.drawImage(img,sx,sy,side,side,0,0,size,size);let q=.92,data=c.toDataURL("image/webp",q);while(data.length>96000&&q>.42){q-=.05;data=c.toDataURL("image/webp",q);}if(data.length>100000)throw new Error("This image is too detailed to fit Lightning’s profile-picture limit. Try a smaller or simpler image.");resolve(data);}catch(e){reject(e);}};img.onerror=()=>reject(new Error("Could not read that image."));img.src=source;});}
 function openProfileEditor(){
     const ov=el("div","modal-overlay open account-settings-overlay"),card=el("div","modal-card account-settings-card"),body=el("div","modal-body account-settings-body"),head=el("div","modal-header");
     head.append(el("h3","","Account settings"),btn("✕",()=>ov.remove()));
@@ -3169,13 +3165,16 @@ function openLightningAuth(){
             const username=q("#lt-user").value.trim(),password=q("#lt-pass").value,err=q("#lt-auth-error"),button=q("#lt-auth-submit");
             err.textContent="";button.disabled=true;button.textContent="Please wait…";
             try{
-                const r=await fetch(mode==="login"?"/api/login":"/api/register",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({username,password})});
-                const j=await r.json();
-                if(!r.ok)throw new Error(j.error||"Account request failed.");
+                if(!username||!password)throw new Error("Enter both your username and password.");
+                const r=await fetch(mode==="login"?"/api/login":"/api/register",{method:"POST",credentials:"include",cache:"no-store",headers:{"content-type":"application/json","accept":"application/json"},body:JSON.stringify({username,password})});
+                const j=await r.json().catch(()=>({error:"Lightning returned an unreadable response. Refresh the page and try again."}));
+                if(!r.ok)throw new Error(j.error||("Account request failed (HTTP "+r.status+")."));
                 try{localStorage.setItem("lightning_username_hint",j.user?.username||username);}catch(_){}
-                ov.remove();await refreshLightningAccount();
+                await refreshLightningAccount();
+                if(!lightningAccount)throw new Error("Your details were accepted, but Lightning could not confirm your sign-in session. Check that cookies are enabled for this site, then try again.");
+                ov.remove();
                 showAiBubbleOnScreen(mode==="login"?"Welcome back to Lightning.":"Your Lightning free trial has started. No API key required.");
-            }catch(e){err.textContent=e.message;button.disabled=false;button.textContent=mode==="login"?"Sign in":"Create account";}
+            }catch(e){err.textContent=e.message||"Sign-in failed. Please try again.";button.disabled=false;button.textContent=mode==="login"?"Sign in":"Create account";}
         };
         q("#lt-auth-submit").onclick=submit;
         q("#lt-pass").onkeydown=e=>{if(e.key==="Enter")submit();};
