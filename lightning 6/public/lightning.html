@@ -2943,7 +2943,7 @@ function makeProfileAvatar(profile,size=38,variant=0){
     if(profile?.avatar){const img=document.createElement("img");img.className="profile-avatar";img.style.width=size+"px";img.style.height=size+"px";img.src=profile.avatar;img.alt="Profile picture";return img;}
     const code=String(profile?.friendCode||profile?.username||"LIGHT")+":"+variant;let hash=2166136261;
     for(let i=0;i<code.length;i++){hash^=code.charCodeAt(i);hash=Math.imul(hash,16777619);}
-    const img=document.createElement("img");img.className="profile-avatar";img.style.width=size+"px";img.style.height=size+"px";img.src=avatarSvgData((hash>>>0)%240);img.alt="Lightning illustrated avatar";img.title="Lightning illustrated avatar";return img;
+    const img=document.createElement("img");img.className="profile-avatar";img.style.width=size+"px";img.style.height=size+"px";img.src=BUILTIN_AVATARS[(hash>>>0)%BUILTIN_AVATARS.length].src;img.alt="Lightning profile picture";img.title="Lightning profile picture";return img;
 }
 
 const AVATAR_CATEGORIES=["Animals","Space","Nature","Portraits","Abstract","Fantasy","Ocean","Architecture","Food","Retro"];
@@ -2967,18 +2967,36 @@ function avatarSvgData(i){
  const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="'+bg+'"/><stop offset="1" stop-color="'+c+'"/></linearGradient><radialGradient id="orb"><stop stop-color="'+light+'"/><stop offset="1" stop-color="'+a+'"/></radialGradient></defs><rect width="256" height="256" rx="34" fill="url(#bg)"/>'+art+stars+'<rect x="4" y="4" width="248" height="248" rx="30" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="5"/></svg>';
  return "data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);
 }
+const BUILTIN_AVATARS=[
+ {name:"Banana 1",category:"Bananas",src:"/avatars/bannana1.png"},
+ {name:"Banana 2",category:"Bananas",src:"/avatars/bannana2.jpg"},
+ {name:"Banana 3",category:"Bananas",src:"/avatars/bannana3.jpg"},
+ {name:"Cat 1",category:"Cats",src:"/avatars/cat1.jpg"},
+ {name:"Cat 2",category:"Cats",src:"/avatars/cat2.jpg"},
+ {name:"Cat 3",category:"Cats",src:"/avatars/cat3.jpg"},
+ {name:"Dog 1",category:"Dogs",src:"/avatars/dog1.jpg"},
+ {name:"Dog 2",category:"Dogs",src:"/avatars/dog2.jpg"},
+ {name:"Dog 3",category:"Dogs",src:"/avatars/dog3.jpg"},
+ {name:"Dog 4",category:"Dogs",src:"/avatars/dog4.jpg"},
+ {name:"Nature 1",category:"Nature",src:"/avatars/plant1.jpg"},
+ {name:"Nature 2",category:"Nature",src:"/avatars/plant2.jpg"},
+ {name:"Nature 3",category:"Nature",src:"/avatars/plant3.jpg"},
+ {name:"Space 1",category:"Space",src:"/avatars/space1.jpg"},
+ {name:"Space 2",category:"Space",src:"/avatars/space2.jpg"},
+ {name:"Space 3",category:"Space",src:"/avatars/space3.jpg"}
+];
 function openAvatarGallery(onChoose){
  const overlay=document.createElement("div");overlay.className="avatar-gallery-overlay";overlay.setAttribute("role","dialog");overlay.setAttribute("aria-modal","true");
  const header=document.createElement("header");header.className="avatar-gallery-header";
- const heading=document.createElement("div");heading.innerHTML="<strong>Lightning avatar library</strong><small>240 original illustrated profile pictures</small>";
- const search=document.createElement("input");search.type="search";search.placeholder="Search avatars…";search.className="avatar-gallery-search";
+ const heading=document.createElement("div");heading.innerHTML="<strong>Lightning avatar library</strong><small>16 wonderfully questionable profile pictures</small>";
+ const search=document.createElement("input");search.type="search";search.placeholder="Search dogs, cats, bananas…";search.className="avatar-gallery-search";
  const close=document.createElement("button");close.className="mini-btn";close.textContent="Close";close.onclick=()=>overlay.remove();header.append(heading,search,close);
  const filters=document.createElement("nav");filters.className="avatar-gallery-filters";const grid=document.createElement("div");grid.className="avatar-gallery-grid";const viewer=document.createElement("div");viewer.className="avatar-gallery-viewer";
- const avatars=Array.from({length:240},(_,i)=>({id:i,category:AVATAR_CATEGORIES[Math.floor(i/24)],name:AVATAR_NAMES[Math.floor(i/24)*12+i%12]+" "+(Math.floor(i/12)%2+1),src:avatarSvgData(i)}));
  let active="All";
- const render=()=>{grid.replaceChildren();avatars.filter(x=>(active==="All"||x.category===active)&&(!search.value||(x.name+" "+x.category).toLowerCase().includes(search.value.toLowerCase()))).forEach(x=>{const card=document.createElement("button");card.className="avatar-gallery-card";const img=document.createElement("img");img.src=x.src;img.alt=x.name;img.loading="lazy";const name=document.createElement("span");name.textContent=x.name;const cat=document.createElement("small");cat.textContent=x.category;card.append(img,name,cat);card.onclick=()=>showViewer(x);grid.append(card);});};
- const showViewer=x=>{viewer.replaceChildren();viewer.classList.add("active");const img=document.createElement("img");img.src=x.src;img.alt=x.name;const label=document.createElement("div");label.className="avatar-gallery-viewer-label";const strong=document.createElement("strong");strong.textContent=x.name;const small=document.createElement("small");small.textContent=x.category+" · Lightning avatar";label.append(strong,small);const back=document.createElement("button");back.className="mini-btn avatar-viewer-back";back.textContent="Back to gallery";back.onclick=()=>{viewer.classList.remove("active");viewer.replaceChildren();};const use=document.createElement("button");use.className="mini-btn avatar-viewer-use";use.textContent="Use this avatar";use.onclick=()=>{onChoose(x.src);overlay.remove();};viewer.append(img,label,back,use);};
- ["All",...AVATAR_CATEGORIES].forEach(name=>{const b=document.createElement("button");b.className="mini-btn"+(name==="All"?" active":"");b.textContent=name;b.onclick=()=>{active=name;filters.querySelectorAll("button").forEach(z=>z.classList.toggle("active",z===b));render();};filters.append(b);});
+ const categories=["Bananas","Cats","Dogs","Nature","Space"];
+ const render=()=>{grid.replaceChildren();const matches=BUILTIN_AVATARS.filter(x=>(active==="All"||x.category===active)&&(!search.value||(x.name+" "+x.category).toLowerCase().includes(search.value.toLowerCase())));matches.forEach(x=>{const card=document.createElement("button");card.className="avatar-gallery-card";const img=document.createElement("img");img.src=x.src;img.alt=x.name;img.loading="lazy";img.onerror=()=>{img.alt=x.name+" (image file not uploaded yet)";card.classList.add("avatar-missing");};const name=document.createElement("span");name.textContent=x.name;const cat=document.createElement("small");cat.textContent=x.category;card.append(img,name,cat);card.onclick=()=>showViewer(x);grid.append(card);});if(!matches.length)grid.innerHTML='<p class="art-empty">No pictures found.</p>';};
+ const showViewer=x=>{viewer.replaceChildren();viewer.classList.add("active");const img=document.createElement("img");img.src=x.src;img.alt=x.name;const label=document.createElement("div");label.className="avatar-gallery-viewer-label";const strong=document.createElement("strong");strong.textContent=x.name;const small=document.createElement("small");small.textContent=x.category+" · Original uploaded picture";label.append(strong,small);const back=document.createElement("button");back.className="mini-btn avatar-viewer-back";back.textContent="Back to gallery";back.onclick=()=>{viewer.classList.remove("active");viewer.replaceChildren();};const use=document.createElement("button");use.className="mini-btn avatar-viewer-use";use.textContent="Use this avatar";use.onclick=()=>{onChoose(x.src);overlay.remove();};viewer.append(img,label,back,use);};
+ ["All",...categories].forEach(name=>{const b=document.createElement("button");b.className="mini-btn"+(name==="All"?" active":"");b.textContent=name;b.onclick=()=>{active=name;filters.querySelectorAll("button").forEach(z=>z.classList.toggle("active",z===b));render();};filters.append(b);});
  search.addEventListener("input",render);overlay.append(header,filters,grid,viewer);document.body.append(overlay);render();
  const key=e=>{if(e.key==="Escape"){overlay.remove();document.removeEventListener("keydown",key);}};document.addEventListener("keydown",key);
 }
