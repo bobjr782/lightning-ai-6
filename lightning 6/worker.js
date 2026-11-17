@@ -924,7 +924,7 @@ async function route(request, env) {
   if(path==="/api/browser/command" && request.method==="POST") return browserCommandRoute(request,env);
   if(path==="/api/browser/resume" && request.method==="POST") return browserResumeRoute(request,env);
   if(path==="/api/browser/stop" && request.method==="POST") return browserStopRoute(request,env);
-  if(path==="/api/config" && request.method==="GET") return json({server:{qwen:!!env.QWEN_API_KEY}});
+  if(path==="/api/config" && request.method==="GET") return json({server:true,qwen:!!env.QWEN_API_KEY});
   if(path==="/api/pixellab" && (request.method==="GET" || request.method==="POST")) return pixelLabRoute(request);
   if(path==="/api/image-references" && request.method==="POST") return imageReferencesRoute(request,env);
   if(path==="/api/image" && request.method==="POST") return imageRoute(request, env);
