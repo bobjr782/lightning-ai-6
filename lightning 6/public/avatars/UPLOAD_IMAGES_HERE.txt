@@ -1,0 +1,20 @@
+Upload the 16 original image files from the supplied img.zip into this folder (public/avatars/). Keep these exact filenames:
+
+- bannana1.png
+- bannana2.jpg
+- bannana3.jpg
+- cat1.jpg
+- cat2.jpg
+- cat3.jpg
+- dog1.jpg
+- dog2.jpg
+- dog3.jpg
+- dog4.jpg
+- plant1.jpg
+- plant2.jpg
+- plant3.jpg
+- space1.jpg
+- space2.jpg
+- space3.jpg
+
+Lightning's profile-picture gallery references these paths directly.
