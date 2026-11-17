@@ -466,7 +466,31 @@ textarea.field { resize: vertical; }
 .logo-bolt .px { width: 24px; height: 24px; vertical-align: -5px; }
 .art-icon .px { width: 32px; height: 32px; }
 .avatar .px { width: 16px; height: 16px; }
-.profile-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;border:1px solid var(--border-color);background:var(--surface-2);flex:0 0 auto;image-rendering:pixelated}.profile-key{font-family:ui-monospace,monospace;letter-spacing:.12em;font-weight:700}.profile-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.profile-tools .mini-btn{margin:0}.profile-shortcut{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;padding:2px;border:1px solid var(--border-color);border-radius:50%;background:var(--surface);cursor:pointer;flex:0 0 auto}.profile-shortcut:hover{border-color:var(--accent);transform:translateY(-1px)}.profile-shortcut .profile-avatar{width:32px!important;height:32px!important;border:0}.profile-shortcut:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.profile-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;border:1px solid var(--border-color);background:var(--surface-2);flex:0 0 auto;}.profile-key{font-family:ui-monospace,monospace;letter-spacing:.12em;font-weight:700}.profile-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.profile-tools .mini-btn{margin:0}.profile-shortcut{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;padding:2px;border:1px solid var(--border-color);border-radius:50%;background:var(--surface);cursor:pointer;flex:0 0 auto}.profile-shortcut:hover{border-color:var(--accent);transform:translateY(-1px)}.profile-shortcut .profile-avatar{width:32px!important;height:32px!important;border:0}.profile-shortcut:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.avatar-gallery-launch{width:100%;min-height:54px!important;font-weight:700!important}
+.avatar-gallery-overlay{position:fixed;inset:0;z-index:30000;background:var(--bg-main,#10131a);color:var(--text-primary,#f4f5f7);display:flex;flex-direction:column;padding:18px;box-sizing:border-box;overflow:hidden}
+.avatar-gallery-header{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:4px 0 16px;border-bottom:1px solid var(--border-color)}
+.avatar-gallery-header>div{display:flex;flex-direction:column;gap:4px;flex:1;min-width:180px}
+.avatar-gallery-header small{color:var(--text-secondary)}
+.avatar-gallery-search{min-width:180px;max-width:340px;flex:1;background:var(--surface);color:var(--text-primary);border:1px solid var(--border-color);border-radius:9px;padding:12px}
+.avatar-gallery-filters{display:flex;gap:8px;overflow-x:auto;padding:14px 0;flex-shrink:0}
+.avatar-gallery-filters .active{border-color:var(--accent);background:var(--surface-2)}
+.avatar-gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(142px,1fr));gap:13px;overflow:auto;min-height:0;padding:2px 4px 20px}
+.avatar-gallery-card{display:flex;flex-direction:column;gap:7px;min-width:0;padding:8px;border:1px solid var(--border-color);border-radius:12px;background:var(--surface);color:var(--text-primary);text-align:left;cursor:pointer}
+.avatar-gallery-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.avatar-gallery-card img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px}
+.avatar-gallery-card span{font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.avatar-gallery-card small{color:var(--text-secondary)}
+.avatar-gallery-viewer{display:none;position:absolute;inset:0;background:#090d16;align-items:center;justify-content:center}
+.avatar-gallery-viewer.active{display:flex}
+.avatar-gallery-viewer>img{width:100%;height:100%;object-fit:contain}
+.avatar-gallery-viewer-label{position:absolute;left:24px;bottom:24px;display:flex;flex-direction:column;gap:5px;padding:12px 16px;border-radius:10px;background:#101722dc;color:#fff;backdrop-filter:blur(12px)}
+.avatar-gallery-viewer-label small{color:#d4dbe6}
+.avatar-viewer-back,.avatar-viewer-use{position:absolute;top:20px;background:#171f2b!important;color:#fff!important;border:1px solid #ffffff44!important}
+.avatar-viewer-back{left:20px}.avatar-viewer-use{right:20px;background:var(--accent)!important}
+@media(max-width:650px){.avatar-gallery-overlay{padding:10px}.avatar-gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.avatar-gallery-header{gap:9px}.avatar-gallery-search{max-width:none;order:3;flex-basis:100%}.avatar-gallery-card{padding:6px}}
+
 .message-row.ai-align::before { content: ""; flex: 0 0 28px; width: 28px; height: 28px; border-radius: 0; background: var(--accent); -webkit-mask: var(--px-bolt) center / 24px 24px no-repeat; mask: var(--px-bolt) center / 24px 24px no-repeat; margin-right: 12px; font-size: 0; }
 #model-pick { max-width: 150px; text-overflow: ellipsis; }
 .acct { flex-direction: column; align-items: stretch; gap: 8px; }
@@ -2871,7 +2895,7 @@ function saveCfg(s) { try { localStorage.setItem("lt_cfg", JSON.stringify(s)); }
 function useProv(id) { const s = rawCfg(); s.provider = id; saveCfg(s); Object.keys(cool).forEach(k => delete cool[k]); drawAcct(); fillModels(); showAiBubbleOnScreen("Now using " + PRESETS[id].name.split(" (")[0] + "."); }
 function disconnect(id) { const s = rawCfg(); s.keys = { ...s.keys, [id]: "" }; if (s.provider === id) s.provider = "openrouter"; if (id === "groq") groqCache = null; if (id === "google") googleCache = null; saveCfg(s); drawAcct(); fillModels(); }
 function provRow(id, label) {
-    const s = rawCfg(), has = !!(s.keys && s.keys[id]), srv = !!(SERVER.on && SERVER[id]), active = getCfg().id === id, signIn = () => (id === "groq" || id === "google" ? keyModal(id) : connectOpenRouter());
+    const s = rawCfg(), has = !!(s.keys && s.keys[id]), srv = !!(SERVER.on && SERVER[id]), active = getCfg().id === id, signIn = () => (id === "groq" || id === "google" ? keyModal(id) : id === "qwen" ? showAiBubbleOnScreen("Qwen is connected by the Lightning site owner. Add QWEN_API_KEY in Cloudflare Worker settings.") : connectOpenRouter());
     if (!has && !srv) return btn("🔑 Sign in with " + label, signIn);
     const r = el("div", "prov-row" + (active ? " active" : "")), nm = el("div", "grow");
     nm.append(el("b", "", label), el("small", "", (active ? "In use" : "Available") + " · " + (has ? "your key" : "included key")));
@@ -2925,6 +2949,44 @@ function makeProfileAvatar(profile,size=38,variant=0){
     for(let y=0;y<8;y++)for(let x=0;x<4;x++){hash^=hash<<13;hash^=hash>>>17;hash^=hash<<5;if(((hash>>>0)&1)||((x===1||x===2)&&y===3)){ctx.fillStyle=color;ctx.fillRect(x,y,1,1);ctx.fillRect(7-x,y,1,1);}}
     canvas.title="Lightning pixel avatar "+(variant+1);return canvas;
 }
+
+const AVATAR_CATEGORIES=["Animals","Space","Nature","Portraits","Abstract","Fantasy","Ocean","Architecture","Food","Retro"];
+const AVATAR_NAMES=["Fox","Cat","Owl","Tiger","Panda","Wolf","Rabbit","Bear","Deer","Raccoon","Parrot","Dragonfly","Nebula","Planet","Comet","Astronaut","Galaxy","Saturn","Moon","Starship","Meteor","Cosmos","Satellite","Supernova","Wildflower","Forest","Sunset","Mountain","Desert","Mushroom","Waterfall","Autumn","Meadow","Aurora","Cactus","Orchid","Explorer","Artist","Pilot","Scientist","Musician","Skater","Dreamer","Inventor","Gardener","Sailor","Reader","Adventurer","Liquid","Prism","Orbit","Waves","Layers","Spectrum","Bloom","Motion","Mirage","Spiral","Pulse","Fragments","Crystal","Phoenix","Castle","Wizard","Unicorn","Enchanted","Griffin","Moonstone","Fairy","Dragon","Runes","Myth","Jellyfish","Whale","Turtle","Coral","Seahorse","Dolphin","Koi","Shell","Reef","Stingray","Octopus","Lagoon","Skyline","Lighthouse","Cabin","Pagoda","Castle","City","Bridge","Tower","Villa","Station","Harbour","Museum","Strawberry","Citrus","Coffee","Ramen","Peach","Donut","Avocado","Cherries","Cupcake","Melon","Tea","Pasta","Sunset","Cassette","Arcade","Roller","Vinyl","Palm","Neon","Skate","Disco","Synth","Horizon","Afterglow"];
+function avatarSvgData(i){
+ let seed=(i+1)*2654435761>>>0;const rnd=()=>{seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;return (seed>>>0)/4294967296;};
+ const ci=Math.floor(i/24),h=Math.floor(rnd()*360),h2=(h+80+Math.floor(rnd()*80))%360,h3=(h+190)%360;
+ const a="hsl("+h+" 75% 52%)",b="hsl("+h2+" 80% 65%)",c="hsl("+h3+" 62% 30%)",bg="hsl("+(h+220)%360+" 48% 13%)",light="hsl("+(h+40)%360+" 95% 82%)";
+ const cat=AVATAR_CATEGORIES[ci];let art="";
+ if(cat==="Animals")art='<ellipse cx="128" cy="145" rx="78" ry="70" fill="'+a+'"/><path d="M67 105 L55 38 L108 83 M148 83 L201 38 L189 105" fill="'+b+'" stroke="'+c+'" stroke-width="8"/><ellipse cx="98" cy="137" rx="8" ry="12" fill="#172033"/><ellipse cx="158" cy="137" rx="8" ry="12" fill="#172033"/><path d="M112 165 Q128 180 144 165" fill="none" stroke="#172033" stroke-width="7" stroke-linecap="round"/>';
+ else if(cat==="Space")art='<circle cx="'+(65+rnd()*120)+'" cy="'+(45+rnd()*120)+'" r="'+(30+rnd()*35)+'" fill="url(#orb)"/><ellipse cx="128" cy="132" rx="108" ry="34" fill="none" stroke="'+light+'" stroke-width="5" transform="rotate(-24 128 132)"/><circle cx="128" cy="132" r="9" fill="#fff"/>';
+ else if(cat==="Nature")art='<circle cx="190" cy="62" r="34" fill="'+light+'"/><path d="M0 160 Q60 85 125 160 T256 150 V256 H0Z" fill="'+a+'"/><path d="M0 196 Q65 140 128 195 T256 190 V256 H0Z" fill="'+c+'"/><path d="M48 222 Q85 164 120 222 M145 220 Q175 165 207 220" fill="none" stroke="'+b+'" stroke-width="12" stroke-linecap="round"/>';
+ else if(cat==="Portraits")art='<path d="M35 256 Q42 185 86 178 H170 Q214 185 221 256Z" fill="'+a+'"/><ellipse cx="128" cy="125" rx="61" ry="76" fill="'+light+'"/><path d="M64 130 Q38 28 130 34 Q222 28 192 140 L178 90 Q128 114 78 86Z" fill="'+c+'"/><circle cx="104" cy="132" r="6" fill="#172033"/><circle cx="152" cy="132" r="6" fill="#172033"/><path d="M110 163 Q128 175 146 163" fill="none" stroke="#a34d58" stroke-width="6" stroke-linecap="round"/>';
+ else if(cat==="Abstract")art='<path d="M-10 120 C35 5 109 25 123 93 S210 192 268 72 V270 H-10Z" fill="'+a+'"/><path d="M-5 172 C45 80 111 91 151 145 S220 214 264 138" fill="none" stroke="'+light+'" stroke-width="25" stroke-linecap="round"/><circle cx="'+(55+rnd()*140)+'" cy="'+(50+rnd()*150)+'" r="'+(18+rnd()*32)+'" fill="'+b+'"/>';
+ else if(cat==="Fantasy")art='<path d="M128 24 L160 95 L232 128 L160 161 L128 232 L96 161 L24 128 L96 95Z" fill="url(#orb)" stroke="'+light+'" stroke-width="5"/><circle cx="128" cy="128" r="28" fill="'+c+'" stroke="#fff" stroke-width="4"/><path d="M128 30 V226 M30 128 H226" stroke="#fff" opacity=".35" stroke-width="3"/>';
+ else if(cat==="Ocean")art='<path d="M0 150 Q32 115 64 150 T128 150 T192 150 T256 150 V256 H0Z" fill="'+a+'"/><path d="M0 188 Q32 153 64 188 T128 188 T192 188 T256 188" fill="none" stroke="'+light+'" stroke-width="8"/><path d="M128 48 C82 52 80 105 128 140 C176 105 174 52 128 48Z" fill="'+b+'"/><circle cx="114" cy="92" r="5" fill="#fff"/><circle cx="142" cy="92" r="5" fill="#fff"/>';
+ else if(cat==="Architecture")art='<circle cx="192" cy="60" r="28" fill="'+light+'"/><path d="M18 230 V122 H74 V230 M82 230 V80 H148 V230 M154 230 V145 H204 V230 M210 230 V105 H248 V230Z" fill="'+a+'"/><path d="M82 80 L115 44 L148 80 M154 145 L179 116 L204 145" fill="'+b+'"/><g fill="'+light+'"><path d="M34 145h14v22H34z M34 183h14v22H34z M101 105h14v22h-14z M101 147h14v22h-14z"/></g>';
+ else if(cat==="Food")art='<path d="M128 35 C78 35 48 86 63 143 Q79 211 128 222 Q177 211 193 143 C208 86 178 35 128 35Z" fill="'+a+'"/><path d="M128 45 Q110 12 145 18" stroke="#4d9a58" stroke-width="13" fill="none" stroke-linecap="round"/><path d="M90 88 Q128 62 166 88" stroke="'+light+'" stroke-width="7" fill="none"/>';
+ else art='<circle cx="128" cy="115" r="96" fill="'+a+'"/><path d="M0 185 H256" stroke="'+light+'" stroke-width="8"/><path d="M0 208 H256 M0 232 H256" stroke="'+b+'" stroke-width="5"/><path d="M15 190 L85 115 L126 155 L176 86 L241 190Z" fill="'+c+'"/>';
+ const stars=Array.from({length:7},()=>'<circle cx="'+Math.round(rnd()*240+8)+'" cy="'+Math.round(rnd()*180+8)+'" r="'+(rnd()*2+1)+'" fill="#fff" opacity=".7"/>').join("");
+ const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="'+bg+'"/><stop offset="1" stop-color="'+c+'"/></linearGradient><radialGradient id="orb"><stop stop-color="'+light+'"/><stop offset="1" stop-color="'+a+'"/></radialGradient></defs><rect width="256" height="256" rx="34" fill="url(#bg)"/>'+art+stars+'<rect x="4" y="4" width="248" height="248" rx="30" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="5"/></svg>';
+ return "data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);
+}
+function openAvatarGallery(onChoose){
+ const overlay=document.createElement("div");overlay.className="avatar-gallery-overlay";overlay.setAttribute("role","dialog");overlay.setAttribute("aria-modal","true");
+ const header=document.createElement("header");header.className="avatar-gallery-header";
+ const heading=document.createElement("div");heading.innerHTML="<strong>Lightning avatar library</strong><small>240 original illustrated profile pictures</small>";
+ const search=document.createElement("input");search.type="search";search.placeholder="Search avatars…";search.className="avatar-gallery-search";
+ const close=document.createElement("button");close.className="mini-btn";close.textContent="Close";close.onclick=()=>overlay.remove();header.append(heading,search,close);
+ const filters=document.createElement("nav");filters.className="avatar-gallery-filters";const grid=document.createElement("div");grid.className="avatar-gallery-grid";const viewer=document.createElement("div");viewer.className="avatar-gallery-viewer";
+ const avatars=Array.from({length:240},(_,i)=>({id:i,category:AVATAR_CATEGORIES[Math.floor(i/24)],name:AVATAR_NAMES[Math.floor(i/24)*12+i%12]+" "+(Math.floor(i/12)%2+1),src:avatarSvgData(i)}));
+ let active="All";
+ const render=()=>{grid.replaceChildren();avatars.filter(x=>(active==="All"||x.category===active)&&(!search.value||(x.name+" "+x.category).toLowerCase().includes(search.value.toLowerCase()))).forEach(x=>{const card=document.createElement("button");card.className="avatar-gallery-card";const img=document.createElement("img");img.src=x.src;img.alt=x.name;img.loading="lazy";const name=document.createElement("span");name.textContent=x.name;const cat=document.createElement("small");cat.textContent=x.category;card.append(img,name,cat);card.onclick=()=>showViewer(x);grid.append(card);});};
+ const showViewer=x=>{viewer.replaceChildren();viewer.classList.add("active");const img=document.createElement("img");img.src=x.src;img.alt=x.name;const label=document.createElement("div");label.className="avatar-gallery-viewer-label";const strong=document.createElement("strong");strong.textContent=x.name;const small=document.createElement("small");small.textContent=x.category+" · Lightning avatar";label.append(strong,small);const back=document.createElement("button");back.className="mini-btn avatar-viewer-back";back.textContent="Back to gallery";back.onclick=()=>{viewer.classList.remove("active");viewer.replaceChildren();};const use=document.createElement("button");use.className="mini-btn avatar-viewer-use";use.textContent="Use this avatar";use.onclick=()=>{onChoose(x.src);overlay.remove();};viewer.append(img,label,back,use);};
+ ["All",...AVATAR_CATEGORIES].forEach(name=>{const b=document.createElement("button");b.className="mini-btn"+(name==="All"?" active":"");b.textContent=name;b.onclick=()=>{active=name;filters.querySelectorAll("button").forEach(z=>z.classList.toggle("active",z===b));render();};filters.append(b);});
+ search.addEventListener("input",render);overlay.append(header,filters,grid,viewer);document.body.append(overlay);render();
+ const key=e=>{if(e.key==="Escape"){overlay.remove();document.removeEventListener("keydown",key);}};document.addEventListener("keydown",key);
+}
+
 function compactProfileImage(source){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{try{const c=document.createElement("canvas");c.width=256;c.height=256;const ctx=c.getContext("2d"),side=Math.min(img.naturalWidth,img.naturalHeight),sx=(img.naturalWidth-side)/2,sy=(img.naturalHeight-side)/2;ctx.drawImage(img,sx,sy,side,side,0,0,256,256);let q=.78,data=c.toDataURL("image/webp",q);while(data.length>95000&&q>.3){q-=.08;data=c.toDataURL("image/webp",q);}if(data.length>100000)throw new Error("That picture is too large. Try a smaller image.");resolve(data);}catch(e){reject(e);}};img.onerror=()=>reject(new Error("Could not read that image."));img.src=source;});}
 function openProfileEditor(){
     const ov=el("div","modal-overlay open account-settings-overlay"),card=el("div","modal-card account-settings-card"),body=el("div","modal-body account-settings-body"),head=el("div","modal-header");
@@ -2992,18 +3054,12 @@ function openProfileEditor(){
         const preview=el("div","profile-settings-preview");
         const paint=()=>preview.replaceChildren(makeProfileAvatar({...lightningAccount,avatar:chosen},76,selectedPixel));
         paint();
-        const note=el("small","auth-note","Choose from the pixel avatars, upload a picture, or generate one with FLUX.");
-        const pixelChoices=el("div","pixel-avatar-choices");
-        for(let v=0;v<12;v++){
-            const choice=btn("",()=>{selectedPixel=v;chosen=makeProfileAvatar({...lightningAccount,avatar:null},64,v).toDataURL("image/png");pixelChoices.querySelectorAll("button").forEach((b,k)=>b.classList.toggle("selected",k===v));paint();});
-            choice.classList.add("pixel-avatar-choice");
-            choice.append(makeProfileAvatar({...lightningAccount,avatar:null},34,v),el("small","","Pixel "+(v+1)));
-            if(v===0)choice.classList.add("selected");
-            pixelChoices.append(choice);
-        }
+        const note=el("small","auth-note","Browse hundreds of illustrated avatars in different styles, or upload your own picture.");
+        const galleryButton=btn("Browse 240 illustrated avatars",async()=>{galleryButton.disabled=true;galleryButton.textContent="Opening avatar gallery…";try{openAvatarGallery(async source=>{chosen=await compactProfileImage(source);paint();note.textContent="Avatar selected. Save profile picture to apply it to your Lightning account.";});}finally{galleryButton.disabled=false;galleryButton.textContent="Browse 240 illustrated avatars";}});
+        galleryButton.classList.add("avatar-gallery-launch");
         const file=el("input","field");file.type="file";file.accept="image/png,image/jpeg,image/webp";
         file.onchange=async()=>{const f=file.files?.[0];if(!f)return;try{const src=await new Promise((res,rej)=>{const reader=new FileReader();reader.onload=()=>res(reader.result);reader.onerror=rej;reader.readAsDataURL(f);});chosen=await compactProfileImage(src);paint();}catch(e){alert(e.message);}};
-        const promptInput=el("input","field");promptInput.placeholder="Describe your profile picture for FLUX…";promptInput.value="A crisp, friendly pixel-art lightning bolt emblem, centered, bold simple shapes, dark background";
+        const promptInput=el("input","field");promptInput.placeholder="Describe your profile picture for FLUX…";promptInput.value="A beautifully illustrated lightning bird emblem, bold flowing shapes, rich midnight-blue and electric-cyan colours, atmospheric lighting, centered composition";
         const generate=btn("Open FreeGen for profile picture",()=>{
             const prompt=promptInput.value.trim();
             if(!prompt){alert("Describe your profile picture first.");return;}
@@ -3013,11 +3069,11 @@ function openProfileEditor(){
             note.textContent="FreeGen opened in a new tab with #profile-picture added automatically. Generate a square image, download it, then choose it here using Add image to finish saving your Lightning avatar.";
         });
         generate.title="Opens FreeGen with the profile-picture prompt tag added automatically.";
-        const reset=btn("Use default pixel avatar",()=>{chosen=null;selectedPixel=0;pixelChoices.querySelectorAll("button").forEach((b,k)=>b.classList.toggle("selected",k===0));paint();});
+        const reset=btn("Use default Lightning avatar",()=>{chosen=null;selectedPixel=0;paint();});
         const save=btn("Save profile picture",async()=>{save.disabled=true;save.textContent="Saving…";try{const r=await fetch("/api/profile",{method:"PUT",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({avatar:chosen})});const j=await r.json();if(!r.ok)throw new Error(j.error||"Could not save profile.");ov.remove();await refreshLightningAccount();showAiBubbleOnScreen("Lightning profile saved.");}catch(e){alert(e.message);}finally{save.disabled=false;save.textContent="Save profile picture";}});
-        body.append(preview,note,pixelChoices,file,promptInput,generate,reset,save);
+        body.append(preview,note,galleryButton,file,promptInput,generate,reset,save);
     }
-    body.append(el("h3","settings-section-title","AI providers"),provRow("openrouter","OpenRouter"),provRow("groq","Groq"),provRow("google","Google"));
+    body.append(el("h3","settings-section-title","AI providers"),provRow("qwen","Qwen"),provRow("openrouter","OpenRouter"),provRow("groq","Groq"),provRow("google","Google"));
     body.append(el("h3","settings-section-title","Game asset generation"));
     addAppearanceSwitch("Use PixelLab","Let Coder Mode generate real transparent pixel-art game assets. PixelLab usage may consume credits on your PixelLab account.",localStorage.getItem("lt_use_pixellab")==="true",enabled=>{
         localStorage.setItem("lt_use_pixellab",enabled?"true":"false");
@@ -3158,6 +3214,7 @@ window.toggleTheme = () => { document.body.classList.toggle("light-mode"); local
 /* ---------- Providers, model rotation, settings ---------- */
 const PRESETS = {
     lightning: { name: "Lightning Free (automatic, no API key)", endpoint: "/api/chat", model: "lightning-free", note: "Connects automatically through Lightning's Cloudflare AI service. No account, API key or provider sign-in required. Usage is subject to Cloudflare's free allowance." },
+    qwen: { name: "Qwen (Lightning server)", endpoint: "/api/chat", model: "qwen3.7-plus", note: "Qwen runs securely through Lightning. Its API key stays in Cloudflare Worker secrets, never in your browser." },
     openrouter: { name: "OpenRouter (free models, auto-rotate)", endpoint: AI_API_ENDPOINT, model: "", note: "Free models share small quotas, so 429s are common. Lightning now rotates through the live list of free models automatically." },
     groq: { name: "Groq (fast, free key)", endpoint: "https://api.groq.com/openai/v1/chat/completions", model: "llama-3.3-70b-versatile", fallback: ["llama-3.1-8b-instant"], vision: "meta-llama/llama-4-scout-17b-16e-instruct", note: "Get a free key at console.groq.com/keys. Much faster, with far higher free limits than OpenRouter's free models." },
     google: { name: "Google Gemini (free key)", endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", model: "gemini-2.5-flash", fallback: ["gemini-2.5-flash-lite", "gemini-3.5-flash"], vision: "gemini-2.5-flash", note: "Free key at aistudio.google.com/apikey. Great as a backup: when OpenRouter or Groq is rate-limited, lightning switches to Gemini automatically." },
@@ -3169,7 +3226,7 @@ function getCfg(force) {
     const s = rawCfg(), keys = s.keys || {};
     let id = PRESETS[force] ? force : PRESETS[s.provider] ? s.provider : "lightning";
     const has = k => keys[k] || (SERVER.on && SERVER[k] && k !== "custom");
-    if (!has(id) && !force) { const alt = ["openrouter", "groq", "google", "custom"].find(k => has(k)); id = alt || "lightning"; }
+    if (!has(id) && !force) { const alt = ["qwen", "openrouter", "groq", "google", "custom"].find(k => has(k)); id = alt || "lightning"; }
     const p = PRESETS[id];
     return { id, p, name: p.name.split(" (")[0], endpoint: id === "custom" ? (s.endpoint || "") : p.endpoint, key: (s.keys && s.keys[id]) || "", model: (s.models && s.models[id]) || p.model };
 }
@@ -3250,6 +3307,7 @@ async function openRouterCoderModels(key) {
     return openRouterCoderCache.list;
 }
 async function candidates(cfg, text, images) {
+    if (cfg.id === "qwen") return [cfg.model || PRESETS.qwen.model];
     if (cfg.id === "openrouter" && currentSelectedMode === "coder" && !images.length) return openRouterCoderModels(cfg.key);
     if (cfg.id === "google") return [...new Set([cfg.model, ...cfg.p.fallback, ...(await googleModels(cfg.key)).slice(0, 2)])].filter(Boolean);
     if (cfg.id === "groq") { if (images.length) return [cfg.p.vision]; const live = await groqModels(cfg.key), pick = currentSelectedMode === "coder" && !(rawCfg().models || {}).groq ? live.filter(m => /qwen3|gpt-oss-120b/.test(m)).slice(0, 1) : []; return [...new Set([...pick, cfg.model, ...cfg.p.fallback, ...live.slice(0, 3)])].filter(Boolean); }
@@ -3265,7 +3323,7 @@ window.openSettings = function () {
     <input class="field" id="s-endpoint" placeholder="Endpoint URL (…/chat/completions)"><input class="field" id="s-key" type="password" placeholder="API key"><input class="field" id="s-model" placeholder="Model (blank = automatic)">
     <button class="send-btn wide" id="s-or" type="button">🔑 Sign in with OpenRouter</button><small class="auth-note" id="s-note"></small><button class="send-btn wide" id="s-save">Save</button></div>`;
     const g = s => card.querySelector(s), prov = g("#s-prov");
-    const fill = id => { const s = rawCfg(), p = PRESETS[id]; g("#s-endpoint").hidden = id !== "custom"; g("#s-endpoint").value = s.endpoint || ""; g("#s-key").hidden = id === "lightning"; g("#s-key").value = (s.keys && s.keys[id]) || ""; g("#s-key").placeholder = "API key"; g("#s-model").hidden = id === "lightning"; g("#s-model").value = (s.models && s.models[id]) || ""; g("#s-model").placeholder = p.model ? `Model (default: ${p.model})` : "Model (blank = automatic)"; g("#s-note").textContent = p.note; g("#s-or").hidden = id !== "openrouter"; };
+    const fill = id => { const s = rawCfg(), p = PRESETS[id]; g("#s-endpoint").hidden = id !== "custom"; g("#s-endpoint").value = s.endpoint || ""; g("#s-key").hidden = id === "lightning" || id === "qwen"; g("#s-key").value = (s.keys && s.keys[id]) || ""; g("#s-key").placeholder = "API key"; g("#s-model").hidden = id === "lightning"; g("#s-model").value = (s.models && s.models[id]) || ""; g("#s-model").placeholder = p.model ? `Model (default: ${p.model})` : "Model (blank = automatic)"; g("#s-note").textContent = p.note; g("#s-or").hidden = id !== "openrouter"; };
     prov.value = c.id; fill(c.id); prov.onchange = () => fill(prov.value); g("#s-or").onclick = () => { close(); connectOpenRouter(); };
     g(".close-modal-btn").onclick = close;
     g("#s-save").onclick = () => {
@@ -3496,12 +3554,13 @@ async function fillModels() {
     const sel = $("#model-pick"), cur = getCfg(), s = rawCfg(); sel.innerHTML = "";
     const grp = (label, opts) => { const g = document.createElement("optgroup"); g.label = label; opts.forEach(([v, t]) => g.append(new Option(t, v))); sel.append(g); };
     grp("Lightning (free, no key)", [["lightning|lightning-free", "Auto-connect — no API key"]]);
+    if (SERVER.on && SERVER.qwen) grp("Qwen (Lightning API)", [["qwen|qwen3.7-plus", "Qwen 3.7 Plus"], ["qwen|qwen4-max", "Qwen 4 Max"]]);
     grp("OpenRouter (free)", [["openrouter|", "Auto — rotate free"], ["openrouter|" + CODE_MODEL, "Qwen3 Coder"], ...(await freeModels()).slice(0, 30).filter(m => m.id !== CODE_MODEL).map(m => ["openrouter|" + m.id, short(m.id)])]);
     grp("OpenRouter (paid — requires credits)", [["openrouter|anthropic/claude-sonnet-4.5", "Claude Sonnet 4.5"]]);
     grp("Groq (fast)", (await groqModels((s.keys && s.keys.groq) || "")).map(m => ["groq|" + m, m]));
     grp("Google Gemini", (await googleModels((s.keys && s.keys.google) || "")).slice(0, 8).map(m => ["google|" + m, m]));
     if (s.endpoint && s.models && s.models.custom) grp("Custom", [["custom|" + s.models.custom, s.models.custom]]);
-    const want = cur.id + "|" + ((s.models && s.models[cur.id]) || (cur.id === "groq" ? PRESETS.groq.model : ""));
+    const want = cur.id + "|" + ((s.models && s.models[cur.id]) || cur.p.model || "");
     if (![...sel.options].some(o => o.value === want)) sel.append(new Option(want.split("|")[1] || "Auto", want));
     sel.value = want;
 }
