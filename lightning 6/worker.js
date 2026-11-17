@@ -588,8 +588,32 @@ async function chatRoute(request,env) {
   const messages=Array.isArray(input.messages)?input.messages.slice(-22):[];
   if(!messages.length)return json({error:{message:"Send a message first."}},400);
   const cleanMessages=messages.map(m=>({role:["system","user","assistant"].includes(m.role)?m.role:"user",content:typeof m.content==="string"?m.content:JSON.stringify(m.content)}));
-  const max_tokens=Math.max(128,Math.min(4096,Number(input.max_tokens)||1800));
+  const max_tokens=Math.max(128,Math.min(8192,Number(input.max_tokens)||1800));
   const temperature=Math.max(0,Math.min(1.5,Number(input.temperature)||0.7));
+
+  // Direct Qwen route. The API key stays in a Cloudflare Worker secret.
+  // Qwen's OpenAI-compatible endpoint supports streaming chat completions.
+  if(String(request.headers.get("x-provider")||"").toLowerCase()==="qwen"){
+    if(!env.QWEN_API_KEY)return json({error:{message:"Qwen is not connected yet. The Lightning owner must add the QWEN_API_KEY secret in Cloudflare."}},503);
+    const model=String(input.model||env.QWEN_MODEL||"qwen3.7-plus").slice(0,120);
+    try{
+      const upstream=await fetch("https://ap-southeast-1.maas.qwencloudapi.com/compatible-mode/v1/chat/completions",{
+        method:"POST",
+        headers:{"Authorization":"Bearer "+env.QWEN_API_KEY,"Content-Type":"application/json","Accept":"text/event-stream"},
+        body:JSON.stringify({model,messages:cleanMessages,max_tokens,temperature,stream:true}),
+        signal:AbortSignal.timeout(90000)
+      });
+      if(!upstream.ok){
+        const detail=await upstream.text().catch(()=>"");
+        console.error("Lightning Qwen request failed:",upstream.status,detail.slice(0,800));
+        return json({error:{message:"Qwen returned HTTP "+upstream.status+". Check the Qwen API key, region and model."}},upstream.status===429?429:502);
+      }
+      return new Response(upstream.body,{status:200,headers:{"content-type":"text/event-stream; charset=utf-8","cache-control":"no-cache, no-transform","x-accel-buffering":"no"}});
+    }catch(error){
+      console.error("Lightning Qwen connection failed:",String(error?.message||error||""));
+      return json({error:{message:"Could not connect to Qwen: "+String(error?.message||"network error")}},502);
+    }
+  }
 
   // Guest/no-personal-key default: JarvisClaw's free-only router.
   // The secret stays on the Worker and is never sent to browser code.
@@ -900,7 +924,7 @@ async function route(request, env) {
   if(path==="/api/browser/command" && request.method==="POST") return browserCommandRoute(request,env);
   if(path==="/api/browser/resume" && request.method==="POST") return browserResumeRoute(request,env);
   if(path==="/api/browser/stop" && request.method==="POST") return browserStopRoute(request,env);
-  if(path==="/api/config" && request.method==="GET") return json({server:null});
+  if(path==="/api/config" && request.method==="GET") return json({server:{qwen:!!env.QWEN_API_KEY}});
   if(path==="/api/pixellab" && (request.method==="GET" || request.method==="POST")) return pixelLabRoute(request);
   if(path==="/api/image-references" && request.method==="POST") return imageReferencesRoute(request,env);
   if(path==="/api/image" && request.method==="POST") return imageRoute(request, env);
