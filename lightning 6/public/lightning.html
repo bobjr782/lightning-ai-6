@@ -2943,10 +2943,11 @@ async function checkModerationConsent(){
 function makeProfileAvatar(profile,size=38,variant=0){
     if(profile?.avatar){
         const saved=String(profile.avatar);
-        const fileName=saved.split(/[\\/]/).pop().replace(/\\?.*$/,"").replace(/\\.[^.]+$/,"").toLowerCase();
-        const bundled=BUILTIN_AVATARS.find(item=>item.name.toLowerCase().replace(/\\s+/g,"")===fileName.replace(/\\s+/g,""));
+        const fileName=saved.split("/").pop().split("\\").pop().split("?")[0].split("#")[0].replace(/\.[^.]+$/,"").toLowerCase();
+        const bundled=BUILTIN_AVATARS.find(item=>item.name.toLowerCase().replace(/\s+/g,"")===fileName.replace(/\s+/g,""));
         const img=document.createElement("img");img.className="profile-avatar";img.style.width=size+"px";img.style.height=size+"px";
-        img.src=(saved.startsWith("data:image/")||saved.startsWith("blob:")||/^https?:\\/\\//i.test(saved))?saved:(bundled?bundled.src:saved);
+        const isWebUrl=saved.startsWith("https://")||saved.startsWith("http://");
+        img.src=(saved.startsWith("data:image/")||saved.startsWith("blob:")||isWebUrl)?saved:(bundled?bundled.src:saved);
         img.alt="Profile picture";return img;
     }
     const code=String(profile?.friendCode||profile?.username||"LIGHT")+":"+variant;let hash=2166136261;
