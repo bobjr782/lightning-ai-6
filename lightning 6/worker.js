@@ -167,6 +167,8 @@ async function ensurePublishedTable(env) {
 const TRIAL_DAYS = 7;
 const TRIAL_TEXT_LIMIT = 40;
 const TRIAL_IMAGE_LIMIT = 5;
+const STARTER_CREDITS = 200;
+const IMAGE_CREDIT_COST = 15;
 
 async function ensureUsage(user, env) {
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS feature_usage (
@@ -174,18 +176,22 @@ async function ensureUsage(user, env) {
     trial_started_at INTEGER NOT NULL,
     text_used INTEGER NOT NULL DEFAULT 0,
     images_used INTEGER NOT NULL DEFAULT 0,
+    credits INTEGER NOT NULL DEFAULT 200,
     updated_at INTEGER NOT NULL
   )`).run();
+  // Migrate existing Lightning accounts without resetting their trial usage.
+  try { await env.DB.prepare("ALTER TABLE feature_usage ADD COLUMN credits INTEGER NOT NULL DEFAULT 200").run(); } catch (_) {}
   const now=Math.floor(Date.now()/1000);
-  await env.DB.prepare("INSERT OR IGNORE INTO feature_usage(user_id,trial_started_at,text_used,images_used,updated_at) VALUES(?,?,0,0,?)").bind(user.id,now,now).run();
-  return await env.DB.prepare("SELECT trial_started_at,text_used,images_used FROM feature_usage WHERE user_id=?").bind(user.id).first();
+  await env.DB.prepare("INSERT OR IGNORE INTO feature_usage(user_id,trial_started_at,text_used,images_used,credits,updated_at) VALUES(?,?,0,0,?,?)").bind(user.id,now,STARTER_CREDITS,now).run();
+  return await env.DB.prepare("SELECT trial_started_at,text_used,images_used,credits FROM feature_usage WHERE user_id=?").bind(user.id).first();
 }
 function entitlement(row) {
   const now=Math.floor(Date.now()/1000), expires=row.trial_started_at+TRIAL_DAYS*86400;
   const active=now<expires;
   return { plan:active?"free-trial":"trial-ended", trialActive:active, trialExpiresAt:expires,
     textLimit:TRIAL_TEXT_LIMIT, textUsed:Number(row.text_used||0), textRemaining:Math.max(0,TRIAL_TEXT_LIMIT-Number(row.text_used||0)),
-    imageLimit:TRIAL_IMAGE_LIMIT, imagesUsed:Number(row.images_used||0), imagesRemaining:Math.max(0,TRIAL_IMAGE_LIMIT-Number(row.images_used||0)) };
+    imageLimit:TRIAL_IMAGE_LIMIT, imagesUsed:Number(row.images_used||0), imagesRemaining:Math.max(0,TRIAL_IMAGE_LIMIT-Number(row.images_used||0)),
+    credits:Number(row.credits??STARTER_CREDITS), imageCreditCost:IMAGE_CREDIT_COST };
 }
 async function reserveTrialUse(user,env,kind) {
   const row=await ensureUsage(user,env), info=entitlement(row);
@@ -202,6 +208,19 @@ async function reserveTrialUse(user,env,kind) {
 async function refundTrialUse(user,env,kind) {
   const col=kind==="image"?"images_used":"text_used";
   await env.DB.prepare(`UPDATE feature_usage SET ${col}=MAX(0,${col}-1),updated_at=? WHERE user_id=?`).bind(Math.floor(Date.now()/1000),user.id).run();
+}
+
+async function reserveImageCredits(user,env) {
+  const row=await ensureUsage(user,env);
+  const result=await env.DB.prepare("UPDATE feature_usage SET credits=credits-?,images_used=images_used+1,updated_at=? WHERE user_id=? AND credits>=?")
+    .bind(IMAGE_CREDIT_COST,Math.floor(Date.now()/1000),user.id,IMAGE_CREDIT_COST).run();
+  const fresh=await ensureUsage(user,env);
+  if(!result.meta?.changes) return {ok:false,error:"Not enough credits. Each image costs "+IMAGE_CREDIT_COST+" credits; you have "+Number(row.credits||0)+".",info:entitlement(fresh)};
+  return {ok:true,info:entitlement(fresh)};
+}
+async function refundImageCredits(user,env) {
+  await env.DB.prepare("UPDATE feature_usage SET credits=credits+?,images_used=MAX(0,images_used-1),updated_at=? WHERE user_id=?")
+    .bind(IMAGE_CREDIT_COST,Math.floor(Date.now()/1000),user.id).run();
 }
 
 const IMAGE_RATE = new Map();
@@ -267,7 +286,7 @@ async function imageRoute(request, env) {
   const width = Math.max(256, Math.min(1536, Math.round(Number(input.width || 1024) / 16) * 16));
   const height = Math.max(256, Math.min(1536, Math.round(Number(input.height || 1024) / 16) * 16));
   const seed = Number.isInteger(Number(input.seed)) ? Math.abs(Number(input.seed)) % 2147483647 : Math.floor(Math.random() * 2147483647);
-  const reserved=await reserveTrialUse(account,env,"image");
+  const reserved=await reserveImageCredits(account,env);
   if(!reserved.ok) return json({error:reserved.error,entitlement:reserved.info},403);
   if (input.enhance === true) {
     try {
@@ -386,7 +405,7 @@ async function imageRoute(request, env) {
       }
     }
     // Neither provider produced an image: return the trial credit.
-    try { await refundTrialUse(account,env,"image"); }
+    try { await refundImageCredits(account,env); }
     catch (refundError) { console.error("Could not refund failed image trial use:", refundError?.message || refundError); }
     const quota = /4006|quota|daily.*(limit|allocation)|limit.*(reached|exceeded)|neuron|billing|payment|paid plan/i.test(detail);
     const capacity = /3040|capacity|overloaded|temporarily unavailable/i.test(detail);
@@ -1111,8 +1130,19 @@ async function route(request, env) {
     }
     if(path==="/api/admin/users" && request.method==="GET") {
       const q=String(url.searchParams.get("q")||"").trim().slice(0,40);
-      const rows=await env.DB.prepare("SELECT users.id,users.username,users.created_at,COALESCE(feature_usage.text_used,0) AS text_used,COALESCE(feature_usage.images_used,0) AS images_used FROM users LEFT JOIN feature_usage ON feature_usage.user_id=users.id WHERE (?='' OR instr(lower(users.username),lower(?))>0) ORDER BY users.created_at DESC LIMIT 200").bind(q,q).all();
-      return json({users:(rows.results||[]).map(r=>({id:r.id,username:r.username,createdAt:r.created_at,textUsed:Number(r.text_used||0),imagesUsed:Number(r.images_used||0)}))});
+      const rows=await env.DB.prepare("SELECT users.id,users.username,users.created_at,COALESCE(feature_usage.text_used,0) AS text_used,COALESCE(feature_usage.images_used,0) AS images_used,COALESCE(feature_usage.credits,200) AS credits FROM users LEFT JOIN feature_usage ON feature_usage.user_id=users.id WHERE (?='' OR instr(lower(users.username),lower(?))>0) ORDER BY users.created_at DESC LIMIT 200").bind(q,q).all();
+      return json({users:(rows.results||[]).map(r=>({id:r.id,username:r.username,createdAt:r.created_at,textUsed:Number(r.text_used||0),imagesUsed:Number(r.images_used||0),credits:Number(r.credits||0)}))});
+    }
+    if(path==="/api/admin/users/credits" && request.method==="POST") {
+      let b;try{b=await body(request)}catch{return json({error:"Invalid request."},400)}
+      const id=String(b.id||""),amount=Math.floor(Number(b.amount));
+      if(!id||!Number.isFinite(amount)||amount<1||amount>100000)return json({error:"Choose an account and a credit amount from 1 to 100,000."},400);
+      const exists=await env.DB.prepare("SELECT id FROM users WHERE id=?").bind(id).first();
+      if(!exists)return json({error:"Account not found."},404);
+      await ensureUsage({id},env);
+      await env.DB.prepare("UPDATE feature_usage SET credits=credits+?,updated_at=? WHERE user_id=?").bind(amount,Math.floor(Date.now()/1000),id).run();
+      const row=await env.DB.prepare("SELECT credits FROM feature_usage WHERE user_id=?").bind(id).first();
+      return json({ok:true,credits:Number(row?.credits||0)});
     }
     if(path==="/api/admin/users/reset" && request.method==="POST") {
       let b;try{b=await body(request)}catch{return json({error:"Invalid request."},400)}
