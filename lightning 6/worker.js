@@ -1016,17 +1016,15 @@ async function route(request, env) {
   if(path==="/api/credits/charge" && request.method==="POST") {
     if(!user)return json({error:"Sign in to use Lightning credits."},401);
     let b;try{b=await body(request);}catch{return json({error:"Invalid credit request."},400);}
-    const kind=String(b.kind||""),refund=b.action==="refund";
+    const kind=String(b.kind||"");
     const cost=kind==="bubble"?BUBBLE_CREDIT_COST:kind==="upload"?UPLOAD_CREDIT_COST:0;
     if(!cost)return json({error:"Unknown credit action."},400);
     await ensureUsage(user,env);
     const now=Math.floor(Date.now()/1000);
-    const result=refund
-      ? await env.DB.prepare("UPDATE feature_usage SET credits=credits+?,updated_at=? WHERE user_id=?").bind(cost,now,user.id).run()
-      : await env.DB.prepare("UPDATE feature_usage SET credits=credits-?,updated_at=? WHERE user_id=? AND credits>=?").bind(cost,now,user.id,cost).run();
+    const result=await env.DB.prepare("UPDATE feature_usage SET credits=credits-?,updated_at=? WHERE user_id=? AND credits>=?").bind(cost,now,user.id,cost).run();
     const fresh=await ensureUsage(user,env);
-    if(!refund && !result.meta?.changes)return json({error:"You're out of Lightning credits. Add credits to continue.",entitlement:entitlement(fresh)},403);
-    return json({ok:true,charged:refund?0:cost,refunded:refund?cost:0,entitlement:entitlement(fresh)});
+    if(!result.meta?.changes)return json({error:"You're out of Lightning credits. Add credits to continue.",entitlement:entitlement(fresh)},403);
+    return json({ok:true,charged:cost,entitlement:entitlement(fresh)});
   }
 
   if(path==="/api/presence" && request.method==="POST") {
