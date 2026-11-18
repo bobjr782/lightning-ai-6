@@ -1757,7 +1757,10 @@ WIDGET OUTPUT (use this when a live embed or interactive preview is more useful 
 - Website iframe: write WIDGET\${type:url}@ on its own line, then one complete https:// URL, then a line containing only @.
 - Interactive HTML preview: write WIDGET\${type:code}@ on its own line, then complete self-contained HTML/CSS/JS, then a line containing only @.
 - Use widgets for embedded websites, interactive demos, mini tools and live previews. Do not put widget markup inside markdown fences.
-- For images in normal replies, use standard Markdown image syntax: ![short description](https://image-url).
+- Widgets NEVER generate images. They only display existing images, just like an image shown in a normal chat reply.
+- To display an existing image in a normal reply, use standard Markdown image syntax: ![short description](https://image-url). Lightning renders that image inline in the chat.
+- You may also include existing image URLs inside an HTML widget with an <img> element. Do not invent image URLs or claim an image was generated.
+- Image generation is a separate feature and must only be used when the user explicitly asks to generate/create an image.
 OUTPUT FORMATS (never use markdown code fences):
 1. Code snippet: CODE@LANG{
 code here
