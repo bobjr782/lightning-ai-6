@@ -1949,7 +1949,7 @@ const IMG_LABELS = { none: "No style", photo: "Photo", anime: "Anime", pixel: "P
 const IMG_SIZES = { square: [1024, 1024], portrait: [768, 1024], landscape: [1024, 768], wide: [1024, 576] };
 const imgBar = el("div", "img-opts");
 imgBar.innerHTML = `<select id="img-style" class="select" translate="no">${Object.keys(IMG_STYLES).map(k => `<option value="${k}">${IMG_LABELS[k]}</option>`).join("")}</select><select id="img-size" class="select"><option value="square">Square</option><option value="portrait">Portrait</option><option value="landscape">Landscape</option><option value="wide">Wide 16:9</option></select><label class="img-enh"><input type="checkbox" id="img-enh"> Improve my prompt with AI (no key)</label>`;
-imgBar.insertAdjacentHTML("beforeend", "<span class=\"img-model-note\">FLUX.2 · Cloudflare AI · no API key</span>");
+imgBar.insertAdjacentHTML("beforeend", "<span class=\"img-model-note\">FLUX.2 · Cloudflare AI · 15 credits per image</span>");
 $(".input-deck-wrapper").prepend(imgBar);
 
 const idbOpen = () => new Promise((res, rej) => { const r = indexedDB.open("lightning", 1); r.onupgradeneeded = () => r.result.createObjectStore("imgs"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
@@ -2013,7 +2013,7 @@ window.handleImageGeneration = async function (prompt, box) {
             if (/not enabled|binding named AI/i.test(String(e.message || e))) {
                 return finalizeAiBubble(box, "⚠️ The image model is not connected yet. In Cloudflare, enable Workers AI and add the AI binding. Then redeploy.");
             }
-            if (/free image-generation allowance|daily reset/i.test(String(e.message || e))) {
+            if (/free image-generation allowance|daily reset|not enough credits/i.test(String(e.message || e))) {
                 return finalizeAiBubble(box, "⚠️ " + e.message);
             }
             live(box, "", "FLUX model unavailable. Waiting for the service to respond… " + secs() + "s");
@@ -3127,14 +3127,12 @@ function trialCard() {
         const e=lightningEntitlement;
         const head=el("div","trial-account-head");
         head.append(el("b","","Account status"));
-        head.append(el("small","",e.trialActive?"Free trial":"Trial ended"));
+        head.append(el("small","",e.trialActive?"Free trial":"Chat trial ended"));
         wrap.append(head);
-        wrap.append(el("small","",e.trialActive?`${e.textRemaining} chat messages · ${e.imagesRemaining} images left`:"Your trial has ended."));
-        if(e.trialActive){
-            const bar=el("div","trial-meter"),fill=el("span");
-            fill.style.width=Math.min(100,Math.max(0,e.imagesUsed/e.imageLimit*100))+"%";
-            bar.append(fill);wrap.append(bar);
-        }
+        wrap.append(el("small","",`${e.textRemaining} chat messages · ${Number(e.credits||0)} credits · ${Number(e.imageCreditCost||15)} per image`));
+        const bar=el("div","trial-meter"),fill=el("span");
+        fill.style.width=Math.min(100,Math.max(0,Number(e.credits||0)/200*100))+"%";
+        bar.append(fill);wrap.append(bar);
         wrap.append(btn("Sign out",async()=>{await fetch("/api/logout",{method:"POST",credentials:"same-origin"});lightningAccount=null;lightningEntitlement=null;user=null;try{localStorage.removeItem("lightning_username_hint");}catch(_){}drawAcct();showAiBubbleOnScreen("Signed out of Lightning.");}));
     }else{
         const head=el("div","trial-account-head");head.append(el("b","","Not signed in"));wrap.append(head);
@@ -3776,8 +3774,8 @@ finishOpenRouter().catch(e => startupError("openrouter", e));
  window.openLightningAdmin=async()=>{overlay.classList.add("open");overlay.setAttribute("aria-hidden","false");await loadLightningAdmin();};
  window.closeLightningAdmin=()=>{overlay.classList.remove("open");overlay.setAttribute("aria-hidden","true");};
  window.loadLightningAdmin=async()=>{msg.textContent="Loading administration data…";try{const j=await api("/api/admin/overview");document.getElementById("admin-who").textContent=j.admin.username;document.getElementById("admin-stats").innerHTML=[["Accounts",j.stats.users],["Active sessions",j.stats.sessions],["Published artifacts",j.stats.artifacts],["Saved workspaces",j.stats.workspaces]].map(x=>'<div class="admin-stat"><span class="admin-muted">'+esc(x[0])+'</span><strong>'+esc(x[1])+'</strong></div>').join("");msg.textContent="System overview loaded.";await loadLightningAdminUsers();}catch(e){msg.textContent=e.message;document.getElementById("admin-stats").innerHTML="";}};
- window.loadLightningAdminUsers=async()=>{const body=document.getElementById("admin-users");body.innerHTML='<tr><td colspan="5">Loading…</td></tr>';try{const q=document.getElementById("admin-search").value.trim(),j=await api("/api/admin/users?q="+encodeURIComponent(q));body.innerHTML=j.users.length?j.users.map(u=>'<tr><td><strong>'+esc(u.username)+'</strong></td><td>'+esc(new Date(u.createdAt*1000).toLocaleDateString())+'</td><td>'+esc(u.textUsed)+' / 40</td><td>'+esc(u.imagesUsed)+' / 5</td><td><button class="mini-btn" data-reset="'+esc(u.id)+'">Reset trial</button> <button class="mini-btn admin-danger" data-delete="'+esc(u.id)+'" data-name="'+esc(u.username)+'">Delete</button></td></tr>').join(""):'<tr><td colspan="5">No accounts found.</td></tr>';}catch(e){body.innerHTML='<tr><td colspan="5">'+esc(e.message)+'</td></tr>';}}
- document.getElementById("admin-users").addEventListener("click",async e=>{const del=e.target.closest("[data-delete]"),reset=e.target.closest("[data-reset]");try{if(del){if(!confirm('Permanently delete "'+del.dataset.name+'"? This cannot be undone.'))return;await api("/api/admin/users?id="+encodeURIComponent(del.dataset.delete),{method:"DELETE"});}if(reset){if(!confirm("Reset this account’s free-trial usage and restart its 7-day trial?"))return;await api("/api/admin/users/reset",{method:"POST",body:JSON.stringify({id:reset.dataset.reset})});}await loadLightningAdmin();}catch(e){msg.textContent=e.message;}});
+ window.loadLightningAdminUsers=async()=>{const body=document.getElementById("admin-users");body.innerHTML='<tr><td colspan="5">Loading…</td></tr>';try{const q=document.getElementById("admin-search").value.trim(),j=await api("/api/admin/users?q="+encodeURIComponent(q));body.innerHTML=j.users.length?j.users.map(u=>'<tr><td><strong>'+esc(u.username)+'</strong></td><td>'+esc(new Date(u.createdAt*1000).toLocaleDateString())+'</td><td>'+esc(u.textUsed)+' / 40</td><td>'+esc(u.imagesUsed)+' images · <strong>'+esc(u.credits)+' credits</strong></td><td><button class="mini-btn" data-credit="'+esc(u.id)+'">Add credits</button> <button class="mini-btn" data-reset="'+esc(u.id)+'">Reset trial</button> <button class="mini-btn admin-danger" data-delete="'+esc(u.id)+'" data-name="'+esc(u.username)+'">Delete</button></td></tr>').join(""):'<tr><td colspan="5">No accounts found.</td></tr>';}catch(e){body.innerHTML='<tr><td colspan="5">'+esc(e.message)+'</td></tr>';}}
+ document.getElementById("admin-users").addEventListener("click",async e=>{const del=e.target.closest("[data-delete]"),reset=e.target.closest("[data-reset]"),credit=e.target.closest("[data-credit]");try{if(credit){const amount=Number(prompt("How many credits should be added to this account?","100"));if(!Number.isFinite(amount)||!Number.isInteger(amount)||amount<1||amount>100000)return;await api("/api/admin/users/credits",{method:"POST",body:JSON.stringify({id:credit.dataset.credit,amount})});msg.textContent=amount+" credits added.";}if(del){if(!confirm('Permanently delete "'+del.dataset.name+'"? This cannot be undone.'))return;await api("/api/admin/users?id="+encodeURIComponent(del.dataset.delete),{method:"DELETE"});}if(reset){if(!confirm("Reset this account’s free-trial usage and restart its 7-day trial?"))return;await api("/api/admin/users/reset",{method:"POST",body:JSON.stringify({id:reset.dataset.reset})});}await loadLightningAdmin();}catch(e){msg.textContent=e.message;}});
  document.getElementById("admin-search").addEventListener("keydown",e=>{if(e.key==="Enter")loadLightningAdminUsers();});
  check();window.addEventListener("lightning-account-ready",check);
 })();
