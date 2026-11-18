@@ -591,10 +591,10 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
           detail.textContent="Hue "+hueLabel+" · "+analysisStats.foregroundPercent.toFixed(1)+"% subject · "+analysisStats.edgeDensity.toFixed(1)+"% edge pixels · "+analysisStats.componentCount+" regions";
           card.append(preview,title,detail);results.append(card);cropped++;
         }catch(error){failed++;const reason=error&&error.message?error.message:"Unknown crop error";rejectionReasons[reason]=(rejectionReasons[reason]||0)+1;}
-        status.textContent="HSV and edge analysis: "+(index+1)+" / "+latest.length;
+        status.textContent=(transparentOnly?"Transparency check: ":"HSV and edge analysis: ")+(index+1)+" / "+latest.length;
       }
       const reasons=Object.keys(rejectionReasons).map(function(reason){return reason+" ("+rejectionReasons[reason]+")";}).join("; ");
-      status.textContent="Created "+cropped+" cut-out"+(cropped===1?"":"s")+" with HSV and edge analysis. Rejected "+failed+" image"+(failed===1?"":"s")+". "+(reasons?"Reasons: "+reasons:"");
+      if(!latest.length)status.textContent="No images found. Try a broader description.";else if(transparentOnly)status.textContent="Verified "+cropped+" transparent image"+(cropped===1?"":"s")+". Rejected "+failed+" image"+(failed===1?"":"s")+". "+(reasons?"Reasons: "+reasons:"");else status.textContent="Created "+cropped+" cut-out"+(cropped===1?"":"s")+" with HSV and edge analysis. Rejected "+failed+" image"+(failed===1?"":"s")+". "+(reasons?"Reasons: "+reasons:"");
                         copy.disabled=!latest.length;
       try{localStorage.setItem("image_forge_references",JSON.stringify({query:data.query,savedAt:Date.now(),results:latest}));localStorage.setItem("image_forge_analysis",JSON.stringify({query:data.query,analyzedAt:Date.now(),items:analysisSummaries}));}catch(_){}
     }catch(error){status.textContent="Image Forge test failed: "+error.message;}
