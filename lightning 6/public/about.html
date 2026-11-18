@@ -541,7 +541,7 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
     const query=prompt.value.trim();
     if(query.length<2){status.textContent="Please enter a more detailed image description.";return;}
     search.disabled=true;search.textContent="Searching…";copy.disabled=true;
-    status.textContent=query.toLowerCase().endsWith("#no-background")?"Searching for transparent images…":"Searching Google Images directly…";results.replaceChildren();latest=[];
+    status.textContent=query.toLowerCase().endsWith("#no-background")?"Searching for transparent images…":"Searching Google Images first, then Openverse if needed…";results.replaceChildren();latest=[];
     try{
       const response=await fetch("/api/image-references",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:query,count:Number(count.value)})});
       const data=await response.json();
@@ -549,9 +549,8 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
       latest=Array.isArray(data.results)?data.results:[];
       const transparentOnly=!!data.noBackground;
       status.textContent=latest.length?"Found "+latest.length+" reference image"+(latest.length===1?"":"s")+" for “"+data.query+"”.":"No images found. Try a broader description.";
-      // Image Forge cut-out v3:
-      // Build a small palette from the whole image border (not one average colour),
-      // flood-fill only border-connected background, then remove tiny foreground specks.
+      // Analyse each reference at a small working resolution, then extract a
+      // transparent foreground crop. The full-size crop is capped at 1024px.
       let cropped=0,failed=0;
       const rejectionReasons={},analysisSummaries=[];
       for(let index=0;index<latest.length;index++){
@@ -584,7 +583,7 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
           out=analysis.canvas;analysisStats=analysis.stats;
           analysisSummaries.push({url:item.url,stats:analysisStats,sampleSize:analysis.sampleSize,outputSize:analysis.outputSize});
           const card=document.createElement("article");card.className="dev-test-card";
-          const preview=document.createElement("img");preview.src=out.toDataURL("image/png");preview.alt="Border-cropped object "+(cropped+1);
+          const preview=document.createElement("img");preview.src=out.toDataURL("image/png");preview.alt="HSV and edge-extracted foreground object "+(cropped+1);
           preview.style.cssText="width:100%;height:190px;object-fit:contain;background:repeating-conic-gradient(#8882 0% 25%,transparent 0% 50%) 50%/16px 16px";
           const title=document.createElement("div");title.className="dev-test-card-title";title.textContent="HSV / edge cut-out "+(cropped+1);
           const detail=document.createElement("div");detail.className="dev-test-card-detail";
@@ -592,7 +591,7 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
           detail.textContent="Hue "+hueLabel+" · "+analysisStats.foregroundPercent.toFixed(1)+"% subject · "+analysisStats.edgeDensity.toFixed(1)+"% edge pixels · "+analysisStats.componentCount+" regions";
           card.append(preview,title,detail);results.append(card);cropped++;
         }catch(error){failed++;const reason=error&&error.message?error.message:"Unknown crop error";rejectionReasons[reason]=(rejectionReasons[reason]||0)+1;}
-        status.textContent="Border-cropping: "+(index+1)+" / "+latest.length;
+        status.textContent="HSV and edge analysis: "+(index+1)+" / "+latest.length;
       }
       const reasons=Object.keys(rejectionReasons).map(function(reason){return reason+" ("+rejectionReasons[reason]+")";}).join("; ");
       status.textContent="Created "+cropped+" cut-out"+(cropped===1?"":"s")+" with HSV and edge analysis. Rejected "+failed+" image"+(failed===1?"":"s")+". "+(reasons?"Reasons: "+reasons:"");
