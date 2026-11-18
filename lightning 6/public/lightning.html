@@ -980,6 +980,7 @@ body.img-mode .img-opts { display: flex; }
 
     <!-- Main execution driver logic script link -->
     <!-- Add ?v=2 to force Live Server to grab the brand new file -->
+<script src="/lightning-avatars.js"></script>
 
 <script>
 // Add this alongside INITIAL_CREDITS, chat, etc.
@@ -2967,24 +2968,12 @@ function avatarSvgData(i){
  const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="'+bg+'"/><stop offset="1" stop-color="'+c+'"/></linearGradient><radialGradient id="orb"><stop stop-color="'+light+'"/><stop offset="1" stop-color="'+a+'"/></radialGradient></defs><rect width="256" height="256" rx="34" fill="url(#bg)"/>'+art+stars+'<rect x="4" y="4" width="248" height="248" rx="30" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="5"/></svg>';
  return "data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);
 }
-const BUILTIN_AVATARS=[
- {name:"Banana 1",category:"Bananas",src:"/avatars/bannana1.png"},
- {name:"Banana 2",category:"Bananas",src:"/avatars/bannana2.jpg"},
- {name:"Banana 3",category:"Bananas",src:"/avatars/bannana3.jpg"},
- {name:"Cat 1",category:"Cats",src:"/avatars/cat1.jpg"},
- {name:"Cat 2",category:"Cats",src:"/avatars/cat2.jpg"},
- {name:"Cat 3",category:"Cats",src:"/avatars/cat3.jpg"},
- {name:"Dog 1",category:"Dogs",src:"/avatars/dog1.jpg"},
- {name:"Dog 2",category:"Dogs",src:"/avatars/dog2.jpg"},
- {name:"Dog 3",category:"Dogs",src:"/avatars/dog3.jpg"},
- {name:"Dog 4",category:"Dogs",src:"/avatars/dog4.jpg"},
- {name:"Nature 1",category:"Nature",src:"/avatars/plant1.jpg"},
- {name:"Nature 2",category:"Nature",src:"/avatars/plant2.jpg"},
- {name:"Nature 3",category:"Nature",src:"/avatars/plant3.jpg"},
- {name:"Space 1",category:"Space",src:"/avatars/space1.jpg"},
- {name:"Space 2",category:"Space",src:"/avatars/space2.jpg"},
- {name:"Space 3",category:"Space",src:"/avatars/space3.jpg"}
-];
+const BUILTIN_AVATARS=(window.LIGHTNING_BUILTIN_AVATARS||[]).map(item=>({
+ name:item.name.replace(/([0-9]+)$/," $1").replace(/^bannana/i,"Banana").replace(/^plant/i,"Nature").replace(/^cat/i,"Cat").replace(/^dog/i,"Dog").replace(/^space/i,"Space"),
+ category:/^bannana/i.test(item.name)?"Bananas":/^cat/i.test(item.name)?"Cats":/^dog/i.test(item.name)?"Dogs":/^plant/i.test(item.name)?"Nature":"Space",
+ src:item.src
+}));
+if(!BUILTIN_AVATARS.length) console.error("Lightning avatar bundle did not load.");
 function openAvatarGallery(onChoose){
  const overlay=document.createElement("div");overlay.className="avatar-gallery-overlay";overlay.setAttribute("role","dialog");overlay.setAttribute("aria-modal","true");
  const header=document.createElement("header");header.className="avatar-gallery-header";
