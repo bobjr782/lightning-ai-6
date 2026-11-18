@@ -167,6 +167,7 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
 .dev-test-card img{display:block;width:100%;height:125px;object-fit:cover;background:var(--panel)}
 .dev-test-card-title{padding:8px 9px 4px;font-size:11px;line-height:1.35;max-height:44px;overflow:hidden;word-break:break-word}
 .dev-test-card-credit{padding:0 9px 9px;color:var(--mute);font-size:10px;line-height:1.35;max-height:34px;overflow:hidden}
+.dev-test-card-detail{padding:0 9px 10px;color:var(--mute);font-size:10px;line-height:1.4;overflow-wrap:anywhere}
 .dev-test-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:16px;color:var(--mute);font-size:11px}
 .dev-test-footer .btn{flex:none}
 .dev-section{padding-bottom:90px}
@@ -338,18 +339,18 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
           <div class="dev-kicker">Experimental project</div>
           <h3 class="serif">Image Forge</h3>
         </div>
-        <span class="dev-status">Test workspace</span>
+        <span class="dev-status">HSV analysis prototype</span>
       </div>
-      <p class="dev-description">A lightweight image compositor that finds 8–20 reference images, checks which ones accurately match the prompt, analyses their colours and shapes, extracts useful regions, and combines them into a realistic composition.</p>
+      <p class="dev-description">The browser prototype finds 8–20 reference images, groups their colours in HSV, detects strong edges and connected regions, then extracts candidate cut-outs. Scene composition and prompt-accuracy ranking are still being developed.</p>
       <div class="dev-pipeline" aria-label="Image Forge planned workflow">
         <div><b>01</b><span>Find 8–20 reference images</span></div>
-        <div><b>02</b><span>Analyse colours, shapes and details</span></div>
-        <div><b>03</b><span>Check reference accuracy and reject images that do not match</span></div>
-        <div><b>04</b><span>Extract useful regions and visual details</span></div>
+        <div><b>02</b><span>Group HSV colours and map strong edges</span></div>
+        <div><b>03</b><span>Separate connected subject regions from the background</span></div>
+        <div><b>04</b><span>Extract useful regions as transparent cut-outs</span></div>
         <div><b>05</b><span>Generate two different candidate images</span></div>
         <div><b>06</b><span>Compare both candidates and keep the most accurate one</span></div>
       </div>
-      <div class="dev-accuracy-control"><label for="image-forge-accuracy">Accuracy</label><output id="image-forge-accuracy-value" for="image-forge-accuracy">70%</output><input id="image-forge-accuracy" type="range" min="10" max="100" step="5" value="70"><div class="dev-accuracy-help">Higher accuracy means deeper reference checking and a longer generation time.</div><div class="dev-eta">Predicted time for two candidates and comparison: <strong id="image-forge-eta">about 1 min 30 sec</strong></div></div>
+      <div class="dev-accuracy-control"><label for="image-forge-accuracy">Accuracy</label><output id="image-forge-accuracy-value" for="image-forge-accuracy">70%</output><input id="image-forge-accuracy" type="range" min="10" max="100" step="5" value="70"><div class="dev-accuracy-help">Planned setting only. The current prototype uses fixed 256px analysis and does not yet use this slider.</div><div class="dev-eta">Planning estimate only; generation time is not measured: <strong id="image-forge-eta">about 1 min 30 sec</strong></div></div>
       <div class="dev-test-panel" id="image-forge-mount">
         <div class="dev-test-heading"><div><h4>Reference image test</h4><p>Describe the subject you want Image Forge to study. Add <code>#no-background</code> to require genuine transparent pixels.</p></div><span class="dev-test-count">8–20 images</span></div>
         <form id="image-forge-test-form" class="dev-test-form">
@@ -361,12 +362,13 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
         </form>
         <div id="image-forge-test-status" class="dev-test-status" role="status" aria-live="polite">Sign in to Lightning, then run a search to test the reference finder.</div>
         <div id="image-forge-test-results" class="dev-test-results"></div>
-        <div class="dev-test-footer"><span>Images are searched across rotating Google Images result pages. Transparent-only searches reject unverified results instead of substituting ordinary images. Check each original source and its usage rights before reuse.</span><button type="button" class="btn ghost" id="image-forge-copy-urls" disabled>Copy image URLs</button></div>
+        <div class="dev-test-footer"><span>Google Images is searched first, with Openverse as a backup. Browser analysis requires image hosts to allow CORS. Check each original source and its usage rights before reuse.</span><button type="button" class="btn ghost" id="image-forge-copy-urls" disabled>Copy image URLs</button></div>
       </div>
     </div>
   </div>
 </section>
 
+<script src="/image-forge-engine.js"></script>
 <script>
 (function () {
   var ICONS = {
@@ -551,7 +553,7 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
       // Build a small palette from the whole image border (not one average colour),
       // flood-fill only border-connected background, then remove tiny foreground specks.
       let cropped=0,failed=0;
-      const rejectionReasons={};
+      const rejectionReasons={},analysisSummaries=[];
       for(let index=0;index<latest.length;index++){
         const item=latest[index];
         try{
@@ -561,11 +563,12 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
           });
           const w=img.naturalWidth,h=img.naturalHeight;
           if(!w||!h||w*h>12000000)throw new Error("Image is too large to process");
-          const scale=256/Math.max(w,h),sw=Math.max(1,Math.round(w*scale)),sh=Math.max(1,Math.round(h*scale));
-          const sample=document.createElement("canvas");sample.width=sw;sample.height=sh;
-          const sc=sample.getContext("2d",{willReadFrequently:true});sc.drawImage(img,0,0,sw,sh);
-          const pixels=sc.getImageData(0,0,sw,sh).data,total=sw*sh;
+          let out=null,analysisStats=null;
           if(transparentOnly){
+            const scale=256/Math.max(w,h),sw=Math.max(1,Math.round(w*scale)),sh=Math.max(1,Math.round(h*scale));
+            const sample=document.createElement("canvas");sample.width=sw;sample.height=sh;
+            const sc=sample.getContext("2d",{willReadFrequently:true});sc.drawImage(img,0,0,sw,sh);
+            const pixels=sc.getImageData(0,0,sw,sh).data,total=sw*sh;
             let transparentPixels=0;
             for(let p=3;p<pixels.length;p+=4)if(pixels[p]<245)transparentPixels++;
             if(transparentPixels<Math.max(12,total*.002))throw new Error("Rejected: image has no real transparent pixels (likely a fake white/checkerboard background)");
@@ -576,111 +579,25 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
             card.append(preview,title);results.append(card);cropped++;
             continue;
           }
-          const edge=[];
-          for(let x=0;x<sw;x++){edge.push(x,(sh-1)*sw+x);}
-          for(let y=1;y<sh-1;y++){edge.push(y*sw,y*sw+sw-1);}
-          // Quantise border colours into a compact palette to tolerate shadows,
-          // gradients and textured backdrops better than a single RGB average.
-          const bins=new Map();
-          edge.forEach(function(p){
-            const q=p*4;if(pixels[q+3]<24)return;
-            const key=(pixels[q]>>5)+","+ (pixels[q+1]>>5)+","+ (pixels[q+2]>>5);
-            let b=bins.get(key);if(!b){b={r:[],g:[],b:[],n:0};bins.set(key,b);}
-            b.r.push(pixels[q]);b.g.push(pixels[q+1]);b.b.push(pixels[q+2]);b.n++;
-          });
-          if(!bins.size)throw new Error("No usable border pixels");
-          function median(a){a.sort(function(x,y){return x-y;});return a[Math.floor(a.length/2)];}
-          const palette=Array.from(bins.values()).sort(function(a,b){return b.n-a.n;}).slice(0,10).map(function(b){return [median(b.r),median(b.g),median(b.b)];});
-          const threshold2=58*58*3;
-          function bgDistance(p){
-            const q=p*4;if(pixels[q+3]<24)return 0;
-            let best=Infinity;
-            for(let k=0;k<palette.length;k++){
-              const c=palette[k],dr=pixels[q]-c[0],dg=pixels[q+1]-c[1],db=pixels[q+2]-c[2];
-              const d=dr*dr+dg*dg+db*db;if(d<best)best=d;
-            }
-            return best;
-          }
-          function isBackground(p){return bgDistance(p)<=threshold2;}
-          const background=new Uint8Array(total),queue=new Int32Array(total);
-          let head=0,tail=0,matchingEdges=0;
-          function seed(p){if(!background[p]&&isBackground(p)){background[p]=1;queue[tail++]=p;matchingEdges++;}}
-          for(let x=0;x<sw;x++){seed(x);seed((sh-1)*sw+x);}
-          for(let y=1;y<sh-1;y++){seed(y*sw);seed(y*sw+sw-1);}
-          if(matchingEdges<edge.length*.12)throw new Error("Could not identify enough background along the border");
-          while(head<tail){
-            const p=queue[head++],x=p%sw,y=(p/sw)|0;
-            for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
-              if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;
-              if(nx<0||ny<0||nx>=sw||ny>=sh)continue;
-              const z=ny*sw+nx;if(!background[z]&&isBackground(z)){background[z]=1;queue[tail++]=z;}
-            }
-          }
-          // Label foreground islands; discard tiny detached flecks while retaining
-          // meaningful separated pieces such as ears, whiskers and tails.
-          const seen=new Uint8Array(total),components=[];
-          for(let p=0;p<total;p++){
-            if(background[p]||seen[p])continue;
-            const stack=[p],members=[];seen[p]=1;
-            while(stack.length){
-              const z=stack.pop();members.push(z);const x=z%sw,y=(z/sw)|0;
-              for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
-                if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;
-                if(nx<0||ny<0||nx>=sw||ny>=sh)continue;
-                const n=ny*sw+nx;if(!background[n]&&!seen[n]){seen[n]=1;stack.push(n);}
-              }
-            }
-            components.push(members);
-          }
-          components.sort(function(a,b){return b.length-a.length;});
-          if(!components.length)throw new Error("No foreground object was detected");
-          const largest=components[0].length;
-          if(largest<total*.025)throw new Error("Detected object is too small");
-          const keep=new Uint8Array(total);
-          components.forEach(function(part,i){
-            if(i===0||part.length>=Math.max(8,largest*.003))part.forEach(function(p){keep[p]=1;});
-          });
-          let minX=sw,minY=sh,maxX=-1,maxY=-1,foreground=0,edgeForeground=0;
-          for(let y=0;y<sh;y++)for(let x=0;x<sw;x++){
-            const p=y*sw+x;if(keep[p]){foreground++;minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);if(x===0||y===0||x===sw-1||y===sh-1)edgeForeground++;}
-          }
-          if(foreground<total*.025)throw new Error("Foreground mask was too weak");
-          if(edgeForeground)throw new Error("Object touches image edge");
-          const boxW=maxX-minX+1,boxH=maxY-minY+1;
-          if(boxW<sw*.07||boxH<sh*.07)throw new Error("Detected object is too small");
-          const pad=Math.max(2,Math.round(Math.max(boxW,boxH)*.018));
-          const cropLeft=Math.max(0,minX-pad),cropTop=Math.max(0,minY-pad),cropRight=Math.min(sw,maxX+1+pad),cropBottom=Math.min(sh,maxY+1+pad);
-          const left=Math.floor(cropLeft/sw*w),top=Math.floor(cropTop/sh*h),right=Math.min(w,Math.ceil(cropRight/sw*w)),bottom=Math.min(h,Math.ceil(cropBottom/sh*h));
-          const out=document.createElement("canvas");out.width=right-left;out.height=bottom-top;
-          if(!out.width||!out.height)throw new Error("Invalid crop bounds");
-          const oc=out.getContext("2d",{willReadFrequently:true});oc.drawImage(img,left,top,out.width,out.height,0,0,out.width,out.height);
-          const outPixels=oc.getImageData(0,0,out.width,out.height),od=outPixels.data;
-          for(let y=0;y<out.height;y++)for(let x=0;x<out.width;x++){
-            const sx=Math.min(sw-1,Math.max(0,Math.floor((left+x)/w*sw)));
-            const sy=Math.min(sh-1,Math.max(0,Math.floor((top+y)/h*sh)));
-            const p=sy*sw+sx,at=(y*out.width+x)*4;
-            if(!keep[p]){od[at+3]=0;continue;}
-            // Soften only the cut-out edge to reduce jagged pixel halos.
-            let nearBackground=false;
-            for(let dy=-1;dy<=1&&!nearBackground;dy++)for(let dx=-1;dx<=1;dx++){
-              const nx=sx+dx,ny=sy+dy;
-              if(nx>=0&&ny>=0&&nx<sw&&ny<sh&&background[ny*sw+nx]){nearBackground=true;break;}
-            }
-            if(nearBackground)od[at+3]=Math.min(od[at+3],210);
-          }
-          oc.putImageData(outPixels,0,0);
+          if(!window.ImageForgeEngine||typeof window.ImageForgeEngine.analyzeImageElement!=="function")throw new Error("The Image Forge analysis engine did not load");
+          const analysis=window.ImageForgeEngine.analyzeImageElement(img,{sampleSize:256});
+          out=analysis.canvas;analysisStats=analysis.stats;
+          analysisSummaries.push({url:item.url,stats:analysisStats,sampleSize:analysis.sampleSize,outputSize:analysis.outputSize});
           const card=document.createElement("article");card.className="dev-test-card";
           const preview=document.createElement("img");preview.src=out.toDataURL("image/png");preview.alt="Border-cropped object "+(cropped+1);
           preview.style.cssText="width:100%;height:190px;object-fit:contain;background:repeating-conic-gradient(#8882 0% 25%,transparent 0% 50%) 50%/16px 16px";
-          const title=document.createElement("div");title.className="dev-test-card-title";title.textContent="Clean cut-out "+(cropped+1);
-          card.append(preview,title);results.append(card);cropped++;
+          const title=document.createElement("div");title.className="dev-test-card-title";title.textContent="HSV / edge cut-out "+(cropped+1);
+          const detail=document.createElement("div");detail.className="dev-test-card-detail";
+          const hueLabel=analysisStats&&analysisStats.dominantHue!==null?analysisStats.dominantHue+"°":"neutral";
+          detail.textContent="Hue "+hueLabel+" · "+analysisStats.foregroundPercent.toFixed(1)+"% subject · "+analysisStats.edgeDensity.toFixed(1)+"% edge pixels · "+analysisStats.componentCount+" regions";
+          card.append(preview,title,detail);results.append(card);cropped++;
         }catch(error){failed++;const reason=error&&error.message?error.message:"Unknown crop error";rejectionReasons[reason]=(rejectionReasons[reason]||0)+1;}
         status.textContent="Border-cropping: "+(index+1)+" / "+latest.length;
       }
       const reasons=Object.keys(rejectionReasons).map(function(reason){return reason+" ("+rejectionReasons[reason]+")";}).join("; ");
-      status.textContent="Created "+cropped+" border crop"+(cropped===1?"":"s")+". Rejected "+failed+" image"+(failed===1?"":"s")+". "+(reasons?"Reasons: "+reasons:"");
+      status.textContent="Created "+cropped+" cut-out"+(cropped===1?"":"s")+" with HSV and edge analysis. Rejected "+failed+" image"+(failed===1?"":"s")+". "+(reasons?"Reasons: "+reasons:"");
                         copy.disabled=!latest.length;
-      try{localStorage.setItem("image_forge_references",JSON.stringify({query:data.query,savedAt:Date.now(),results:latest}));}catch(_){}
+      try{localStorage.setItem("image_forge_references",JSON.stringify({query:data.query,savedAt:Date.now(),results:latest}));localStorage.setItem("image_forge_analysis",JSON.stringify({query:data.query,analyzedAt:Date.now(),items:analysisSummaries}));}catch(_){}
     }catch(error){status.textContent="Image Forge test failed: "+error.message;}
     finally{search.disabled=false;search.textContent="Find reference images";}
   });
