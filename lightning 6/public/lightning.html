@@ -1753,6 +1753,11 @@ const MODES = {
 };
 const SYSTEM = () => `You are lightning, an AI assistant. Always reply in the language the user writes in (English unless they write in another language). Current mode: ${currentSelectedMode}. ${MODES[currentSelectedMode] || MODES.normal}
 ${currentSelectedMode === "coder" && localStorage.getItem("lt_use_pixellab") === "true" && localStorage.getItem("lt_pixellab_key") ? "PIXELLAB GAME-ASSET TOOL: When a game or visual app needs real pixel-art assets, request one asset with exactly this marker: $INVOKE{assets_generator: detailed description}. In the ARTIFACT HTML, put the exact placeholder PIXELLAB_ASSET_1 in the image src where the generated PNG belongs. Lightning embeds the transparent PNG automatically. Use this for real sprites, props or a coherent sprite sheet; do not draw a rough SVG substitute. Only request an asset when it materially improves the result. Maximum one invocation per response." : ""}
+WIDGET OUTPUT (use this when a live embed or interactive preview is more useful than a normal artifact):
+- Website iframe: write WIDGET${type:url}@ on its own line, then one complete https:// URL, then a line containing only @.
+- Interactive HTML preview: write WIDGET${type:code}@ on its own line, then complete self-contained HTML/CSS/JS, then a line containing only @.
+- Use widgets for embedded websites, interactive demos, mini tools and live previews. Do not put widget markup inside markdown fences.
+- For images in normal replies, use standard Markdown image syntax: ![short description](https://image-url).
 OUTPUT FORMATS (never use markdown code fences):
 1. Code snippet: CODE@LANG{
 code here
@@ -1925,13 +1930,39 @@ function codeBox(lang, code) {
 }
 
 /* ---------- Rich message rendering ---------- */
-const RE = /ARTIFACT@([^{]*)\{([\s\S]*?)\}\$ARTIFACT|CODE@([\w+#-]*)\{([\s\S]*?)\}\$CODE|%@CODE\{([\s\S]*?)\}%@CODE|```([\w+#-]*)\n([\s\S]*?)```|FILE@([^{]*)\{([\s\S]*?)\}\$FILE|ARTIFACT@([^{]*)\{([\s\S]*)$/g;
+const RE = /ARTIFACT@([^{]*)\{([\s\S]*?)\}\$ARTIFACT|CODE@([\w+#-]*)\{([\s\S]*?)\}\$CODE|%@CODE\{([\s\S]*?)\}%@CODE|```([\w+#-]*)\n([\s\S]*?)```|FILE@([^{]*)\{([\s\S]*?)\}\$FILE|ARTIFACT@([^{]*)\{([\s\S]*)$|WIDGET\$\{\s*type\s*:\s*(url|code)\s*\}\s*@([\s\S]*?)\n@(?:\n|$)/g;
+function renderWidget(type, source) {
+    const card=el("section","lightning-widget"),head=el("div","lightning-widget-head");
+    const label=el("strong","",type==="url"?"Website preview":"Interactive preview");
+    const frame=el("iframe","lightning-widget-frame");
+    frame.title=type==="url"?"Embedded website":"Interactive HTML preview";
+    frame.loading="lazy";frame.referrerPolicy="no-referrer";
+    frame.setAttribute("sandbox","allow-scripts allow-forms allow-modals allow-popups");
+    const open=el("button","mini-btn","Open separately");
+    if(type==="url"){
+        let target;try{target=new URL(String(source||"").trim());}catch(_){target=null;}
+        if(!target||target.protocol!=="https:"){card.append(el("div","","Widget blocked: only valid HTTPS website URLs can be embedded."));return card;}
+        frame.src=target.href;open.onclick=()=>window.open(target.href,"_blank","noopener,noreferrer");
+    }else{
+        const code=String(source||"").trim();
+        if(!code){card.append(el("div","","The interactive preview was empty."));return card;}
+        frame.srcdoc=withErr(wrapDoc(code));
+        open.onclick=()=>{const win=window.open("about:blank","_blank","noopener");if(win){win.document.open();win.document.write(withErr(wrapDoc(code)));win.document.close();}};
+    }
+    const expand=el("button","mini-btn","Expand");
+    expand.onclick=()=>{frame.classList.toggle("expanded");expand.textContent=frame.classList.contains("expanded")?"Shrink":"Expand";};
+    head.append(label,expand,open);card.append(head,frame);return card;
+}
 function renderRich(box, text) {
     text = combineFences(text == null ? "" : String(text));
     box.classList.remove("thinking-bubble"); box.innerHTML = "";
     let last = 0, m, lastArt = -1;
-    const inline = (p, s) => s.split(/(\*\*[^*\n]+\*\*|`[^`\n]+`)/).forEach(t => {
-        if (/^\*\*[^*]+\*\*$/.test(t)) p.append(el("strong", "", t.slice(2, -2)));
+    const inline = (p, s) => s.split(/(!\\[[^\\]]*\\]\\(https?:\\/\\/[^)\\s]+\\)|\\*\\*[^*\\n]+\\*\\*|`[^`\\n]+`)/).forEach(t => {
+        if (/^!\\[/.test(t)) {
+            const m=t.match(/^!\\[([^\\]]*)\\]\\((https?:\\/\\/[^)\\s]+)\\)$/);
+            if(m){const img=el("img","chat-inline-image");img.src=m[2];img.alt=m[1]||"Image";img.loading="lazy";img.referrerPolicy="no-referrer";p.append(img);}
+            else p.append(document.createTextNode(t));
+        } else if (/^\\*\\*[^*]+\\*\\*$/.test(t)) p.append(el("strong", "", t.slice(2, -2)));
         else if (/^`[^`]+`$/.test(t)) { const c = el("code", "inline-code", t.slice(1, -1)); c.setAttribute("translate", "no"); p.append(c); }
         else if (t) p.append(document.createTextNode(t));
     });
@@ -1944,6 +1975,7 @@ function renderRich(box, text) {
         else if (m[4] !== undefined) box.append(codeBox(m[3] || "code", m[4]));
         else if (m[5] !== undefined) box.append(codeBox("code", m[5]));
         else if (m[8] !== undefined) box.append(fileCard(m[8].trim(), m[9]));
+        else if (m[12] !== undefined) box.append(renderWidget(m[12].toLowerCase(),m[13]));
         else if ((m[6] || "").toLowerCase() === "svg" && /<svg/i.test(m[7])) lastArt = addArt(box, "SVG graphic", '<!DOCTYPE html><html><body style="margin:0;display:grid;place-items:center;min-height:100vh;background:#fff">' + m[7] + "<\/body><\/html>");
         else if (/^(html?|)$/i.test(m[6] || "") && /<!doctype|<html|<body/i.test(m[7])) lastArt = addArt(box, ((m[7].match(/<title>([^<]*)/i) || [])[1] || "Web app").trim(), m[7]);
         else box.append(codeBox(m[6] || "code", m[7]));
@@ -2122,11 +2154,28 @@ async function extractText(f) {
     }
     return await f.text();
 }
-function addFile(f) {
-    if (f.type.startsWith("image/")) return shrink(f).then(d => { if (d) { pending.push({ name: f.name || "pasted-image.png", isImage: true, data: d }); renderPills(); } });
-    const isBin = READABLE.test(f.name);
-    if (!(isBin || f.type.startsWith("text/") || f.type === "application/json" || TEXT_EXT.test(f.name))) return showAiBubbleOnScreen(`⚠️ ${f.name}: unsupported type. Supported: images, PDF, Word, Excel, PowerPoint, ZIP, CSV and text/code files.`);
-    if (f.size > (isBin ? 15e6 : 3e5)) return showAiBubbleOnScreen(`⚠️ ${f.name} is too large (max ${isBin ? "15 MB" : "300 KB"}).`);
+async function chargeLightningCredits(kind) {
+    if(!lightningAccount){openLightningAuth();showAiBubbleOnScreen("Sign in to Lightning to use credit-based chat and uploads.");return false;}
+    try{
+        const response=await fetch("/api/credits/charge",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({kind})});
+        const data=await response.json().catch(()=>({}));
+        if(data.entitlement){lightningEntitlement=data.entitlement;drawAcct();}
+        if(!response.ok){showAiBubbleOnScreen(data.error||"You're out of Lightning credits. Add credits to continue.");updateCreditLock();return false;}
+        return true;
+    }catch(_){showAiBubbleOnScreen("Could not check Lightning credits. Please try again.");return false;}
+}
+function updateCreditLock(){
+    const credits=lightningAccount&&lightningEntitlement?Math.max(0,Number(lightningEntitlement.credits)||0):null;
+    const send=document.querySelector(".input-container .send-btn"),attach=document.querySelector(".input-container .attach-btn");
+    if(send)send.disabled=credits!==null&&credits<2;
+    if(attach)attach.disabled=credits!==null&&credits<5;
+}
+async function addFile(f) {
+    const isImage=f.type.startsWith("image/"),isBin=READABLE.test(f.name);
+    if (!(isImage||isBin||f.type.startsWith("text/")||f.type==="application/json"||TEXT_EXT.test(f.name))) return showAiBubbleOnScreen(`⚠️ ${f.name}: unsupported type. Supported: images, PDF, Word, Excel, PowerPoint, ZIP, CSV and text/code files.`);
+    if (f.size > (isBin ? 15e6 : isImage ? 20e6 : 3e5)) return showAiBubbleOnScreen(`⚠️ ${f.name} is too large (max ${isBin ? "15 MB" : isImage ? "20 MB" : "300 KB"}).`);
+    if(!await chargeLightningCredits("upload"))return;
+    if(isImage){const data=await shrink(f);if(data){pending.push({name:f.name||"pasted-image.png",isImage:true,data});renderPills();}else showAiBubbleOnScreen("Could not read "+f.name+".");return;}
     const item = { name: f.name, isImage: false, data: "", loading: true }; pending.push(item); renderPills();
     extractText(f).then(t => { item.data = t.length > 120000 ? t.slice(0, 120000) + "\n…[truncated]" : t; })
         .catch(e => { pending.splice(pending.indexOf(item), 1); showAiBubbleOnScreen("⚠️ " + f.name + ": " + e.message); })
@@ -2220,6 +2269,7 @@ async function groqCoderOverview(apiKey, source) {
 }
 
 async function askAI(apiText, images, names, force, reuse, tried) {
+    if(!reuse && !await chargeLightningCredits("bubble")){busy=false;return;}
     busy = true; const t0 = performance.now();
     let dedicatedGroqCoder = false, dedicatedOpenRouterCoder = false, messages = [];
     const groqOverviewKey = (rawCfg().keys || {}).groq || "";
@@ -2585,6 +2635,13 @@ button, .sidebar-chat-item, .gal-card, .row-item, .modal-card, .artifact-panel, 
 @keyframes lightningMessageIn { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
 .pixel-art-frame { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 12px; padding: 10px; max-width: min(100%, 420px); background: var(--surface-2, #202633); border: 1px solid var(--border-color); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
 .pixel-art-canvas { display: block; width: min(100%, 384px); height: auto; image-rendering: pixelated; image-rendering: crisp-edges; background: #fff; border-radius: 2px; }
+.lightning-widget{width:min(100%,760px);margin:10px 0;padding:10px;border:1px solid var(--border-color);border-radius:12px;background:var(--surface,rgba(255,255,255,.035));box-sizing:border-box}
+.lightning-widget-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px}
+.lightning-widget-head strong{font-size:.86rem;margin-right:auto}
+.lightning-widget-frame{display:block;width:100%;height:330px;border:1px solid var(--border-color);border-radius:8px;background:#fff}
+.lightning-widget-frame.expanded{height:70vh;min-height:420px}
+.chat-inline-image{display:block;max-width:min(100%,520px);max-height:360px;object-fit:contain;margin:9px 0;border:1px solid var(--border-color);border-radius:9px;background:var(--surface-2,#202020)}
+.input-container .send-btn:disabled,.input-container .attach-btn:disabled{opacity:.4;cursor:not-allowed}
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
 </style>` + doc;
     if (js) doc = /<\/body>/i.test(doc) ? doc.replace(/<\/body>/i, () => `<script>\n${js}\n<\/script><\/body>`) : doc + `<script>\n${js}\n<\/script>`;
@@ -3138,7 +3195,7 @@ function trialCard() {
         head.append(el("b","","Account status"));
         head.append(el("small","",e.trialActive?"Free trial":"Chat trial ended"));
         wrap.append(head);
-        wrap.append(el("small","",`${e.textRemaining} chat messages · ${Number(e.credits||0)} credits · ${Number(e.imageCreditCost||15)} per image`));
+        wrap.append(el("small","",`${Number(e.credits||0)} credits · 2 per reply · 5 per upload · ${Number(e.imageCreditCost||15)} per image`));
         const bar=el("div","trial-meter"),fill=el("span");
         fill.style.width=Math.min(100,Math.max(0,Number(e.credits||0)/200*100))+"%";
         bar.append(fill);wrap.append(bar);
@@ -3205,6 +3262,7 @@ function openLightningAuth(){
 function drawAcct() {
     acct.innerHTML = "";
     updateTopProfileShortcut();
+    updateCreditLock();
     const chip = document.getElementById("lightning-credit-chip");
     const count = document.getElementById("lightning-credit-count");
     if (chip && count) {
@@ -3213,7 +3271,7 @@ function drawAcct() {
         if (signedIn) {
             const credits = Math.max(0, Number(lightningEntitlement.credits) || 0);
             count.textContent = credits.toLocaleString();
-            chip.title = credits + " Lightning credits · " + (Number(lightningEntitlement.imageCreditCost) || 15) + " credits per image";
+            chip.title = credits + " Lightning credits · 2 per AI reply · 5 per upload · " + (Number(lightningEntitlement.imageCreditCost) || 15) + " per image";
             chip.setAttribute("aria-label", chip.title);
         }
     }
