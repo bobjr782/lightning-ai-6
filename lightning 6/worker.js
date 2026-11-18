@@ -169,6 +169,8 @@ const TRIAL_TEXT_LIMIT = 40;
 const TRIAL_IMAGE_LIMIT = 5;
 const STARTER_CREDITS = 200;
 const IMAGE_CREDIT_COST = 15;
+const BUBBLE_CREDIT_COST = 2;
+const UPLOAD_CREDIT_COST = 5;
 
 async function ensureUsage(user, env) {
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS feature_usage (
@@ -191,7 +193,8 @@ function entitlement(row) {
   return { plan:active?"free-trial":"trial-ended", trialActive:active, trialExpiresAt:expires,
     textLimit:TRIAL_TEXT_LIMIT, textUsed:Number(row.text_used||0), textRemaining:Math.max(0,TRIAL_TEXT_LIMIT-Number(row.text_used||0)),
     imageLimit:TRIAL_IMAGE_LIMIT, imagesUsed:Number(row.images_used||0), imagesRemaining:Math.max(0,TRIAL_IMAGE_LIMIT-Number(row.images_used||0)),
-    credits:Number(row.credits??STARTER_CREDITS), imageCreditCost:IMAGE_CREDIT_COST };
+    credits:Number(row.credits??STARTER_CREDITS), imageCreditCost:IMAGE_CREDIT_COST,
+    bubbleCreditCost:BUBBLE_CREDIT_COST, uploadCreditCost:UPLOAD_CREDIT_COST };
 }
 async function reserveTrialUse(user,env,kind) {
   const row=await ensureUsage(user,env), info=entitlement(row);
@@ -1009,6 +1012,22 @@ async function route(request, env) {
   }
 
   const user=await userFor(request,env);
+
+  if(path==="/api/credits/charge" && request.method==="POST") {
+    if(!user)return json({error:"Sign in to use Lightning credits."},401);
+    let b;try{b=await body(request);}catch{return json({error:"Invalid credit request."},400);}
+    const kind=String(b.kind||""),refund=b.action==="refund";
+    const cost=kind==="bubble"?BUBBLE_CREDIT_COST:kind==="upload"?UPLOAD_CREDIT_COST:0;
+    if(!cost)return json({error:"Unknown credit action."},400);
+    await ensureUsage(user,env);
+    const now=Math.floor(Date.now()/1000);
+    const result=refund
+      ? await env.DB.prepare("UPDATE feature_usage SET credits=credits+?,updated_at=? WHERE user_id=?").bind(cost,now,user.id).run()
+      : await env.DB.prepare("UPDATE feature_usage SET credits=credits-?,updated_at=? WHERE user_id=? AND credits>=?").bind(cost,now,user.id,cost).run();
+    const fresh=await ensureUsage(user,env);
+    if(!refund && !result.meta?.changes)return json({error:"You're out of Lightning credits. Add credits to continue.",entitlement:entitlement(fresh)},403);
+    return json({ok:true,charged:refund?0:cost,refunded:refund?cost:0,entitlement:entitlement(fresh)});
+  }
 
   if(path==="/api/presence" && request.method==="POST") {
     if(!user)return json({error:"Sign in required."},401);
