@@ -1070,6 +1070,7 @@ async function route(request, env) {
     await ensureAccountTables(env);
     await ensurePublishedTable(env);
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS feature_usage (user_id TEXT PRIMARY KEY,trial_started_at INTEGER NOT NULL,text_used INTEGER NOT NULL DEFAULT 0,images_used INTEGER NOT NULL DEFAULT 0,updated_at INTEGER NOT NULL)").run();
+    await ensureUsage(user,env);
     await ensureModerationTables(env);
     if(path==="/api/admin/moderation/flagged" && request.method==="GET") {
       const rows=await env.DB.prepare("SELECT c.id,c.title,c.flagged_terms_json,c.updated_at,u.id AS user_id,u.username FROM chat_conversations c JOIN users u ON u.id=c.user_id WHERE c.flagged_terms_json<>'[]' ORDER BY c.updated_at DESC LIMIT 250").all();
