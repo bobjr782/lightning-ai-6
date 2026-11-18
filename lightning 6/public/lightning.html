@@ -1754,8 +1754,8 @@ const MODES = {
 const SYSTEM = () => `You are lightning, an AI assistant. Always reply in the language the user writes in (English unless they write in another language). Current mode: ${currentSelectedMode}. ${MODES[currentSelectedMode] || MODES.normal}
 ${currentSelectedMode === "coder" && localStorage.getItem("lt_use_pixellab") === "true" && localStorage.getItem("lt_pixellab_key") ? "PIXELLAB GAME-ASSET TOOL: When a game or visual app needs real pixel-art assets, request one asset with exactly this marker: $INVOKE{assets_generator: detailed description}. In the ARTIFACT HTML, put the exact placeholder PIXELLAB_ASSET_1 in the image src where the generated PNG belongs. Lightning embeds the transparent PNG automatically. Use this for real sprites, props or a coherent sprite sheet; do not draw a rough SVG substitute. Only request an asset when it materially improves the result. Maximum one invocation per response." : ""}
 WIDGET OUTPUT (use this when a live embed or interactive preview is more useful than a normal artifact):
-- Website iframe: write WIDGET${type:url}@ on its own line, then one complete https:// URL, then a line containing only @.
-- Interactive HTML preview: write WIDGET${type:code}@ on its own line, then complete self-contained HTML/CSS/JS, then a line containing only @.
+- Website iframe: write WIDGET\${type:url}@ on its own line, then one complete https:// URL, then a line containing only @.
+- Interactive HTML preview: write WIDGET\${type:code}@ on its own line, then complete self-contained HTML/CSS/JS, then a line containing only @.
 - Use widgets for embedded websites, interactive demos, mini tools and live previews. Do not put widget markup inside markdown fences.
 - For images in normal replies, use standard Markdown image syntax: ![short description](https://image-url).
 OUTPUT FORMATS (never use markdown code fences):
@@ -1947,7 +1947,7 @@ function renderWidget(type, source) {
         const code=String(source||"").trim();
         if(!code){card.append(el("div","","The interactive preview was empty."));return card;}
         frame.srcdoc=withErr(wrapDoc(code));
-        open.onclick=()=>{const win=window.open("about:blank","_blank","noopener");if(win){win.document.open();win.document.write(withErr(wrapDoc(code)));win.document.close();}};
+        open.onclick=()=>{const blob=new Blob([withErr(wrapDoc(code))],{type:"text/html"}),url=URL.createObjectURL(blob);window.open(url,"_blank","noopener,noreferrer");setTimeout(()=>URL.revokeObjectURL(url),60000);};
     }
     const expand=el("button","mini-btn","Expand");
     expand.onclick=()=>{frame.classList.toggle("expanded");expand.textContent=frame.classList.contains("expanded")?"Shrink":"Expand";};
@@ -1957,12 +1957,12 @@ function renderRich(box, text) {
     text = combineFences(text == null ? "" : String(text));
     box.classList.remove("thinking-bubble"); box.innerHTML = "";
     let last = 0, m, lastArt = -1;
-    const inline = (p, s) => s.split(/(!\\[[^\\]]*\\]\\(https?:\\/\\/[^)\\s]+\\)|\\*\\*[^*\\n]+\\*\\*|`[^`\\n]+`)/).forEach(t => {
-        if (/^!\\[/.test(t)) {
-            const m=t.match(/^!\\[([^\\]]*)\\]\\((https?:\\/\\/[^)\\s]+)\\)$/);
+    const inline = (p, s) => s.split(/(!\[[^\]]*\]\(https?:\/\/[^)\s]+\)|\*\*[^*\n]+\*\*|`[^`\n]+`)/).forEach(t => {
+        if (/^!\[/.test(t)) {
+            const m=t.match(/^!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)$/);
             if(m){const img=el("img","chat-inline-image");img.src=m[2];img.alt=m[1]||"Image";img.loading="lazy";img.referrerPolicy="no-referrer";p.append(img);}
             else p.append(document.createTextNode(t));
-        } else if (/^\\*\\*[^*]+\\*\\*$/.test(t)) p.append(el("strong", "", t.slice(2, -2)));
+        } else if (/^\*\*[^*]+\*\*$/.test(t)) p.append(el("strong", "", t.slice(2, -2)));
         else if (/^`[^`]+`$/.test(t)) { const c = el("code", "inline-code", t.slice(1, -1)); c.setAttribute("translate", "no"); p.append(c); }
         else if (t) p.append(document.createTextNode(t));
     });
@@ -2166,8 +2166,9 @@ async function chargeLightningCredits(kind) {
 }
 function updateCreditLock(){
     const credits=lightningAccount&&lightningEntitlement?Math.max(0,Number(lightningEntitlement.credits)||0):null;
-    const send=document.querySelector(".input-container .send-btn"),attach=document.querySelector(".input-container .attach-btn");
+    const send=document.querySelector(".input-container .send-btn"),attach=document.querySelector(".input-container .attach-btn"),input=document.getElementById("bob");
     if(send)send.disabled=credits!==null&&credits<2;
+    if(input)input.disabled=credits!==null&&credits<2;
     if(attach)attach.disabled=credits!==null&&credits<5;
 }
 async function addFile(f) {
