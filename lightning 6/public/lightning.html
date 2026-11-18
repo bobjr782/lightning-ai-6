@@ -94,6 +94,14 @@ textarea.input { flex: 1; height: 36px; background: transparent; color: var(--te
 .send-btn { background-color: var(--accent-blue); color: white; border: none; border-radius: 6px; padding: 8px 16px; cursor: pointer; font-size: 1rem; font-weight: 600; }
 .send-btn:hover { background-color: var(--accent-blue-hover); }
 
+/* Credits beside the chat composer */
+.lightning-credit-chip{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;padding:7px 10px;border:1px solid var(--border-color);border-radius:8px;background:var(--surface-2);color:var(--text-primary);font-size:12px;font-weight:700;white-space:nowrap}
+.lightning-credit-chip strong{color:var(--accent)}
+.lightning-credit-chip[hidden]{display:none!important}
+@media(max-width:760px){.input-container{gap:6px;padding:7px}.lightning-credit-chip{padding:6px 7px;font-size:11px}#models{max-width:68px}#model-pick{max-width:100px}}
+@media(max-width:520px){.lightning-credit-chip .credit-word{display:none}.input-container{flex-wrap:wrap}.input-container textarea.input{min-width:90px}}
+
+
 .message-row { width: 100%; display: flex; margin: 8px 0; }
 .message-row.user-align { justify-content: flex-end; }
 .message-row.ai-align { justify-content: flex-start; }
@@ -936,7 +944,7 @@ body.img-mode .img-opts { display: flex; }
                         <option value="pro+" class="option">pro+</option>
                     </select>
                     <select id="model-pick" class="select" title="Model"></select>
-                    <button class="send-btn" onclick="ai_send()" title="Send">↑</button> 
+                    <span id="lightning-credit-chip" class="lightning-credit-chip" hidden title="Your Lightning image-generation credits"><strong id="lightning-credit-count">0</strong><span class="credit-word">credits</span></span>\n                    <button class="send-btn" onclick="ai_send()" title="Send">↑</button> 
                 </div> 
             </div>
         </div>
@@ -3193,7 +3201,22 @@ function openLightningAuth(){
     };
     ov.onclick=e=>{if(e.target===ov)ov.remove();};render();
 }
-function drawAcct() { acct.innerHTML = ""; updateTopProfileShortcut(); }
+function drawAcct() {
+    acct.innerHTML = "";
+    updateTopProfileShortcut();
+    const chip = document.getElementById("lightning-credit-chip");
+    const count = document.getElementById("lightning-credit-count");
+    if (chip && count) {
+        const signedIn = !!(lightningAccount && lightningEntitlement);
+        chip.hidden = !signedIn;
+        if (signedIn) {
+            const credits = Math.max(0, Number(lightningEntitlement.credits) || 0);
+            count.textContent = credits.toLocaleString();
+            chip.title = credits + " Lightning credits · " + (Number(lightningEntitlement.imageCreditCost) || 15) + " credits per image";
+            chip.setAttribute("aria-label", chip.title);
+        }
+    }
+}
 const KEYINFO = { groq: { name: "Groq", prefix: "gsk_", url: "https://console.groq.com/keys", check: "https://api.groq.com/openai/v1/models", cache: () => { groqCache = null; } },
     google: { name: "Google", prefix: "AIza", url: "https://aistudio.google.com/apikey", check: "https://generativelanguage.googleapis.com/v1beta/openai/models", cache: () => { googleCache = null; } } };
 function keyModal(id) {
