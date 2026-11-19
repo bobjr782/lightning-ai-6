@@ -3281,7 +3281,7 @@ function trialCard() {
         const bar=el("div","trial-meter"),fill=el("span");
         fill.style.width=Math.min(100,Math.max(0,Number(e.credits||0)/200*100))+"%";
         bar.append(fill);wrap.append(bar);
-        wrap.append(btn("Sign out",async()=>{await fetch("/api/logout",{method:"POST",credentials:"same-origin"});lightningAccount=null;lightningEntitlement=null;user=null;try{localStorage.removeItem("lightning_username_hint");}catch(_){}drawAcct();showAiBubbleOnScreen("Signed out of Lightning.");}));
+        wrap.append(btn("Connect another sign-in method",()=>openLightningAuth(true)));wrap.append(btn("Sign out",async()=>{await fetch("/api/logout",{method:"POST",credentials:"same-origin"});lightningAccount=null;lightningEntitlement=null;user=null;try{localStorage.removeItem("lightning_username_hint");}catch(_){}drawAcct();showAiBubbleOnScreen("Signed out of Lightning.");}));
     }else{
         const head=el("div","trial-account-head");head.append(el("b","","Not signed in"));wrap.append(head);
         wrap.append(el("small","auth-note","Sign in to save your profile and share artifacts with friends."));
@@ -3304,43 +3304,83 @@ async function refreshLightningAccount(){
     updateTopProfileShortcut();
     if(lightningAccount){checkModerationConsent();}else{moderationConsent=false;moderationPromptShown=false;}
 }
-function openLightningAuth(){
+function openLightningAuth(linkMode=false){
     const ov=el("div","modal-overlay open"),card=el("div","modal-card");ov.append(card);document.body.append(ov);
     let mode="login";
+    if(!document.getElementById("lt-oauth-style")){
+        const style=document.createElement("style");
+        style.id="lt-oauth-style";
+        style.textContent=".lt-oauth-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:4px 0 8px}.lt-oauth-btn{min-height:40px;padding:9px 11px;border:1px solid var(--border-color,#394150);border-radius:8px;background:var(--bg-input,#202633);color:var(--text-primary,#f2f4f8);font:600 13px inherit;cursor:pointer;text-align:left}.lt-oauth-btn:hover{border-color:var(--accent-blue,#3987ff);background:var(--bg-bubble-ai,#293345)}.lt-oauth-btn.is-ready{border-color:var(--accent-blue,#3987ff)}.lt-oauth-btn:disabled{opacity:.5;cursor:not-allowed}.lt-oauth-status{display:block;color:var(--text-secondary,#929bab);font-size:11px;line-height:1.5}.lt-auth-separator{display:flex;align-items:center;gap:9px;color:var(--text-secondary,#929bab);font-size:11px;margin:5px 0}.lt-auth-separator:before,.lt-auth-separator:after{content:'';height:1px;background:var(--border-color,#394150);flex:1}@media(max-width:440px){.lt-oauth-grid{grid-template-columns:1fr}}";
+        document.head.appendChild(style);
+    }
     const render=()=>{
-        card.innerHTML=`<div class="modal-header"><h3>${mode==="login"?"Sign in to Lightning":"Create your Lightning account"}</h3><button class="close-modal-btn" type="button">✕</button></div>
-        <div class="modal-body">
-          <p class="auth-note">${mode==="login"?"Welcome back.":"Get 7 days of Lightning Free Trial: 40 chat messages and 5 image generations. No API key needed."}</p>
-          <input class="field" id="lt-user" autocomplete="username" maxlength="24" placeholder="Username (3–24 letters, numbers or _)">
-          <input class="field" id="lt-pass" type="password" autocomplete="${mode==="login"?"current-password":"new-password"}" placeholder="${mode==="login"?"Password":"Password (at least 10 characters)"}">
-          <div class="auth-err" id="lt-auth-error"></div>
-          <button class="send-btn wide" id="lt-auth-submit" type="button">${mode==="login"?"Sign in":"Create account"}</button>
-          <button class="mini-btn wide" id="lt-auth-switch" type="button">${mode==="login"?"Need an account? Create one":"Already have an account? Sign in"}</button>
-        </div>`;
+        const fields=linkMode
+          ? '<p class="auth-note">Choose a provider to connect it to your currently signed-in Lightning account.</p>'
+          : '<div class="lt-auth-separator">or use a Lightning username</div><input class="field" id="lt-user" autocomplete="username" maxlength="24" placeholder="Username (3–24 letters, numbers or _)"><input class="field" id="lt-pass" type="password" autocomplete="'+(mode==="login"?"current-password":"new-password")+'" placeholder="'+(mode==="login"?"Password":"Password (at least 10 characters)")+'"><div class="auth-err" id="lt-auth-error"></div><button class="send-btn wide" id="lt-auth-submit" type="button">'+(mode==="login"?"Sign in":"Create account")+'</button><button class="mini-btn wide" id="lt-auth-switch" type="button">'+(mode==="login"?"Need an account? Create one":"Already have an account? Sign in")+'</button>';
+        card.innerHTML =
+          '<div class="modal-header"><h3>'+(linkMode?"Connect a sign-in method":(mode==="login"?"Sign in to Lightning":"Create your Lightning account"))+'</h3><button class="close-modal-btn" type="button">✕</button></div>'+
+          '<div class="modal-body">'+
+          '<p class="auth-note">'+(linkMode?"Connect another sign-in method so you can access this same Lightning account.":(mode==="login"?"Welcome back.":"Get 7 days of Lightning Free Trial: 40 chat messages and 5 image generations. No API key needed."))+'</p>'+
+          '<div class="lt-oauth-grid">'+
+          '<button type="button" class="lt-oauth-btn" data-oauth="google">Continue with Google</button>'+
+          '<button type="button" class="lt-oauth-btn" data-oauth="facebook">Continue with Facebook</button>'+
+          '<button type="button" class="lt-oauth-btn" data-oauth="twitter">Continue with X / Twitter</button>'+
+          '<button type="button" class="lt-oauth-btn" data-oauth="discord">Continue with Discord</button>'+
+          '<button type="button" class="lt-oauth-btn" data-oauth="huggingface">Continue with Hugging Face</button>'+
+          '<button type="button" class="lt-oauth-btn" disabled title="EdPass requires an approved Department for Education SSO integration.">EdPass · setup required</button>'+
+          '</div><small class="lt-oauth-status" id="lt-oauth-status">Checking which sign-in providers are configured…</small>'+
+          fields+
+          '</div>';
         const q=s=>card.querySelector(s);
-        try{q("#lt-user").value=localStorage.getItem("lightning_username_hint")||"";}catch(_){}
         q(".close-modal-btn").onclick=()=>ov.remove();
-        q("#lt-auth-switch").onclick=()=>{mode=mode==="login"?"register":"login";render();};
-        const submit=async()=>{
-            const username=q("#lt-user").value.trim(),password=q("#lt-pass").value,err=q("#lt-auth-error"),button=q("#lt-auth-submit");
-            err.textContent="";button.disabled=true;button.textContent="Please wait…";
-            try{
-                if(!username||!password)throw new Error("Enter both your username and password.");
-                const r=await fetch(mode==="login"?"/api/login":"/api/register",{method:"POST",credentials:"include",cache:"no-store",headers:{"content-type":"application/json","accept":"application/json"},body:JSON.stringify({username,password})});
-                const j=await r.json().catch(()=>({error:"Lightning returned an unreadable response. Refresh the page and try again."}));
-                if(!r.ok)throw new Error(j.error||("Account request failed (HTTP "+r.status+")."));
-                try{localStorage.setItem("lightning_username_hint",j.user?.username||username);}catch(_){}
-                await refreshLightningAccount();
-                if(!lightningAccount)throw new Error("Your details were accepted, but Lightning could not confirm your sign-in session. Check that cookies are enabled for this site, then try again.");
-                ov.remove();
-                showAiBubbleOnScreen(mode==="login"?"Welcome back to Lightning.":"Your Lightning free trial has started. No API key required.");
-            }catch(e){err.textContent=e.message||"Sign-in failed. Please try again.";button.disabled=false;button.textContent=mode==="login"?"Sign in":"Create account";}
-        };
-        q("#lt-auth-submit").onclick=submit;
-        q("#lt-pass").onkeydown=e=>{if(e.key==="Enter")submit();};
+        card.querySelectorAll("[data-oauth]").forEach(button=>{
+            button.onclick=()=>{
+                const provider=button.getAttribute("data-oauth");
+                window.location.assign("/api/oauth/start?provider="+encodeURIComponent(provider)+(linkMode?"&link=1":""));
+            };
+        });
+        fetch("/api/oauth/providers",{credentials:"same-origin",cache:"no-store"})
+          .then(r=>r.json())
+          .then(data=>{
+              const configured=data.providers||{};
+              card.querySelectorAll("[data-oauth]").forEach(button=>{
+                  const provider=button.getAttribute("data-oauth"),ready=!!configured[provider];
+                  button.classList.toggle("is-ready",ready);
+                  button.textContent=button.textContent.replace(/ · setup required$/,"")+(ready?"":" · setup required");
+                  button.title=ready?"Continue securely with "+provider:"Not configured yet. The site owner must add this provider's OAuth credentials in Cloudflare.";
+              });
+              const status=q("#lt-oauth-status");
+              if(status)status.textContent="To enable a provider, register its OAuth app and add its client ID/secret in Cloudflare. Callback URL: "+window.location.origin+(data.callbackPath||"/oauth/callback")+". EdPass needs a separate approved school SSO connection.";
+          })
+          .catch(()=>{
+              const status=q("#lt-oauth-status");
+              if(status)status.textContent="Social sign-in is not configured yet. The site owner must add provider credentials in Cloudflare.";
+          });
+        if(!linkMode){
+            try{q("#lt-user").value=localStorage.getItem("lightning_username_hint")||"";}catch(_){}
+            q("#lt-auth-switch").onclick=()=>{mode=mode==="login"?"register":"login";render();};
+            const submit=async()=>{
+                const username=q("#lt-user").value.trim(),password=q("#lt-pass").value,err=q("#lt-auth-error"),button=q("#lt-auth-submit");
+                err.textContent="";button.disabled=true;button.textContent="Please wait…";
+                try{
+                    if(!username||!password)throw new Error("Enter both your username and password.");
+                    const r=await fetch(mode==="login"?"/api/login":"/api/register",{method:"POST",credentials:"include",cache:"no-store",headers:{"content-type":"application/json","accept":"application/json"},body:JSON.stringify({username,password})});
+                    const j=await r.json().catch(()=>({error:"Lightning returned an unreadable response. Refresh the page and try again."}));
+                    if(!r.ok)throw new Error(j.error||("Account request failed (HTTP "+r.status+")."));
+                    try{localStorage.setItem("lightning_username_hint",j.user?.username||username);}catch(_){}
+                    await refreshLightningAccount();
+                    if(!lightningAccount)throw new Error("Your details were accepted, but Lightning could not confirm your sign-in session. Check that cookies are enabled for this site, then try again.");
+                    ov.remove();
+                    showAiBubbleOnScreen(mode==="login"?"Welcome back to Lightning.":"Your Lightning free trial has started. No API key required.");
+                }catch(e){err.textContent=e.message||"Sign-in failed. Please try again.";button.disabled=false;button.textContent=mode==="login"?"Sign in":"Create account";}
+            };
+            q("#lt-auth-submit").onclick=submit;
+            q("#lt-pass").onkeydown=e=>{if(e.key==="Enter")submit();};
+        }
     };
     ov.onclick=e=>{if(e.target===ov)ov.remove();};render();
 }
+
 function drawAcct() {
     acct.innerHTML = "";
     updateTopProfileShortcut();
@@ -3621,6 +3661,30 @@ safe("migrate", () => {
 });
 safe("theme", () => { if (localStorage.getItem("lt_theme") !== "dark") document.body.classList.add("light-mode"); });
 safe("account", () => { drawAcct(); drawOr(); refreshLightningAccount(); });
+safe("oauth-result", () => {
+    const params=new URLSearchParams(location.search),result=params.get("oauth");
+    if(!result)return;
+    const provider=params.get("provider")||"social";
+    const reason=params.get("reason")||"";
+    history.replaceState(null,"",location.pathname+location.hash);
+    if(result==="success"||result==="linked"){
+        refreshLightningAccount().then(()=>{
+            showAiBubbleOnScreen(result==="linked"?"Connected "+provider+" to your Lightning account.":"Signed in to Lightning with "+provider+".");
+        });
+    }else{
+        const messages={
+            not_configured:"That sign-in provider is not configured yet. The owner must add its OAuth client credentials in Cloudflare.",
+            provider_cancelled:"Sign-in was cancelled.",
+            link_requires_login:"Sign in to Lightning before connecting another provider.",
+            state_expired:"The sign-in link expired. Please try again.",
+            invalid_state:"The sign-in check failed. Please start again.",
+            authentication_failed:"The provider could not complete sign-in. Check its OAuth app settings and try again.",
+            database_not_ready:"Lightning's account database is not available right now.",
+            missing_code:"The provider did not return an authorization code."
+        };
+        showAiBubbleOnScreen(messages[reason]||"Could not sign in with "+provider+". Please try again.");
+    }
+});
 safe("chats", () => {
     const lastChat = rd("cur", null);
     try { if (lastChat && chats.some(c => c.id === lastChat)) openChat(lastChat); else { showWelcome(); updateTop(); renderSidebarChats(); } }
