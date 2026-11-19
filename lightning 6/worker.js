@@ -926,9 +926,287 @@ async function pixelLabRoute(request) {
   return json({error:"Method not allowed."},405);
 }
 
+
+const OAUTH_PROVIDERS = {
+  google: {
+    clientId: "GOOGLE_CLIENT_ID", clientSecret: "GOOGLE_CLIENT_SECRET",
+    authorize: "https://accounts.google.com/o/oauth2/v2/auth",
+    token: "https://oauth2.googleapis.com/token",
+    userInfo: "https://openidconnect.googleapis.com/v1/userinfo",
+    scope: "openid email profile", pkce: true, tokenAuth: "body"
+  },
+  facebook: {
+    clientId: "FACEBOOK_CLIENT_ID", clientSecret: "FACEBOOK_CLIENT_SECRET",
+    authorize: "https://www.facebook.com/dialog/oauth",
+    token: "https://graph.facebook.com/oauth/access_token",
+    userInfo: "https://graph.facebook.com/me?fields=id,name,email,picture",
+    scope: "public_profile,email", pkce: false, tokenAuth: "query"
+  },
+  twitter: {
+    clientId: "TWITTER_CLIENT_ID", clientSecret: "TWITTER_CLIENT_SECRET",
+    authorize: "https://twitter.com/i/oauth2/authorize",
+    token: "https://api.twitter.com/2/oauth2/token",
+    userInfo: "https://api.twitter.com/2/users/me?user.fields=profile_image_url,name,username",
+    scope: "users.read", pkce: true, tokenAuth: "basic"
+  },
+  discord: {
+    clientId: "DISCORD_CLIENT_ID", clientSecret: "DISCORD_CLIENT_SECRET",
+    authorize: "https://discord.com/oauth2/authorize",
+    token: "https://discord.com/api/oauth2/token",
+    userInfo: "https://discord.com/api/users/@me",
+    scope: "identify email", pkce: true, tokenAuth: "body"
+  },
+  huggingface: {
+    clientId: "HF_CLIENT_ID", clientSecret: "HF_CLIENT_SECRET",
+    authorize: "https://huggingface.co/oauth/authorize",
+    token: "https://huggingface.co/oauth/token",
+    userInfo: "https://huggingface.co/oauth/userinfo",
+    scope: "openid profile email", pkce: true, tokenAuth: "basic-optional"
+  }
+};
+
+function oauthReturn(request, result, provider, reason, sessionToken) {
+  const target = new URL("/lightning.html", new URL(request.url).origin);
+  target.searchParams.set("oauth", result);
+  if (provider) target.searchParams.set("provider", provider);
+  if (reason) target.searchParams.set("reason", reason);
+  const headers = new Headers({ "location": target.toString(), "cache-control": "no-store" });
+  if (sessionToken) headers.append("set-cookie", cookie(sessionToken, SESSION_DAYS * 86400));
+  return new Response(null, { status: 302, headers });
+}
+
+async function ensureOAuthTables(env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS oauth_accounts (
+    provider TEXT NOT NULL,
+    provider_user_id TEXT NOT NULL,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY(provider, provider_user_id),
+    UNIQUE(provider, user_id)
+  )`).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS oauth_accounts_user_idx ON oauth_accounts(user_id)").run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS oauth_states (
+    state_hash TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    code_verifier TEXT,
+    link_user_id TEXT,
+    expires_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  )`).run();
+  await env.DB.prepare("DELETE FROM oauth_states WHERE expires_at<=?").bind(Math.floor(Date.now()/1000)).run();
+}
+
+function oauthConfigured(provider, env) {
+  const cfg = OAUTH_PROVIDERS[provider];
+  if (!cfg || !env[cfg.clientId]) return false;
+  if (provider !== "huggingface" && !env[cfg.clientSecret]) return false;
+  return true;
+}
+
+async function oauthProvidersRoute(env) {
+  const enabled = {};
+  for (const key of Object.keys(OAUTH_PROVIDERS)) enabled[key] = oauthConfigured(key, env);
+  return json({ providers: enabled, callbackPath: "/oauth/callback", edpass: false });
+}
+
+async function oauthStartRoute(request, env) {
+  if (!env.DB) return oauthReturn(request, "error", "", "database_not_ready");
+  const url = new URL(request.url);
+  const provider = String(url.searchParams.get("provider") || "").toLowerCase();
+  const cfg = OAUTH_PROVIDERS[provider];
+  if (!cfg) return oauthReturn(request, "error", "", "unknown_provider");
+  if (!oauthConfigured(provider, env)) return oauthReturn(request, "error", provider, "not_configured");
+
+  await ensureAccountTables(env);
+  await ensureOAuthTables(env);
+  const linkRequested = url.searchParams.get("link") === "1";
+  const currentUser = linkRequested ? await userFor(request, env) : null;
+  if (linkRequested && !currentUser) return oauthReturn(request, "error", provider, "link_requires_login");
+
+  const state = b64(randomBytes(32));
+  const verifier = cfg.pkce ? b64(randomBytes(32)) : "";
+  const now = Math.floor(Date.now()/1000);
+  await env.DB.prepare("INSERT INTO oauth_states(state_hash,provider,code_verifier,link_user_id,expires_at,created_at) VALUES(?,?,?,?,?,?)")
+    .bind(await sha(state), provider, verifier || null, currentUser?.id || null, now + 600, now).run();
+
+  const redirectUri = new URL("/oauth/callback", url.origin).toString();
+  const auth = new URL(cfg.authorize);
+  auth.searchParams.set("client_id", env[cfg.clientId]);
+  auth.searchParams.set("redirect_uri", redirectUri);
+  auth.searchParams.set("response_type", "code");
+  auth.searchParams.set("scope", cfg.scope);
+  auth.searchParams.set("state", state);
+  if (provider === "google") auth.searchParams.set("prompt", "select_account");
+  if (provider === "discord") auth.searchParams.set("prompt", "none");
+  if (cfg.pkce) {
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(verifier)));
+    auth.searchParams.set("code_challenge", b64(digest));
+    auth.searchParams.set("code_challenge_method", "S256");
+  }
+  return Response.redirect(auth.toString(), 302);
+}
+
+async function oauthFetchJson(url, options, label) {
+  const response = await fetch(url, { ...options, signal: AbortSignal.timeout(20000) });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const detail = String(data.error_description || data.error?.message || data.message || data.error || label + " rejected the request");
+    throw new Error(label + " returned HTTP " + response.status + ": " + detail.slice(0, 220));
+  }
+  return data;
+}
+
+async function oauthExchange(provider, cfg, request, code, verifier, env) {
+  const url = new URL("/oauth/callback", new URL(request.url).origin);
+  const redirectUri = url.toString();
+  const clientId = env[cfg.clientId];
+  const clientSecret = env[cfg.clientSecret] || "";
+  const params = new URLSearchParams({
+    grant_type: "authorization_code",
+    code: code,
+    redirect_uri: redirectUri
+  });
+  if (verifier) params.set("code_verifier", verifier);
+
+  if (cfg.tokenAuth === "query") {
+    const tokenUrl = new URL(cfg.token);
+    tokenUrl.searchParams.set("client_id", clientId);
+    tokenUrl.searchParams.set("client_secret", clientSecret);
+    tokenUrl.searchParams.set("code", code);
+    tokenUrl.searchParams.set("redirect_uri", redirectUri);
+    tokenUrl.searchParams.set("grant_type", "authorization_code");
+    return oauthFetchJson(tokenUrl.toString(), { method: "GET" }, "Facebook token exchange");
+  }
+
+  const headers = { "content-type": "application/x-www-form-urlencoded", "accept": "application/json" };
+  if (cfg.tokenAuth === "basic" || (cfg.tokenAuth === "basic-optional" && clientSecret)) {
+    headers.Authorization = "Basic " + btoa(clientId + ":" + clientSecret);
+  } else {
+    params.set("client_id", clientId);
+    if (clientSecret) params.set("client_secret", clientSecret);
+  }
+  return oauthFetchJson(cfg.token, { method: "POST", headers, body: params.toString() }, provider + " token exchange");
+}
+
+async function oauthProfile(provider, cfg, accessToken) {
+  const headers = { "authorization": "Bearer " + accessToken, "accept": "application/json" };
+  const raw = await oauthFetchJson(cfg.userInfo, { method: "GET", headers }, provider + " profile lookup");
+  if (provider === "twitter") {
+    const u = raw.data || {};
+    return { id: u.id, username: u.username, name: u.name, picture: u.profile_image_url };
+  }
+  if (provider === "discord") {
+    const avatar = raw.avatar && raw.id ? "https://cdn.discordapp.com/avatars/" + raw.id + "/" + raw.avatar + ".png" : "";
+    return { id: raw.id, username: raw.global_name || raw.username, name: raw.global_name || raw.username, picture: avatar };
+  }
+  if (provider === "huggingface") {
+    return { id: raw.sub, username: raw.preferred_username, name: raw.name || raw.preferred_username, picture: raw.picture };
+  }
+  if (provider === "facebook") {
+    return { id: raw.id, username: raw.name, name: raw.name, picture: raw.picture?.data?.url || "" };
+  }
+  return { id: raw.sub, username: raw.name || raw.email, name: raw.name, picture: raw.picture };
+}
+
+function oauthUsernameBase(value) {
+  const base = String(value || "lightning_user").replace(/[^A-Za-z0-9_]/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "").slice(0, 16);
+  return base.length >= 3 ? base : "user";
+}
+
+async function oauthCreateUser(provider, profile, env) {
+  await ensureModerationTables(env);
+  const base = oauthUsernameBase(profile.username || profile.name || (provider + "_user"));
+  const salt = b64(randomBytes(16));
+  const randomPassword = b64(randomBytes(32));
+  const hash = await passwordHash(randomPassword, salt);
+  const now = Math.floor(Date.now()/1000);
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const username = base.slice(0, 16) + "_" + b64(randomBytes(4)).slice(0, 5);
+    const norm = username.toLowerCase();
+    const [exists, blocked] = await Promise.all([
+      env.DB.prepare("SELECT id FROM users WHERE username_norm=?").bind(norm).first(),
+      env.DB.prepare("SELECT username FROM blocked_users WHERE username_norm=?").bind(norm).first()
+    ]);
+    if (exists || blocked) continue;
+    const user = { id: b64(randomBytes(18)), username };
+    try {
+      await env.DB.prepare("INSERT INTO users(id,username,username_norm,salt,password_hash,created_at) VALUES(?,?,?,?,?,?)")
+        .bind(user.id, user.username, norm, salt, hash, now).run();
+      return user;
+    } catch (error) {
+      if (attempt === 19) throw error;
+    }
+  }
+  throw new Error("Could not create a unique Lightning username for this provider account.");
+}
+
+async function oauthCallbackRoute(request, env) {
+  if (!env.DB) return oauthReturn(request, "error", "", "database_not_ready");
+  await ensureAccountTables(env);
+  await ensureOAuthTables(env);
+  const url = new URL(request.url);
+  const providerFromQuery = String(url.searchParams.get("provider") || "").toLowerCase();
+  const state = String(url.searchParams.get("state") || "");
+  if (url.searchParams.has("error")) return oauthReturn(request, "error", providerFromQuery, "provider_cancelled");
+  if (!state || state.length > 200) return oauthReturn(request, "error", providerFromQuery, "invalid_state");
+
+  const stateHash = await sha(state);
+  const saved = await env.DB.prepare("SELECT provider,code_verifier,link_user_id FROM oauth_states WHERE state_hash=? AND expires_at>?")
+    .bind(stateHash, Math.floor(Date.now()/1000)).first();
+  await env.DB.prepare("DELETE FROM oauth_states WHERE state_hash=?").bind(stateHash).run();
+  if (!saved) return oauthReturn(request, "error", providerFromQuery, "state_expired");
+
+  const provider = saved.provider;
+  const cfg = OAUTH_PROVIDERS[provider];
+  if (!cfg || !oauthConfigured(provider, env)) return oauthReturn(request, "error", provider, "not_configured");
+  const code = String(url.searchParams.get("code") || "");
+  if (!code || code.length > 4096) return oauthReturn(request, "error", provider, "missing_code");
+
+  try {
+    const tokenData = await oauthExchange(provider, cfg, request, code, saved.code_verifier || "", env);
+    const accessToken = tokenData.access_token;
+    if (typeof accessToken !== "string" || !accessToken) throw new Error("The provider did not return an access token.");
+    const profile = await oauthProfile(provider, cfg, accessToken);
+    const providerUserId = String(profile.id || "");
+    if (!providerUserId || providerUserId.length > 500) throw new Error("The provider did not return a valid account ID.");
+
+    const existing = await env.DB.prepare("SELECT user_id FROM oauth_accounts WHERE provider=? AND provider_user_id=?")
+      .bind(provider, providerUserId).first();
+    let account = null;
+    let linked = false;
+
+    if (existing) {
+      if (saved.link_user_id && saved.link_user_id !== existing.user_id) throw new Error("This provider account is already connected to a different Lightning account.");
+      account = await env.DB.prepare("SELECT id,username FROM users WHERE id=?").bind(existing.user_id).first();
+      linked = !!saved.link_user_id;
+    } else if (saved.link_user_id) {
+      account = await env.DB.prepare("SELECT id,username FROM users WHERE id=?").bind(saved.link_user_id).first();
+      if (!account) throw new Error("The Lightning account you were linking is no longer available. Sign in again.");
+      await env.DB.prepare("INSERT INTO oauth_accounts(provider,provider_user_id,user_id,created_at) VALUES(?,?,?,?)")
+        .bind(provider, providerUserId, account.id, Math.floor(Date.now()/1000)).run();
+      linked = true;
+    } else {
+      account = await oauthCreateUser(provider, profile, env);
+      await env.DB.prepare("INSERT INTO oauth_accounts(provider,provider_user_id,user_id,created_at) VALUES(?,?,?,?)")
+        .bind(provider, providerUserId, account.id, Math.floor(Date.now()/1000)).run();
+    }
+
+    if (!account) throw new Error("The Lightning account could not be loaded.");
+    await ensureProfile(account, env);
+    const sessionToken = await newSession(account, env);
+    return oauthReturn(request, linked ? "linked" : "success", provider, "", sessionToken);
+  } catch (error) {
+    console.error("Lightning OAuth callback failed for " + provider + ":", error?.message || error);
+    return oauthReturn(request, "error", provider, "authentication_failed");
+  }
+}
+
 async function route(request, env) {
   const url=new URL(request.url), path=url.pathname;
   if(path.startsWith("/api/") && !sameOrigin(request)) return json({error:"Origin not allowed."},403);
+  if(path==="/api/oauth/providers" && request.method==="GET") return await oauthProvidersRoute(env);
+  if(path==="/api/oauth/start" && request.method==="GET") return oauthStartRoute(request,env);
+  if(path==="/oauth/callback" && request.method==="GET") return oauthCallbackRoute(request,env);
   if(path==="/api/health" && request.method==="GET") return json({ok:true,service:"Lightning accounts"});
   if(path==="/api/health/db" && request.method==="GET") {
     if(!env.DB) return json({ok:false,stage:"binding",error:"D1 binding DB is missing."},503);
