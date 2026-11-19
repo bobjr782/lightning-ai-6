@@ -935,33 +935,26 @@ const OAUTH_PROVIDERS = {
     userInfo: "https://openidconnect.googleapis.com/v1/userinfo",
     scope: "openid email profile", pkce: true, tokenAuth: "body"
   },
-  facebook: {
-    clientId: "FACEBOOK_CLIENT_ID", clientSecret: "FACEBOOK_CLIENT_SECRET",
-    authorize: "https://www.facebook.com/dialog/oauth",
-    token: "https://graph.facebook.com/oauth/access_token",
-    userInfo: "https://graph.facebook.com/me?fields=id,name,email,picture",
-    scope: "public_profile,email", pkce: false, tokenAuth: "query"
+  microsoft: {
+    clientId: "MICROSOFT_CLIENT_ID", clientSecret: "MICROSOFT_CLIENT_SECRET",
+    authorize: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+    token: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+    userInfo: "https://graph.microsoft.com/oidc/userinfo",
+    scope: "openid profile email User.Read", pkce: true, tokenAuth: "body"
   },
-  twitter: {
-    clientId: "TWITTER_CLIENT_ID", clientSecret: "TWITTER_CLIENT_SECRET",
-    authorize: "https://twitter.com/i/oauth2/authorize",
-    token: "https://api.twitter.com/2/oauth2/token",
-    userInfo: "https://api.twitter.com/2/users/me?user.fields=profile_image_url,name,username",
-    scope: "users.read", pkce: true, tokenAuth: "basic"
+  github: {
+    clientId: "GITHUB_CLIENT_ID", clientSecret: "GITHUB_CLIENT_SECRET",
+    authorize: "https://github.com/login/oauth/authorize",
+    token: "https://github.com/login/oauth/access_token",
+    userInfo: "https://api.github.com/user",
+    scope: "read:user user:email", pkce: false, tokenAuth: "body"
   },
-  discord: {
-    clientId: "DISCORD_CLIENT_ID", clientSecret: "DISCORD_CLIENT_SECRET",
-    authorize: "https://discord.com/oauth2/authorize",
-    token: "https://discord.com/api/oauth2/token",
-    userInfo: "https://discord.com/api/users/@me",
-    scope: "identify email", pkce: true, tokenAuth: "body"
-  },
-  huggingface: {
-    clientId: "HF_CLIENT_ID", clientSecret: "HF_CLIENT_SECRET",
-    authorize: "https://huggingface.co/oauth/authorize",
-    token: "https://huggingface.co/oauth/token",
-    userInfo: "https://huggingface.co/oauth/userinfo",
-    scope: "openid profile email", pkce: true, tokenAuth: "basic-optional"
+  reddit: {
+    clientId: "REDDIT_CLIENT_ID", clientSecret: "REDDIT_CLIENT_SECRET",
+    authorize: "https://www.reddit.com/api/v1/authorize",
+    token: "https://www.reddit.com/api/v1/access_token",
+    userInfo: "https://oauth.reddit.com/api/v1/me",
+    scope: "identity", pkce: false, tokenAuth: "basic"
   }
 };
 
@@ -1000,7 +993,7 @@ async function ensureOAuthTables(env) {
 function oauthConfigured(provider, env) {
   const cfg = OAUTH_PROVIDERS[provider];
   if (!cfg || !env[cfg.clientId]) return false;
-  if (provider !== "huggingface" && !env[cfg.clientSecret]) return false;
+  if (!env[cfg.clientSecret]) return false;
   return true;
 }
 
@@ -1038,6 +1031,7 @@ async function oauthStartRoute(request, env) {
   auth.searchParams.set("scope", cfg.scope);
   auth.searchParams.set("state", state);
   if (provider === "google") auth.searchParams.set("prompt", "select_account");
+  if (provider === "reddit") { auth.searchParams.set("duration", "permanent"); auth.searchParams.set("redirect_uri", redirectUri); }
   if (cfg.pkce) {
     const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(verifier)));
     auth.searchParams.set("code_challenge", b64(digest));
@@ -1097,6 +1091,9 @@ async function oauthProfile(provider, cfg, accessToken) {
     const u = raw.data || {};
     return { id: u.id, username: u.username, name: u.name, picture: u.profile_image_url };
   }
+  if (provider === "github") { return { id: raw.id, username: raw.login, name: raw.name || raw.login, picture: raw.avatar_url }; }
+  if (provider === "reddit") { return { id: raw.id, username: raw.name, name: raw.name, picture: "" }; }
+  if (provider === "microsoft") { return { id: raw.sub, username: raw.name || raw.email, name: raw.name, picture: "" }; }
   if (provider === "discord") {
     const avatar = raw.avatar && raw.id ? "https://cdn.discordapp.com/avatars/" + raw.id + "/" + raw.avatar + ".png" : "";
     return { id: raw.id, username: raw.global_name || raw.username, name: raw.global_name || raw.username, picture: avatar };
