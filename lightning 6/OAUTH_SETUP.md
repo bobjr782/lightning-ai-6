@@ -1,6 +1,6 @@
 # Lightning social sign-in setup
 
-Lightning now has OAuth sign-in handlers for Google, Facebook, X/Twitter, Discord and Hugging Face. Each provider must be configured by the site owner before its button can authenticate users.
+Lightning's sign-in screen is limited to Apple, Microsoft, GitHub, Google and Reddit. Each provider must be configured before its button becomes active.
 
 ## Redirect URI
 
@@ -8,38 +8,35 @@ Register this exact callback URL with every OAuth application:
 
 `https://lightning-ai-6.ray-collier264.workers.dev/oauth/callback`
 
-If Lightning is later served from a custom domain, register that domain's matching `/oauth/callback` URL as well. The Worker uses the hostname on which the sign-in was started.
+If Lightning is later served from a custom domain, register that domain's matching `/oauth/callback` URL as well.
 
 ## Cloudflare Worker variables and secrets
 
-In Cloudflare, open the `lightning-ai-6` Worker, then Settings → Variables and Secrets. Add the following names:
+In Cloudflare, open the `lightning-ai-6` Worker, then Settings → Variables and Secrets. Add:
 
 | Provider | Client ID variable | Client secret |
 | --- | --- | --- |
+| Apple | Not enabled yet | Requires Apple-specific signed client-secret JWT support |
+| Microsoft | `MICROSOFT_CLIENT_ID` | `MICROSOFT_CLIENT_SECRET` |
+| GitHub | `GITHUB_CLIENT_ID` | `GITHUB_CLIENT_SECRET` |
 | Google | `GOOGLE_CLIENT_ID` | `GOOGLE_CLIENT_SECRET` |
-| Facebook | `FACEBOOK_CLIENT_ID` | `FACEBOOK_CLIENT_SECRET` |
-| X / Twitter | `TWITTER_CLIENT_ID` | `TWITTER_CLIENT_SECRET` |
-| Discord | `DISCORD_CLIENT_ID` | `DISCORD_CLIENT_SECRET` |
-| Hugging Face | `HF_CLIENT_ID` | `HF_CLIENT_SECRET` (optional for a public PKCE app) |
+| Reddit | `REDDIT_CLIENT_ID` | `REDDIT_CLIENT_SECRET` |
 
-Store each client secret as a **Secret**, not as a plain text variable. Client IDs may be plain text variables. Never commit provider secrets to GitHub or put them in the browser.
+Store client secrets as **Secrets**, not plain text variables. Never commit secrets to GitHub or put them in browser code.
 
 ## Provider app settings
 
-- **Google:** Create a Web application OAuth client. Add the redirect URI above to its authorised redirect URIs. Request the standard `openid email profile` scopes.
-- **Facebook:** Add the Facebook Login product to your Meta app, enable web OAuth, and add the redirect URI to Valid OAuth Redirect URIs. Lightning requests `public_profile,email`.
-- **X / Twitter:** Create an OAuth 2.0 app using Authorization Code with PKCE. Add the callback URI and allow the `users.read` scope.
-- **Discord:** Create an OAuth2 application and add the callback URI under Redirects. Lightning requests `identify email`.
-- **Hugging Face:** Create an OAuth application and add the callback URI. Enable `openid profile email`. Public PKCE apps can omit the client secret.
+Use the callback URI above for each web application.
 
-After adding credentials, redeploy or restart the Worker if your Cloudflare dashboard requires it. Reopen Lightning's sign-in dialog; configured providers will be marked as ready.
+- **Microsoft:** Register a Web platform redirect URI. The app uses the Microsoft identity platform's common v2 endpoint and requests OpenID Connect plus `User.Read`.
+- **GitHub:** Create an OAuth App and set its Authorization callback URL to the callback URI. Lightning requests `read:user` and `user:email`.
+- **Google:** Create a Web application OAuth client and add the callback URI to authorised redirect URIs. Lightning requests `openid email profile`.
+- **Reddit:** Create a Reddit web app with the callback URI as its redirect URI. Lightning requests the `identity` scope.
 
-## EdPass
+## Apple
 
-EdPass is not configured as a generic OAuth provider. A real EdPass login requires an approved integration and the Department for Education's supported SSO protocol, issuer/metadata, and client registration. The EdPass button remains disabled until those details are formally provided.
+Apple's web sign-in requires a Services ID, Team ID, Key ID, private signing key and a short-lived ES256 client-secret JWT. The current generic OAuth handler does not yet generate or validate Apple's identity token, so the Apple logo is shown but remains disabled until that dedicated support is implemented. Do not enter an Apple private key into the generic client-secret field.
 
 ## Account behaviour
 
-OAuth sign-in creates or reuses a Lightning account using that provider's stable account ID. It does not merge separate provider accounts based only on matching email addresses. Signed-in users can choose **Connect another sign-in method** to link additional providers to their existing Lightning account.
-
-The OAuth state is short-lived, stored hashed in D1, and checked against a secure, HttpOnly browser cookie during the callback.
+OAuth sign-in uses each provider's stable account ID. It does not merge separate provider accounts just because their email addresses match. Users can link additional methods to an existing Lightning account while signed in.
