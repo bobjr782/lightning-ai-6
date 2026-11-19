@@ -1996,6 +1996,76 @@ imgBar.innerHTML = `<select id="img-style" class="select" translate="no">${Objec
 imgBar.insertAdjacentHTML("beforeend", "<span class=\"img-model-note\">FLUX.2 · Cloudflare AI · 15 credits per image</span>");
 $(".input-deck-wrapper").prepend(imgBar);
 
+// FreeGen is an independent external generator. Keep it in Lightning's image
+// workspace, but do not call its private endpoints or inspect its cross-origin data.
+const freeGenButton = document.createElement("button");
+freeGenButton.type = "button";
+freeGenButton.className = "mini-btn";
+freeGenButton.textContent = "FreeGen";
+freeGenButton.title = "Open FreeGen inside Lightning";
+freeGenButton.addEventListener("click", openFreeGenPanel);
+imgBar.insertBefore(freeGenButton, imgBar.querySelector(".img-model-note"));
+
+const freeGenStyle = document.createElement("style");
+freeGenStyle.textContent = `
+#freegen-modal{position:fixed;inset:0;z-index:10050;display:none;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;background:rgba(0,0,0,.76)}
+#freegen-modal.open{display:flex}
+#freegen-modal .freegen-dialog{display:flex;flex-direction:column;width:min(1240px,100%);height:min(900px,96vh);min-height:360px;overflow:hidden;background:var(--bg-side,#151a24);color:var(--text-primary,#edf1f8);border:1px solid var(--border-color,#303847);border-radius:13px;box-shadow:0 24px 80px rgba(0,0,0,.55)}
+#freegen-modal .freegen-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 15px;border-bottom:1px solid var(--border-color,#303847)}
+#freegen-modal .freegen-heading{min-width:0;display:flex;flex-direction:column;gap:3px}
+#freegen-modal .freegen-heading strong{font-size:14px}
+#freegen-modal .freegen-heading small{font-size:11px;color:var(--text-secondary,#9aa5b5)}
+#freegen-modal .freegen-actions{display:flex;align-items:center;gap:7px;flex-shrink:0}
+#freegen-modal .freegen-actions a{margin:0;text-decoration:none}
+#freegen-modal .freegen-note{padding:8px 14px;background:var(--bg-input,rgba(255,255,255,.04));border-bottom:1px solid var(--border-color,#303847);font-size:11px;line-height:1.45;color:var(--text-secondary,#9aa5b5)}
+#freegen-modal iframe{display:block;flex:1;width:100%;min-height:0;border:0;background:#fff}
+@media(max-width:640px){#freegen-modal{padding:0}#freegen-modal .freegen-dialog{height:100vh;max-height:100vh;border-radius:0}#freegen-modal .freegen-head{align-items:flex-start}#freegen-modal .freegen-actions{flex-direction:column;align-items:flex-end}}
+`;
+document.head.appendChild(freeGenStyle);
+
+function closeFreeGenPanel() {
+    const modal = document.getElementById("freegen-modal");
+    if (!modal) return;
+    const frame = modal.querySelector("iframe");
+    if (frame) frame.src = "about:blank";
+    modal.remove();
+    document.removeEventListener("keydown", freeGenEscape);
+}
+function freeGenEscape(event) {
+    if (event.key === "Escape") closeFreeGenPanel();
+}
+function openFreeGenPanel() {
+    let modal = document.getElementById("freegen-modal");
+    if (modal) {
+        modal.classList.add("open");
+        return;
+    }
+    modal = document.createElement("div");
+    modal.id = "freegen-modal";
+    modal.innerHTML = `
+      <section class="freegen-dialog" role="dialog" aria-modal="true" aria-label="FreeGen image generator">
+        <header class="freegen-head">
+          <div class="freegen-heading">
+            <strong>FreeGen image generator</strong>
+            <small>FreeGen runs independently from Lightning</small>
+          </div>
+          <div class="freegen-actions">
+            <a class="mini-btn" href="https://freegen.app/" target="_blank" rel="noopener noreferrer">Open in new tab ↗</a>
+            <button class="mini-btn" type="button" data-freegen-close>Close</button>
+          </div>
+        </header>
+        <div class="freegen-note">Use FreeGen's own Download control to save an image, then attach that file in Lightning to include it in your chat. External generations do not use Lightning credits. If the frame is blocked, use “Open in new tab”.</div>
+        <iframe src="https://freegen.app/" title="FreeGen image generator" loading="eager" allow="clipboard-read; clipboard-write; fullscreen" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+      </section>`;
+    modal.querySelector("[data-freegen-close]").addEventListener("click", closeFreeGenPanel);
+    modal.addEventListener("click", event => {
+        if (event.target === modal) closeFreeGenPanel();
+    });
+    document.body.appendChild(modal);
+    modal.classList.add("open");
+    document.addEventListener("keydown", freeGenEscape);
+}
+
 const idbOpen = () => new Promise((res, rej) => { const r = indexedDB.open("lightning", 1); r.onupgradeneeded = () => r.result.createObjectStore("imgs"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
 const idbPut = async (k, v) => { try { const db = await idbOpen(); await new Promise((res, rej) => { const t = db.transaction("imgs", "readwrite"); t.objectStore("imgs").put(v, k); t.oncomplete = res; t.onerror = rej; }); } catch (e) {} };
 const idbGet = async k => { try { const db = await idbOpen(); return await new Promise((res, rej) => { const q = db.transaction("imgs").objectStore("imgs").get(k); q.onsuccess = () => res(q.result); q.onerror = rej; }); } catch (e) { return null; } };
