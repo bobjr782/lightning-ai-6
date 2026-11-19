@@ -3063,7 +3063,7 @@ if(!BUILTIN_AVATARS.length) console.error("Lightning avatar bundle did not load.
 function openAvatarGallery(onChoose){
  const overlay=document.createElement("div");overlay.className="avatar-gallery-overlay";overlay.setAttribute("role","dialog");overlay.setAttribute("aria-modal","true");
  const header=document.createElement("header");header.className="avatar-gallery-header";
- const heading=document.createElement("div");heading.innerHTML="<strong>Lightning avatar library</strong><small>${BUILTIN_AVATARS.length} built-in profile pictures</small>";
+ const heading=document.createElement("div");heading.innerHTML="<strong>Lightning avatar library</strong><small>"+BUILTIN_AVATARS.length+" built-in profile pictures</small>";
  const search=document.createElement("input");search.type="search";search.placeholder="Search dogs, cats, bananas…";search.className="avatar-gallery-search";
  const close=document.createElement("button");close.className="mini-btn";close.textContent="Close";close.onclick=()=>overlay.remove();header.append(heading,search,close);
  const filters=document.createElement("nav");filters.className="avatar-gallery-filters";const grid=document.createElement("div");grid.className="avatar-gallery-grid";
