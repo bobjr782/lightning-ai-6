@@ -972,6 +972,7 @@ function oauthReturn(request, result, provider, reason, sessionToken) {
   if (reason) target.searchParams.set("reason", reason);
   const headers = new Headers({ "location": target.toString(), "cache-control": "no-store" });
   if (sessionToken) headers.append("set-cookie", cookie(sessionToken, SESSION_DAYS * 86400));
+  headers.append("set-cookie", "lightning_oauth_state=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0");
   return new Response(null, { status: 302, headers });
 }
 
@@ -1037,13 +1038,14 @@ async function oauthStartRoute(request, env) {
   auth.searchParams.set("scope", cfg.scope);
   auth.searchParams.set("state", state);
   if (provider === "google") auth.searchParams.set("prompt", "select_account");
-  if (provider === "discord") auth.searchParams.set("prompt", "none");
   if (cfg.pkce) {
     const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(verifier)));
     auth.searchParams.set("code_challenge", b64(digest));
     auth.searchParams.set("code_challenge_method", "S256");
   }
-  return Response.redirect(auth.toString(), 302);
+  const startHeaders = new Headers({ "location": auth.toString(), "cache-control": "no-store" });
+  startHeaders.append("set-cookie", "lightning_oauth_state=" + encodeURIComponent(state) + "; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600");
+  return new Response(null, { status: 302, headers: startHeaders });
 }
 
 async function oauthFetchJson(url, options, label) {
@@ -1148,7 +1150,7 @@ async function oauthCallbackRoute(request, env) {
   const providerFromQuery = String(url.searchParams.get("provider") || "").toLowerCase();
   const state = String(url.searchParams.get("state") || "");
   if (url.searchParams.has("error")) return oauthReturn(request, "error", providerFromQuery, "provider_cancelled");
-  if (!state || state.length > 200) return oauthReturn(request, "error", providerFromQuery, "invalid_state");
+  if (!state || state.length > 200 || cookieValue(request, "lightning_oauth_state") !== state) return oauthReturn(request, "error", providerFromQuery, "invalid_state");
 
   const stateHash = await sha(state);
   const saved = await env.DB.prepare("SELECT provider,code_verifier,link_user_id FROM oauth_states WHERE state_hash=? AND expires_at>?")
