@@ -3046,21 +3046,29 @@ function avatarSvgData(i){
  const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="'+bg+'"/><stop offset="1" stop-color="'+c+'"/></linearGradient><radialGradient id="orb"><stop stop-color="'+light+'"/><stop offset="1" stop-color="'+a+'"/></radialGradient></defs><rect width="256" height="256" rx="34" fill="url(#bg)"/>'+art+stars+'<rect x="4" y="4" width="248" height="248" rx="30" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="5"/></svg>';
  return "data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);
 }
-const BUILTIN_AVATARS=(window.LIGHTNING_BUILTIN_AVATARS||[]).map(item=>({
- name:item.name.replace(/([0-9]+)$/," $1").replace(/^bannana/i,"Banana").replace(/^plant/i,"Nature").replace(/^cat/i,"Cat").replace(/^dog/i,"Dog").replace(/^space/i,"Space"),
- category:/^bannana/i.test(item.name)?"Bananas":/^cat/i.test(item.name)?"Cats":/^dog/i.test(item.name)?"Dogs":/^plant/i.test(item.name)?"Nature":"Space",
- src:item.src
-}));
+const BUILTIN_AVATARS=(window.LIGHTNING_BUILTIN_AVATARS||[]).map(item=>{
+ const raw=item.name||"avatar";
+ const key=raw.toLowerCase();
+ const category=/^(cat|dog|bee|bird|dear|deer|ducks|fish|pumpkincat)/.test(key)?"Animals":
+  /^(ai|astro|galixy|space)/.test(key)?"Space":
+  /^(bannana|banana|coffecup|fruit)/.test(key)?"Food":
+  /^mario/.test(key)?"Gaming":
+  /^(robot|redwire|tech)/.test(key)?"Tech":
+  /^(chrismas|christmas|pumpkin|snowy|summer)/.test(key)?"Seasonal":
+  /^(beatch|beach|desert|fllowers|flowers|forest|green|lake|leaves|mountes|plant|rock|rocky|tree)/.test(key)?"Nature":"Other";
+ const label=raw.replace(/([0-9]+)$/," $1").replace(/^bannana/i,"Banana").replace(/^chrismas/i,"Christmas").replace(/^galixy/i,"Galaxy").replace(/^beatch/i,"Beach").replace(/^dear/i,"Deer").replace(/^fllowers/i,"Flowers").replace(/^mountes/i,"Mountains").replace(/^greenTunnle/i,"Green Tunnel").replace(/^coffecup/i,"Coffee Cup");
+ return {name:label,category,src:item.src};
+});
 if(!BUILTIN_AVATARS.length) console.error("Lightning avatar bundle did not load.");
 function openAvatarGallery(onChoose){
  const overlay=document.createElement("div");overlay.className="avatar-gallery-overlay";overlay.setAttribute("role","dialog");overlay.setAttribute("aria-modal","true");
  const header=document.createElement("header");header.className="avatar-gallery-header";
- const heading=document.createElement("div");heading.innerHTML="<strong>Lightning avatar library</strong><small>16 wonderfully questionable profile pictures</small>";
+ const heading=document.createElement("div");heading.innerHTML="<strong>Lightning avatar library</strong><small>${BUILTIN_AVATARS.length} built-in profile pictures</small>";
  const search=document.createElement("input");search.type="search";search.placeholder="Search dogs, cats, bananas…";search.className="avatar-gallery-search";
  const close=document.createElement("button");close.className="mini-btn";close.textContent="Close";close.onclick=()=>overlay.remove();header.append(heading,search,close);
  const filters=document.createElement("nav");filters.className="avatar-gallery-filters";const grid=document.createElement("div");grid.className="avatar-gallery-grid";
  let active="All";
- const categories=["Bananas","Cats","Dogs","Nature","Space"];
+ const categories=[...new Set(BUILTIN_AVATARS.map(x=>x.category))].sort();
  const render=()=>{grid.replaceChildren();const matches=BUILTIN_AVATARS.filter(x=>(active==="All"||x.category===active)&&(!search.value||(x.name+" "+x.category).toLowerCase().includes(search.value.toLowerCase())));matches.forEach(x=>{const card=document.createElement("button");card.className="avatar-gallery-card";const img=document.createElement("img");img.src=x.src;img.alt=x.name;img.loading="lazy";img.onerror=()=>{img.alt=x.name+" (image file not uploaded yet)";card.classList.add("avatar-missing");};const name=document.createElement("span");name.textContent=x.name;const cat=document.createElement("small");cat.textContent=x.category;card.append(img,name,cat);card.onclick=()=>{onChoose(x.src);overlay.remove();};grid.append(card);});if(!matches.length)grid.innerHTML='<p class="art-empty">No pictures found.</p>';};
  ["All",...categories].forEach(name=>{const b=document.createElement("button");b.className="mini-btn"+(name==="All"?" active":"");b.textContent=name;b.onclick=()=>{active=name;filters.querySelectorAll("button").forEach(z=>z.classList.toggle("active",z===b));render();};filters.append(b);});
  search.addEventListener("input",render);overlay.append(header,filters,grid);document.body.append(overlay);render();
