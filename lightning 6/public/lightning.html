@@ -3310,7 +3310,7 @@ function openLightningAuth(linkMode=false){
     if(!document.getElementById("lt-oauth-style")){
         const style=document.createElement("style");
         style.id="lt-oauth-style";
-        style.textContent=".lt-oauth-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:4px 0 8px}.lt-oauth-btn{min-height:40px;padding:9px 11px;border:1px solid var(--border-color,#394150);border-radius:8px;background:var(--bg-input,#202633);color:var(--text-primary,#f2f4f8);font:600 13px inherit;cursor:pointer;text-align:left}.lt-oauth-btn:hover{border-color:var(--accent-blue,#3987ff);background:var(--bg-bubble-ai,#293345)}.lt-oauth-btn.is-ready{border-color:var(--accent-blue,#3987ff)}.lt-oauth-btn:disabled{opacity:.5;cursor:not-allowed}.lt-oauth-status{display:block;color:var(--text-secondary,#929bab);font-size:11px;line-height:1.5}.lt-auth-separator{display:flex;align-items:center;gap:9px;color:var(--text-secondary,#929bab);font-size:11px;margin:5px 0}.lt-auth-separator:before,.lt-auth-separator:after{content:'';height:1px;background:var(--border-color,#394150);flex:1}@media(max-width:440px){.lt-oauth-grid{grid-template-columns:1fr}}";
+        style.textContent=".lt-oauth-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px;margin:5px 0 8px}.lt-oauth-btn{width:100%;aspect-ratio:1/1;min-width:0;min-height:48px;max-height:58px;padding:9px;border:1px solid var(--border-color,#394150);border-radius:12px;background:#fff;color:#111;cursor:pointer;display:grid;place-items:center;transition:border-color .15s,transform .15s,opacity .15s}.lt-oauth-btn img{display:block;width:27px;height:27px;max-width:100%;object-fit:contain}.lt-oauth-btn[data-oauth="edpass"] img{width:42px;height:30px}.lt-oauth-btn:hover:not(:disabled){border-color:var(--accent-blue,#3987ff);transform:translateY(-1px)}.lt-oauth-btn.is-ready{border-color:var(--accent-blue,#3987ff)}.lt-oauth-btn:disabled{opacity:.38;cursor:not-allowed}.lt-oauth-status{display:block;color:var(--text-secondary,#929bab);font-size:11px;line-height:1.5}.lt-auth-separator{display:flex;align-items:center;gap:9px;color:var(--text-secondary,#929bab);font-size:11px;margin:5px 0}.lt-auth-separator:before,.lt-auth-separator:after{content:'';height:1px;background:var(--border-color,#394150);flex:1}@media(max-width:440px){.lt-oauth-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.lt-oauth-btn{max-height:none}}";
         document.head.appendChild(style);
     }
     const render=()=>{
@@ -3322,12 +3322,12 @@ function openLightningAuth(linkMode=false){
           '<div class="modal-body">'+
           '<p class="auth-note">'+(linkMode?"Connect another sign-in method so you can access this same Lightning account.":(mode==="login"?"Welcome back.":"Get 7 days of Lightning Free Trial: 40 chat messages and 5 image generations. No API key needed."))+'</p>'+
           '<div class="lt-oauth-grid">'+
-          '<button type="button" class="lt-oauth-btn" data-oauth="google">Continue with Google</button>'+
-          '<button type="button" class="lt-oauth-btn" data-oauth="facebook">Continue with Facebook</button>'+
-          '<button type="button" class="lt-oauth-btn" data-oauth="twitter">Continue with X / Twitter</button>'+
-          '<button type="button" class="lt-oauth-btn" data-oauth="discord">Continue with Discord</button>'+
-          '<button type="button" class="lt-oauth-btn" data-oauth="huggingface">Continue with Hugging Face</button>'+
-          '<button type="button" class="lt-oauth-btn" disabled title="EdPass requires an approved Department for Education SSO integration.">EdPass · setup required</button>'+
+          '<button type="button" class="lt-oauth-btn" data-oauth="google" aria-label="Sign in with Google" title="Google sign-in"><img src="https://cdn.simpleicons.org/google/4285F4" alt="" loading="eager"></button>'+
+          '<button type="button" class="lt-oauth-btn" data-oauth="facebook" aria-label="Sign in with Facebook" title="Facebook sign-in"><img src="https://cdn.simpleicons.org/facebook/0866FF" alt="" loading="eager"></button>'+
+          '<button type="button" class="lt-oauth-btn" data-oauth="twitter" aria-label="Sign in with X or Twitter" title="X / Twitter sign-in"><img src="https://cdn.simpleicons.org/x/000000" alt="" loading="eager"></button>'+
+          '<button type="button" class="lt-oauth-btn" data-oauth="discord" aria-label="Sign in with Discord" title="Discord sign-in"><img src="https://cdn.simpleicons.org/discord/5865F2" alt="" loading="eager"></button>'+
+          '<button type="button" class="lt-oauth-btn" data-oauth="huggingface" aria-label="Sign in with Hugging Face" title="Hugging Face sign-in"><img src="https://cdn.simpleicons.org/huggingface/FFD21E" alt="" loading="eager"></button>'+
+          '<button type="button" class="lt-oauth-btn" data-oauth="edpass" aria-label="EdPass sign-in not yet available" title="EdPass requires an approved Department for Education SSO integration." disabled><img src="https://images.squarespace-cdn.com/content/v1/53686b4ae4b0e77173cd2f60/bb7858a4-5af2-4948-a44b-0a2cad1cae9b/EdPass-2.JPG.png" alt="" loading="eager"></button>'+
           '</div><small class="lt-oauth-status" id="lt-oauth-status">Checking which sign-in providers are configured…</small>'+
           fields+
           '</div>';
@@ -3346,8 +3346,10 @@ function openLightningAuth(linkMode=false){
               card.querySelectorAll("[data-oauth]").forEach(button=>{
                   const provider=button.getAttribute("data-oauth"),ready=!!configured[provider];
                   button.classList.toggle("is-ready",ready);
-                  button.textContent=button.textContent.replace(/ · setup required$/,"")+(ready?"":" · setup required");
-                  button.title=ready?"Continue securely with "+provider:"Not configured yet. The site owner must add this provider's OAuth credentials in Cloudflare.";
+                  button.disabled=!ready;
+                  const label=provider==="twitter"?"X / Twitter":provider==="huggingface"?"Hugging Face":provider.charAt(0).toUpperCase()+provider.slice(1);
+                  button.title=ready?"Sign in with "+label:"Sign-in setup required for "+label+". The site owner must add its OAuth credentials in Cloudflare.";
+                  button.setAttribute("aria-label",button.title);
               });
               const status=q("#lt-oauth-status");
               if(status)status.textContent="To enable a provider, register its OAuth app and add its client ID/secret in Cloudflare. Callback URL: "+window.location.origin+(data.callbackPath||"/oauth/callback")+". EdPass needs a separate approved school SSO connection.";
