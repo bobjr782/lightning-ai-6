@@ -364,10 +364,19 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
         <div id="image-forge-test-results" class="dev-test-results"></div>
         <div class="dev-test-footer"><span>Google Images is searched first, with Openverse as a backup. Browser analysis requires image hosts to allow CORS. Check each original source and its usage rights before reuse.</span><button type="button" class="btn ghost" id="image-forge-copy-urls" disabled>Copy image URLs</button></div>
       </div>
+
+      <div class="dev-test-panel" id="captchaer200-dev-test" style="margin-top:24px">
+        <div class="dev-test-heading"><div><h4>CAPTCHAER200</h4><p>Interactive anti-bot experiment. Tick the box, then complete a picture check if triggered.</p></div><span class="dev-test-count">Developer test</span></div>
+        <label style="display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--bg);cursor:pointer"><input id="captchaer200-dev-check" type="checkbox" style="width:20px;height:20px;accent-color:var(--accent)"><span><strong>I'm not a banana</strong><small style="display:block;color:var(--mute);margin-top:3px">Prove you aren't a banana.</small></span></label>
+        <div id="captchaer200-dev-status" class="dev-test-status" role="status" aria-live="polite">Ready to test. Tick the checkbox to begin.</div>
+        <div id="captchaer200-dev-challenge" class="dev-test-results"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"><button class="btn ghost" id="captchaer200-dev-reset" type="button">Reset test</button><span style="font-size:12px;color:var(--mute);align-self:center">Experimental UI only; client-side checks can be bypassed.</span></div>
+      </div>
     </div>
   </div>
 </section>
 
+<script src="/lightning-avatars.js"></script>
 <script src="/image-forge-engine.js"></script>
 <script>
 (function () {
@@ -607,6 +616,20 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
   });
 })();
 
+</script>
+
+
+<script>
+(function(){
+ const check=document.getElementById("captchaer200-dev-check"),status=document.getElementById("captchaer200-dev-status"),grid=document.getElementById("captchaer200-dev-challenge"),reset=document.getElementById("captchaer200-dev-reset");
+ if(!check||!status||!grid||!reset)return;
+ let round=0,selected=new Set(),deck=[],target="",passed=false;
+ const categoryFor=name=>{const n=String(name||"").toLowerCase();if(/^(beach|beatch|ocean|whale|turtle|fish|coral|seahorse|dolphin|koi|shell|reef|stingray|octopus|lagoon|waves)/.test(n))return "Ocean";if(/^(forest|green|lake|leaves|mountain|mountes|plant|tree|flowers|fllowers|waterfall|desert|sunset|snowy|summer|rock)/.test(n))return "Nature";if(/^(cat|dog|bee|bird|deer|dear|ducks|fox|wolf|panda|tiger|rabbit|bear|owl|parrot)/.test(n))return "Animals";if(/^(ai|astro|galaxy|galixy|space|planet|moon|starship|nebula)/.test(n))return "Space";return "Other";};
+ function finish(){passed=true;status.textContent="CAPTCHAER200 test passed. You completed both picture rounds.";grid.replaceChildren();}
+ function draw(){selected=new Set();grid.replaceChildren();const avatars=(window.LIGHTNING_BUILTIN_AVATARS||[]).map((x,i)=>({name:x.name||("Picture "+(i+1)),src:x.src,category:categoryFor(x.name)})).filter(x=>x.src);const cats=["Ocean","Nature","Animals","Space"].filter(c=>avatars.filter(x=>x.category===c).length>=3);if(!cats.length){status.textContent="Picture library unavailable. The checkbox test still works; add the avatar library to enable image rounds.";return;}target=cats[Math.floor(Math.random()*cats.length)];const yes=avatars.filter(x=>x.category===target).sort(()=>Math.random()-.5).slice(0,5),no=avatars.filter(x=>x.category!==target).sort(()=>Math.random()-.5).slice(0,11);deck=[...yes,...no].sort(()=>Math.random()-.5);status.textContent="Round "+(round+1)+" of 2: select every "+target.toLowerCase()+" picture.";deck.forEach((item,i)=>{const b=document.createElement("button");b.type="button";b.setAttribute("aria-pressed","false");b.style.cssText="padding:4px;border:2px solid var(--line);border-radius:9px;background:var(--bg);cursor:pointer";const img=document.createElement("img");img.src=item.src;img.alt=item.name;img.style.cssText="width:100%;aspect-ratio:1;object-fit:cover;border-radius:5px";b.append(img);b.addEventListener("click",()=>{if(selected.has(i)){selected.delete(i);b.style.borderColor="var(--line)";b.setAttribute("aria-pressed","false");}else{selected.add(i);b.style.borderColor="var(--accent)";b.setAttribute("aria-pressed","true");}});grid.append(b);});const verify=document.createElement("button");verify.type="button";verify.className="btn";verify.textContent="Verify pictures";verify.style.gridColumn="1/-1";verify.addEventListener("click",()=>{const ok=deck.every((x,i)=>selected.has(i)===(x.category===target));if(!ok){status.textContent="Not quite. Try selecting all and only the "+target.toLowerCase()+" pictures.";return;}round++;if(round<2)draw();else finish();});grid.append(verify);}
+ check.addEventListener("change",()=>{grid.replaceChildren();round=0;passed=false;if(!check.checked){status.textContent="Checkbox cleared. Test reset.";return;}status.textContent="Checkbox accepted. Starting the interactive picture challenge…";draw();});
+ reset.addEventListener("click",()=>{check.checked=false;round=0;passed=false;selected.clear();grid.replaceChildren();status.textContent="Ready to test. Tick the checkbox to begin.";});
+})();
 </script>
 
 </body>
