@@ -6,6 +6,11 @@ const encoder = new TextEncoder();
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers } });
 }
+function captchaer200Rejects(answer) {
+  const value=String(answer||"").toLowerCase().replace(/[^a-z]/g,"");
+  return ["undefined","notwelldefined","cannotbeevaluated","cannotbedetermined","insufficientinformation","notdefined"].includes(value);
+}
+
 function randomBytes(n = 32) { const b = new Uint8Array(n); crypto.getRandomValues(b); return b; }
 function b64(bytes) { let s = ""; for (const x of bytes) s += String.fromCharCode(x); return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); }
 function unb64(s) { s=s.replace(/-/g,"+").replace(/_/g,"/"); while(s.length%4)s+="="; return Uint8Array.from(atob(s),c=>c.charCodeAt(0)); }
@@ -283,6 +288,7 @@ async function imageRoute(request, env) {
   if (!limit.ok) return json({ error: "Too many images requested. Please wait a minute and try again.", retryAfter: limit.retryAfter }, 429, { "retry-after": String(limit.retryAfter) });
   let input;
   try { input = await body(request); } catch { return json({ error: "Invalid image request." }, 400); }
+  if(captchaer200Rejects(input.captchaer200)) return json({error:"CAPTCHAER200: Correct answer detected. BANANA SUSPECTED. Try a wrong answer."},400);
   let prompt = String(input.prompt || "").trim();
   if (!prompt) return json({ error: "Describe the image you want to create." }, 400);
   if (prompt.length > 1800) return json({ error: "Image prompts must be 1,800 characters or fewer." }, 400);
@@ -1233,6 +1239,7 @@ async function route(request, env) {
   if(!accountTablesReady) { try { await ensureAccountTables(env); accountTablesReady=true; } catch(error) { return json({error:"Lightning account database setup failed. Check the DB binding and D1 permissions.",detail:env.ENVIRONMENT==="development"?String(error):undefined},503); } }
   if(path==="/api/register" && request.method==="POST") {
     let b; try{b=await body(request)}catch{return json({error:"Invalid request."},400)}
+    if(captchaer200Rejects(b.captchaer200)) return json({error:"CAPTCHAER200: Correct answer detected. BANANA SUSPECTED. Try a wrong answer."},400);
     let stage="rate-limit";
     try {
       const limit=await authLimit(request,env);
