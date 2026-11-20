@@ -903,6 +903,8 @@ body.img-mode .img-opts { display: flex; }
                 <button class="sidebar-btn" onclick="openPlugins()">🔌 Plugins</button>
                 <button class="sidebar-btn" id="lightning-admin-nav" onclick="openLightningAdmin()" hidden>Admin panel</button>
                 <button class="sidebar-btn" onclick="clearHistory()">🗑 Clear all chats</button>
+                <div class="sidebar-chat-heading" id="lightning-dev-heading">Dev</div>
+                <button class="sidebar-btn" id="lightning-dev-captcha-test" type="button" title="Open the CAPTCHAER200 test in chat">CAPTCHAER200 test</button>
                 <div class="sidebar-chat-heading">Your chats</div><div id="sidebar-chat-list" class="sidebar-chat-list"></div>
             </div>
 
@@ -4123,5 +4125,29 @@ finishOpenRouter().catch(e => startupError("openrouter", e));
  heartbeat();
  setInterval(heartbeat,45000);
  window.addEventListener("focus",heartbeat);
+})();
+</script>
+<script>
+(() => {
+  const button = document.getElementById("lightning-dev-captcha-test");
+  if (!button) return;
+  button.addEventListener("click", async () => {
+    if (typeof captchaer200Check !== "function") {
+      if (typeof showAiBubbleOnScreen === "function") showAiBubbleOnScreen("CAPTCHAER200 is not ready yet. Refresh Lightning and try again.");
+      return;
+    }
+    button.disabled = true;
+    const oldText = button.textContent;
+    button.textContent = "Testing CAPTCHAER200…";
+    try {
+      const passed = await captchaer200Check();
+      if (typeof showAiBubbleOnScreen === "function") showAiBubbleOnScreen(passed ? "CAPTCHAER200 test passed." : "CAPTCHAER200 test cancelled or not completed.");
+    } catch (error) {
+      if (typeof showAiBubbleOnScreen === "function") showAiBubbleOnScreen("CAPTCHAER200 test error: " + (error.message || error));
+    } finally {
+      button.disabled = false;
+      button.textContent = oldText;
+    }
+  });
 })();
 </script>
