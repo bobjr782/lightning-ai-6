@@ -3313,13 +3313,98 @@ async function captchaer200Check() {
         overlay.style.zIndex="100000";
         const card=document.createElement("div");
         card.className="modal-card";
-        card.innerHTML=`<div class="modal-header"><h3>CAPTCHAER200</h3><button class="close-modal-btn" type="button">✕</button></div><div class="modal-body"><p class="auth-note"><b>PROVE YOU AREN'T A BANANA</b></p><div style="font-size:22px;text-align:center;padding:12px">⨌ ℵ₀ ∇² = ?</div><label style="display:flex;align-items:center;gap:10px;padding:13px;border:1px solid var(--border-color);border-radius:10px;cursor:pointer"><input id="captchaer200-check" type="checkbox" style="width:19px;height:19px"> I am not a banana</label><button class="send-btn wide" id="captchaer200-continue" type="button" style="margin-top:12px">Continue</button></div>`;
+        card.style.maxHeight="90vh";
+        card.style.overflowY="auto";
+        card.innerHTML=`<div class="modal-header"><h3>CAPTCHAER200</h3><button class="close-modal-btn" type="button">✕</button></div><div class="modal-body"><p class="auth-note"><b>PROVE YOU AREN'T A BANANA</b></p><label style="display:flex;align-items:center;gap:10px;padding:13px;border:1px solid var(--border-color);border-radius:10px;cursor:pointer"><input id="captchaer200-check" type="checkbox" style="width:19px;height:19px"> I am not a banana</label><p id="captchaer200-hint" style="font-size:12px;color:var(--text-secondary);margin:0">Complete the checkbox to continue.</p><div id="captchaer200-extra"></div><button class="send-btn wide" id="captchaer200-continue" type="button" style="margin-top:12px">Continue</button></div>`;
         overlay.append(card);
         document.body.append(overlay);
         const close=value=>{overlay.remove();resolve(value);};
         card.querySelector(".close-modal-btn").onclick=()=>close(false);
         overlay.onclick=e=>{if(e.target===overlay)close(false);};
-        card.querySelector("#captchaer200-continue").onclick=()=>close(!!card.querySelector("#captchaer200-check").checked);
+
+        // Only flag a clear, sustained, unusually straight pointer path.
+        // Touch and keyboard users are not forced into the image challenge.
+        const points=[];
+        const track=e=>{
+            if(e.pointerType==="touch")return;
+            points.push({x:e.clientX,y:e.clientY,t:performance.now()});
+            if(points.length>24)points.shift();
+        };
+        overlay.addEventListener("pointermove",track,{passive:true});
+        const looksAutomated=()=>{
+            if(points.length<6)return false;
+            const first=points[0],last=points[points.length-1];
+            const dx=last.x-first.x,dy=last.y-first.y,distance=Math.hypot(dx,dy);
+            if(distance<95)return false;
+            let path=0;for(let i=1;i<points.length;i++)path+=Math.hypot(points[i].x-points[i-1].x,points[i].y-points[i-1].y);
+            const straightness=distance/Math.max(path,1);
+            let aligned=0,valid=0;
+            for(let i=1;i<points.length;i++){
+                const ax=points[i].x-points[i-1].x,ay=points[i].y-points[i-1].y,len=Math.hypot(ax,ay);
+                if(len<1)continue;aligned+=(ax*dx+ay*dy)/(len*distance);valid++;
+            }
+            return valid>=5 && straightness>.985 && aligned/valid>.995;
+        };
+        let challengeNeeded=false,challengePassed=false,challengeStarted=false;
+        const extra=card.querySelector("#captchaer200-extra");
+        const hint=card.querySelector("#captchaer200-hint");
+        const startChallenge=()=>{
+            if(challengeStarted)return;
+            challengeStarted=true;challengeNeeded=true;
+            const all=Array.isArray(window.LIGHTNING_BUILTIN_AVATARS)?window.LIGHTNING_BUILTIN_AVATARS:[];
+            const avatars=all.map((item,i)=>{
+                const name=String(item.name||("Picture "+(i+1)));
+                const key=name.toLowerCase();
+                const category=/^(beach|beatch|ocean|whale|turtle|fish|coral|seahorse|dolphin|koi|shell|reef|stingray|octopus|lagoon|waves)/.test(key)?"Ocean":
+                    /^(forest|green|lake|leaves|mountain|mountes|plant|tree|flowers|fllowers|waterfall|desert|sunset|snowy|summer|rock)/.test(key)?"Nature":
+                    /^(cat|dog|bee|bird|deer|dear|ducks|fish|fox|wolf|panda|tiger|rabbit|bear|owl|parrot)/.test(key)?"Animals":
+                    /^(ai|astro|galaxy|galixy|space|planet|moon|starship|nebula)/.test(key)?"Space":"Other";
+                return {name,src:item.src,category};
+            }).filter(x=>x.src);
+            const categories=["Ocean","Nature","Animals","Space"].filter(cat=>avatars.filter(x=>x.category===cat).length>=3);
+            if(!avatars.length||!categories.length){
+                hint.textContent="Suspicious pointer movement detected, but the picture library is unavailable. Please try again.";
+                return;
+            }
+            let round=0,correct=0,selected=new Set(),target="";
+            const rounds=2,grid=document.createElement("div");
+            grid.style.cssText="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:10px";
+            const title=document.createElement("b");
+            const note=document.createElement("small");note.style.color="var(--text-secondary)";
+            const verify=document.createElement("button");verify.className="send-btn wide";verify.type="button";verify.textContent="Verify pictures";
+            extra.replaceChildren(title,note,grid,verify);
+            const makeRound=()=>{
+                selected=new Set();grid.replaceChildren();
+                target=categories[(Math.random()*categories.length)|0];
+                title.textContent="Round "+(round+1)+" of "+rounds+": select every "+(target==="Ocean"?"ocean":target==="Nature"?"nature":target==="Animals"?"animal":"space")+" picture";
+                const hits=avatars.filter(x=>x.category===target).sort(()=>Math.random()-.5).slice(0,6);
+                const misses=avatars.filter(x=>x.category!==target).sort(()=>Math.random()-.5).slice(0,16-hits.length);
+                const deck=[...hits,...misses].sort(()=>Math.random()-.5);
+                deck.forEach((item,i)=>{
+                    const b=document.createElement("button");b.type="button";b.setAttribute("aria-pressed","false");
+                    b.style.cssText="padding:3px;background:var(--surface-2);border:2px solid var(--border-color);border-radius:7px;overflow:hidden;cursor:pointer;min-width:0";
+                    const img=document.createElement("img");img.src=item.src;img.alt="Picture "+(i+1);img.draggable=false;img.style.cssText="width:100%;aspect-ratio:1;object-fit:cover;display:block;border-radius:4px";
+                    b.append(img);b.onclick=()=>{if(selected.has(i)){selected.delete(i);b.style.borderColor="var(--border-color)";b.style.boxShadow="none";b.setAttribute("aria-pressed","false");}else{selected.add(i);b.style.borderColor="var(--accent-blue)";b.style.boxShadow="0 0 0 2px var(--accent-blue)";b.setAttribute("aria-pressed","true");}};
+                    b.dataset.correct=String(item.category===target);grid.append(b);
+                });
+                note.textContent="Some pictures are deliberately similar. There are "+deck.length+" pictures.";
+            };
+            verify.onclick=()=>{
+                const buttons=[...grid.children];
+                const right=buttons.every((b,i)=>selected.has(i)===(b.dataset.correct==="true"));
+                if(!right){note.textContent="Not quite. Try this round again.";return;}
+                round++;if(round<rounds){makeRound();return;}
+                challengePassed=true;hint.textContent="Picture check passed. You can continue.";extra.replaceChildren();
+            };
+            makeRound();
+            hint.textContent="Unusually straight mouse movement detected. Complete both picture rounds.";
+        };
+        card.querySelector("#captchaer200-continue").onclick=()=>{
+            if(!card.querySelector("#captchaer200-check").checked)return;
+            if(!challengeStarted&&looksAutomated()){startChallenge();return;}
+            if(challengeNeeded&&!challengePassed)return;
+            close(true);
+        };
     });
 }
 
