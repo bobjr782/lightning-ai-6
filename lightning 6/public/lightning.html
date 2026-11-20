@@ -3310,7 +3310,7 @@ function openLightningAuth(linkMode=false){
     if(!document.getElementById("lt-oauth-style")){
         const style=document.createElement("style");
         style.id="lt-oauth-style";
-        style.textContent=".lt-oauth-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;margin:5px 0 8px}.lt-oauth-btn{width:100%;aspect-ratio:1/1;min-width:0;min-height:48px;max-height:58px;padding:9px;border:1px solid var(--border-color,#394150);border-radius:12px;background:#fff;color:#111;cursor:pointer;display:grid;place-items:center;transition:border-color .15s,transform .15s,opacity .15s}.lt-oauth-btn img{display:block;width:27px;height:27px;max-width:100%;object-fit:contain}.lt-oauth-btn[data-oauth=edpass] img{width:42px;height:30px}.lt-oauth-btn:hover:not(:disabled){border-color:var(--accent-blue,#3987ff);transform:translateY(-1px)}.lt-oauth-btn.is-ready{border-color:var(--accent-blue,#3987ff)}.lt-oauth-btn:disabled{opacity:.38;cursor:not-allowed}.lt-oauth-status{display:block;color:var(--text-secondary,#929bab);font-size:11px;line-height:1.5}.lt-auth-separator{display:flex;align-items:center;gap:9px;color:var(--text-secondary,#929bab);font-size:11px;margin:5px 0}.lt-auth-separator:before,.lt-auth-separator:after{content:'';height:1px;background:var(--border-color,#394150);flex:1}@media(max-width:440px){.lt-oauth-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.lt-oauth-btn{max-height:none}}";
+        style.textContent=".lt-oauth-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:5px 0 8px}.lt-oauth-btn{width:100%;aspect-ratio:1/1;min-width:0;min-height:58px;max-height:76px;padding:9px;border:1px solid var(--border-color,#394150);border-radius:12px;background:#fff;color:#111;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;transition:border-color .15s,transform .15s,opacity .15s}.lt-oauth-btn img{display:block;width:27px;height:27px;max-width:100%;object-fit:contain}.lt-oauth-name{font-size:10px;font-weight:700;line-height:1.1;color:#222}.lt-oauth-btn:hover:not(:disabled){border-color:var(--accent-blue,#3987ff);transform:translateY(-1px)}.lt-oauth-btn.is-ready{border-color:var(--accent-blue,#3987ff)}.lt-oauth-btn:disabled{opacity:.48;cursor:not-allowed}.lt-oauth-mark{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font-size:15px;font-weight:900;color:#fff}.lt-oauth-mark.sushi{background:#e34b36}.lt-oauth-mark.kitkat{background:#c8102e;border:2px solid #fff;box-shadow:0 0 0 1px #c8102e;border-radius:6px;font-size:10px}.lt-oauth-status{display:block;color:var(--text-secondary,#929bab);font-size:11px;line-height:1.5}.lt-auth-separator{display:flex;align-items:center;gap:9px;color:var(--text-secondary,#929bab);font-size:11px;margin:5px 0}.lt-auth-separator:before,.lt-auth-separator:after{content:'';height:1px;background:var(--border-color,#394150);flex:1}@media(max-width:440px){.lt-oauth-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.lt-oauth-btn{max-height:none}}";
         document.head.appendChild(style);
     }
     const render=()=>{
@@ -3322,12 +3322,11 @@ function openLightningAuth(linkMode=false){
           '<div class="modal-body">'+
           '<p class="auth-note">'+(linkMode?"Connect another sign-in method so you can access this same Lightning account.":(mode==="login"?"Welcome back.":"Get 7 days of Lightning Free Trial: 40 chat messages and 5 image generations. No API key needed."))+'</p>'+
           '<div class="lt-oauth-grid">'+
-          '<button type="button" class="lt-oauth-btn" data-oauth="apple" aria-label="Sign in with Apple" title="Apple sign-in"><img src="https://cdn.simpleicons.org/apple/000000" alt="" loading="eager"></button>'+
-          '<button type="button" class="lt-oauth-btn" data-oauth="microsoft" aria-label="Sign in with Microsoft" title="Microsoft sign-in"><img src="https://cdn.simpleicons.org/microsoft/5E5E5E" alt="" loading="eager"></button>'+
-          '<button type="button" class="lt-oauth-btn" data-oauth="github" aria-label="Sign in with GitHub" title="GitHub sign-in"><img src="https://cdn.simpleicons.org/github/181717" alt="" loading="eager"></button>'+
-          '<button type="button" class="lt-oauth-btn" data-oauth="google" aria-label="Sign in with Google" title="Google sign-in"><img src="https://cdn.simpleicons.org/google/4285F4" alt="" loading="eager"></button>'+
-          '<button type="button" class="lt-oauth-btn" data-oauth="reddit" aria-label="Sign in with Reddit" title="Reddit sign-in"><img src="https://cdn.simpleicons.org/reddit/FF4500" alt="" loading="eager"></button>'+
-          '</div><small class="lt-oauth-status" id="lt-oauth-status">Checking which sign-in providers are configured…</small>'+
+          '<button type="button" class="lt-oauth-btn" data-coming="scratch" disabled title="Scratch sign-in connection is not built yet"><img src="https://cdn.simpleicons.org/scratch/4D97FF" alt="" loading="eager"><span class="lt-oauth-name">Scratch</span></button>'+
+          '<button type="button" class="lt-oauth-btn" data-coming="sushihub" disabled title="SushiHub sign-in connection is not built yet"><span class="lt-oauth-mark sushi" aria-hidden="true">S</span><span class="lt-oauth-name">SushiHub</span></button>'+
+          '<button type="button" class="lt-oauth-btn" data-coming="kitkat" disabled title="KitKat sign-in connection is not built yet"><span class="lt-oauth-mark kitkat" aria-hidden="true">KITKAT</span><span class="lt-oauth-name">KitKat</span></button>'+
+          '<button type="button" class="lt-oauth-btn" data-oauth="github" aria-label="Sign in with GitHub" title="Checking GitHub sign-in"><img src="https://cdn.simpleicons.org/github/181717" alt="" loading="eager"><span class="lt-oauth-name">GitHub</span></button>'+
+          '</div><small class="lt-oauth-status" id="lt-oauth-status">Checking GitHub sign-in… Scratch, SushiHub and KitKat are not connected yet.</small>'+
           fields+
           '</div>';
         const q=s=>card.querySelector(s);
@@ -3341,21 +3340,20 @@ function openLightningAuth(linkMode=false){
         fetch("/api/oauth/providers",{credentials:"same-origin",cache:"no-store"})
           .then(r=>r.json())
           .then(data=>{
-              const configured=data.providers||{};
-              card.querySelectorAll("[data-oauth]").forEach(button=>{
-                  const provider=button.getAttribute("data-oauth"),ready=!!configured[provider];
+              const ready=!!((data.providers||{}).github);
+              const button=q('[data-oauth="github"]');
+              if(button){
                   button.classList.toggle("is-ready",ready);
                   button.disabled=!ready;
-                  const label=provider.charAt(0).toUpperCase()+provider.slice(1);
-                  button.title=ready?"Sign in with "+label:"Sign-in setup required for "+label+". The site owner must add its OAuth credentials in Cloudflare.";
+                  button.title=ready?"Sign in with GitHub":"GitHub setup required: add its OAuth Client ID and Secret in Cloudflare.";
                   button.setAttribute("aria-label",button.title);
-              });
+              }
               const status=q("#lt-oauth-status");
-              if(status)status.textContent="To enable a provider, register its OAuth app and add its client ID/secret in Cloudflare. Callback URL: "+window.location.origin+(data.callbackPath||"/oauth/callback")+". EdPass needs a separate approved school SSO connection.";
+              if(status)status.textContent=(ready?"GitHub sign-in is configured. ":"GitHub needs OAuth credentials in Cloudflare. ")+"Scratch, SushiHub and KitKat are displayed but their sign-in connections still need to be built.";
           })
           .catch(()=>{
               const status=q("#lt-oauth-status");
-              if(status)status.textContent="Social sign-in is not configured yet. The site owner must add provider credentials in Cloudflare.";
+              if(status)status.textContent="Could not check GitHub setup. Scratch, SushiHub and KitKat are not connected yet.";
           });
         if(!linkMode){
             try{q("#lt-user").value=localStorage.getItem("lightning_username_hint")||"";}catch(_){}
@@ -3381,7 +3379,6 @@ function openLightningAuth(linkMode=false){
     };
     ov.onclick=e=>{if(e.target===ov)ov.remove();};render();
 }
-
 function drawAcct() {
     acct.innerHTML = "";
     updateTopProfileShortcut();
