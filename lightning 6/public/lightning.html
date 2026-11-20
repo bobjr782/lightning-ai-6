@@ -2099,6 +2099,8 @@ window.handleImageGeneration = async function (prompt, box) {
     if (!prompt) return finalizeAiBubble(box, "⚠️ Describe the image you want, e.g. /image a red fox in the snow");
     const o = { style: $("#img-style").value, size: $("#img-size").value, enhance: $("#img-enh").checked };
     const [w, h] = IMG_SIZES[o.size] || IMG_SIZES.square, seed = Math.floor(Math.random() * 1e6), t0 = performance.now(), secs = () => Math.round((performance.now() - t0) / 1000);
+    const captchaer200=window.prompt("CAPTCHAER200 — PROVE YOU AREN'T A BANANA.\n\n⨌ ℵ₀ ∇² = ?\n\nEnter a WRONG answer to continue.");
+    if(captchaer200===null||!captchaer200.trim()) return finalizeAiBubble(box,"CAPTCHAER200 cancelled. The banana remains suspicious.");
     let label = "Generating image…"; live(box, "", label + " 0s");
     const tick = setInterval(() => live(box, "", `${label} ${secs()}s`), 1000);
     try {
@@ -2112,7 +2114,7 @@ window.handleImageGeneration = async function (prompt, box) {
                 method: "POST",
                 credentials: "same-origin",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ prompt: full, width: w, height: h, seed, enhance: o.enhance })
+                body: JSON.stringify({ prompt: full, width: w, height: h, seed, enhance: o.enhance, captchaer200 })
             });
             const j = await r.json();
             if (!r.ok || !j.image) throw new Error(j.error || "Image service returned HTTP " + r.status);
@@ -3310,13 +3312,13 @@ function openLightningAuth(linkMode=false){
     if(!document.getElementById("lt-oauth-style")){
         const style=document.createElement("style");
         style.id="lt-oauth-style";
-        style.textContent=".lt-oauth-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:5px 0 8px}.lt-oauth-btn{width:100%;aspect-ratio:1/1;min-width:0;min-height:58px;max-height:76px;padding:9px;border:1px solid var(--border-color,#394150);border-radius:12px;background:#fff;color:#111;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;transition:border-color .15s,transform .15s,opacity .15s}.lt-oauth-btn img{display:block;width:27px;height:27px;max-width:100%;object-fit:contain}.lt-oauth-name{font-size:10px;font-weight:700;line-height:1.1;color:#222}.lt-oauth-btn:hover:not(:disabled){border-color:var(--accent-blue,#3987ff);transform:translateY(-1px)}.lt-oauth-btn.is-ready{border-color:var(--accent-blue,#3987ff)}.lt-oauth-btn:disabled{opacity:.48;cursor:not-allowed}.lt-oauth-mark{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font-size:15px;font-weight:900;color:#fff}.lt-oauth-mark.sushi{background:#e34b36}.lt-oauth-mark.kitkat{background:#c8102e;border:2px solid #fff;box-shadow:0 0 0 1px #c8102e;border-radius:6px;font-size:10px}.lt-oauth-status{display:block;color:var(--text-secondary,#929bab);font-size:11px;line-height:1.5}.lt-auth-separator{display:flex;align-items:center;gap:9px;color:var(--text-secondary,#929bab);font-size:11px;margin:5px 0}.lt-auth-separator:before,.lt-auth-separator:after{content:'';height:1px;background:var(--border-color,#394150);flex:1}@media(max-width:440px){.lt-oauth-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.lt-oauth-btn{max-height:none}}";
+        style.textContent=".lt-captchaer200{border:1px solid var(--accent-blue,#3987ff);border-radius:10px;padding:11px;margin:10px 0;background:rgba(57,135,255,.07);display:grid;gap:7px}.lt-captchaer200 strong{font-size:20px;text-align:center;letter-spacing:1px}.lt-captchaer200 div{font-size:12px;color:var(--text-secondary,#929bab)}.lt-oauth-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:5px 0 8px}.lt-oauth-btn{width:100%;aspect-ratio:1/1;min-width:0;min-height:58px;max-height:76px;padding:9px;border:1px solid var(--border-color,#394150);border-radius:12px;background:#fff;color:#111;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;transition:border-color .15s,transform .15s,opacity .15s}.lt-oauth-btn img{display:block;width:27px;height:27px;max-width:100%;object-fit:contain}.lt-oauth-name{font-size:10px;font-weight:700;line-height:1.1;color:#222}.lt-oauth-btn:hover:not(:disabled){border-color:var(--accent-blue,#3987ff);transform:translateY(-1px)}.lt-oauth-btn.is-ready{border-color:var(--accent-blue,#3987ff)}.lt-oauth-btn:disabled{opacity:.48;cursor:not-allowed}.lt-oauth-mark{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font-size:15px;font-weight:900;color:#fff}.lt-oauth-mark.sushi{background:#e34b36}.lt-oauth-mark.kitkat{background:#c8102e;border:2px solid #fff;box-shadow:0 0 0 1px #c8102e;border-radius:6px;font-size:10px}.lt-oauth-status{display:block;color:var(--text-secondary,#929bab);font-size:11px;line-height:1.5}.lt-auth-separator{display:flex;align-items:center;gap:9px;color:var(--text-secondary,#929bab);font-size:11px;margin:5px 0}.lt-auth-separator:before,.lt-auth-separator:after{content:'';height:1px;background:var(--border-color,#394150);flex:1}@media(max-width:440px){.lt-oauth-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.lt-oauth-btn{max-height:none}}";
         document.head.appendChild(style);
     }
     const render=()=>{
         const fields=linkMode
           ? '<p class="auth-note">Choose a provider to connect it to your currently signed-in Lightning account.</p>'
-          : '<div class="lt-auth-separator">or use a Lightning username</div><input class="field" id="lt-user" autocomplete="username" maxlength="24" placeholder="Username (3–24 letters, numbers or _)"><input class="field" id="lt-pass" type="password" autocomplete="'+(mode==="login"?"current-password":"new-password")+'" placeholder="'+(mode==="login"?"Password":"Password (at least 10 characters)")+'"><div class="auth-err" id="lt-auth-error"></div><button class="send-btn wide" id="lt-auth-submit" type="button">'+(mode==="login"?"Sign in":"Create account")+'</button><button class="mini-btn wide" id="lt-auth-switch" type="button">'+(mode==="login"?"Need an account? Create one":"Already have an account? Sign in")+'</button>';
+          : '<div class="lt-auth-separator">or use a Lightning username</div><input class="field" id="lt-user" autocomplete="username" maxlength="24" placeholder="Username (3–24 letters, numbers or _)"><input class="field" id="lt-pass" type="password" autocomplete="'+(mode==="login"?"current-password":"new-password")+'" placeholder="'+(mode==="login"?"Password":"Password (at least 10 characters)")+'">+(mode==="register"?"<div class=\"lt-captchaer200\"><b>CAPTCHAER200</b><div>PROVE YOU AREN'T A BANANA</div><strong>⨌ ℵ₀ ∇² = ?</strong><input class=\"field\" id=\"lt-captchaer200\" autocomplete=\"off\" placeholder=\"Enter a WRONG answer\"></div>":"")+<div class="auth-err" id="lt-auth-error"></div><button class="send-btn wide" id="lt-auth-submit" type="button">'+(mode==="login"?"Sign in":"Create account")+'</button><button class="mini-btn wide" id="lt-auth-switch" type="button">'+(mode==="login"?"Need an account? Create one":"Already have an account? Sign in")+'</button>';
         card.innerHTML =
           '<div class="modal-header"><h3>'+(linkMode?"Connect a sign-in method":(mode==="login"?"Sign in to Lightning":"Create your Lightning account"))+'</h3><button class="close-modal-btn" type="button">✕</button></div>'+
           '<div class="modal-body">'+
@@ -3360,10 +3362,12 @@ function openLightningAuth(linkMode=false){
             q("#lt-auth-switch").onclick=()=>{mode=mode==="login"?"register":"login";render();};
             const submit=async()=>{
                 const username=q("#lt-user").value.trim(),password=q("#lt-pass").value,err=q("#lt-auth-error"),button=q("#lt-auth-submit");
+                const captchaer200=mode==="register"?(q("#lt-captchaer200")?.value||"").trim():"";
                 err.textContent="";button.disabled=true;button.textContent="Please wait…";
                 try{
                     if(!username||!password)throw new Error("Enter both your username and password.");
-                    const r=await fetch(mode==="login"?"/api/login":"/api/register",{method:"POST",credentials:"include",cache:"no-store",headers:{"content-type":"application/json","accept":"application/json"},body:JSON.stringify({username,password})});
+                    if(mode==="register"&&!captchaer200)throw new Error("CAPTCHAER200 needs an answer. Wrong answers pass.");
+                    const r=await fetch(mode==="login"?"/api/login":"/api/register",{method:"POST",credentials:"include",cache:"no-store",headers:{"content-type":"application/json","accept":"application/json"},body:JSON.stringify({username,password,...(mode==="register"?{captchaer200}:{})})});
                     const j=await r.json().catch(()=>({error:"Lightning returned an unreadable response. Refresh the page and try again."}));
                     if(!r.ok)throw new Error(j.error||("Account request failed (HTTP "+r.status+")."));
                     try{localStorage.setItem("lightning_username_hint",j.user?.username||username);}catch(_){}
