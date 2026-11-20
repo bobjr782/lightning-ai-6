@@ -3351,7 +3351,7 @@ async function captchaer200Check() {
         const startChallenge=()=>{
             if(challengeStarted)return;
             challengeStarted=true;challengeNeeded=true;
-            const all=Array.isArray(window.LIGHTNING_BUILTIN_AVATARS)?window.LIGHTNING_BUILTIN_AVATARS:[];
+            const all=(typeof BUILTIN_AVATARS!=="undefined"&&BUILTIN_AVATARS.length?BUILTIN_AVATARS:(Array.isArray(window.LIGHTNING_BUILTIN_AVATARS)?window.LIGHTNING_BUILTIN_AVATARS:[]));
             const avatars=all.map((item,i)=>{
                 const name=String(item.name||("Picture "+(i+1)));
                 const key=name.toLowerCase();
