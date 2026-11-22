@@ -2207,7 +2207,8 @@ window.handleImageGeneration = async function (prompt, box) {
         const id = src.startsWith("data:") ? nid() : "";
         if (id) await idbPut(id, src);
         clearInterval(tick);
-        await showImageBuildPreview(box, img);\n        imageResult(box, prompt, img, src, used); addImage(prompt, id ? "" : src, id);
+        await showImageBuildPreview(box, img);
+        imageResult(box, prompt, img, src, used); addImage(prompt, id ? "" : src, id);
         chat.push({ text: `🖼️ [Generated Image]: ${prompt}`, alignment: "ai-align", type: "aiBox", isImage: false, imgData: "", genUrl: id ? "" : src, imgId: id, prompt });
         try { store(KEY); } catch (e) {}
         scrollToLatestMessage();
