@@ -2428,7 +2428,7 @@ async function runLightningLocalReply(messages, box, apiText, images, startedAt,
     if (!full) throw new Error("The local model returned an empty reply. Try again.");
     const art = renderRich(box, full);
     const secs = ((performance.now() - startedAt) / 1000).toFixed(1);
-    box.append(el("div", "status-done", "✓ " + secs + "s · " + full.split(/\\s+/).length + " words · Local AI (" + (modelId || PRESETS.local.model) + ")"));
+    box.append(el("div", "status-done", "✓ " + secs + "s · " + full.split(/\s+/).length + " words · Local AI (" + (modelId || PRESETS.local.model) + ")"));
     chat.push({ text: full, alignment: "ai-align", type: "aiBox", isImage: false, imgData: "" });
     try { store(KEY); } catch (_) {}
     if (art >= 0) openArtifact(art);
