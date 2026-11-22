@@ -878,6 +878,15 @@ body.img-mode .img-opts { display: flex; }
     #pluginsModal .plugin-item > button { width: 100%; }
 }
 </style>
+<style id="lightning-image-build-preview">
+.lightning-image-build{width:100%;max-width:720px;margin:4px 0 12px;padding:12px;border:1px solid rgba(150,150,150,.22);border-radius:12px;background:rgba(120,120,120,.055)}
+.lightning-image-build-heading{font-size:13px;font-weight:650;margin-bottom:10px}
+.lightning-image-build-stage{font-size:12px;opacity:.75;margin-bottom:8px;font-family:"JetBrains Mono",monospace}
+.lightning-image-build-canvas{display:block;width:100%;height:auto;max-height:520px;object-fit:contain;border-radius:7px;background:#f1f1ed}
+.lightning-image-build-progress{height:3px;margin-top:10px;background:rgba(130,130,130,.2);border-radius:4px;overflow:hidden}
+.lightning-image-build-bar{height:100%;width:0;background:#5b9bd5;transition:width .18s ease}
+.lightning-image-build-note{font-size:10px;opacity:.52;margin-top:7px}
+</style>
 </head>
 <body> 
 
@@ -2072,6 +2081,64 @@ const idbPut = async (k, v) => { try { const db = await idbOpen(); await new Pro
 const idbGet = async k => { try { const db = await idbOpen(); return await new Promise((res, rej) => { const q = db.transaction("imgs").objectStore("imgs").get(k); q.onsuccess = () => res(q.result); q.onerror = rej; }); } catch (e) { return null; } };
 async function openUrl(u) { if (!u) return; if (u.startsWith("data:")) u = URL.createObjectURL(await (await fetch(u)).blob()); window.open(u, "_blank"); }
 
+async function showImageBuildPreview(box, img) {
+    // One FLUX result only: these are client-side visual treatments of that same image.
+    box.classList.remove("thinking-bubble");
+    box.innerHTML = "";
+    const panel = el("div", "lightning-image-build");
+    const heading = el("div", "lightning-image-build-heading", "Image received — revealing your result");
+    const stage = el("div", "lightning-image-build-stage", "Preparing preview…");
+    const canvas = document.createElement("canvas");
+    canvas.className = "lightning-image-build-canvas";
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const maxSide = 720, scale = Math.min(1, maxSide / Math.max(img.naturalWidth || img.width, img.naturalHeight || img.height));
+    canvas.width = Math.max(1, Math.round((img.naturalWidth || img.width) * scale));
+    canvas.height = Math.max(1, Math.round((img.naturalHeight || img.height) * scale));
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const original = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const w = canvas.width, h = canvas.height, src = original.data;
+    const gray = new Uint8ClampedArray(w * h);
+    for (let i = 0, p = 0; i < src.length; i += 4, p++) gray[p] = Math.round(src[i] * .299 + src[i + 1] * .587 + src[i + 2] * .114);
+    const edges = new Uint8ClampedArray(w * h);
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+        const p = y * w + x;
+        const gx = -gray[p-w-1] + gray[p-w+1] - 2*gray[p-1] + 2*gray[p+1] - gray[p+w-1] + gray[p+w+1];
+        const gy = -gray[p-w-1] - 2*gray[p-w] - gray[p-w+1] + gray[p+w-1] + 2*gray[p+w] + gray[p+w+1];
+        edges[p] = Math.min(255, Math.hypot(gx, gy) * .8);
+    }
+    const sketch = ctx.createImageData(w, h), outline = ctx.createImageData(w, h);
+    for (let p = 0, i = 0; p < gray.length; p++, i += 4) {
+        const line = edges[p] > 48 ? 28 : 255;
+        const pencil = Math.max(95, Math.min(250, 246 - edges[p] * .45 - (255-gray[p]) * .12));
+        sketch.data[i] = pencil; sketch.data[i+1] = pencil; sketch.data[i+2] = pencil; sketch.data[i+3] = 255;
+        outline.data[i] = line; outline.data[i+1] = line; outline.data[i+2] = line; outline.data[i+3] = 255;
+    }
+    const progress = el("div", "lightning-image-build-progress");
+    const bar = el("div", "lightning-image-build-bar");
+    progress.append(bar);
+    const note = el("div", "lightning-image-build-note", "Preview animation only · 1 image generated");
+    panel.append(heading, stage, canvas, progress, note); box.append(panel);
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const drawStage = async (label, pct, data) => {
+        stage.textContent = label;
+        bar.style.width = pct + "%";
+        if (data) ctx.putImageData(data, 0, 0);
+        await wait(650);
+    };
+    await drawStage("01 / Sketch", 22, sketch);
+    await drawStage("02 / Outline", 48, outline);
+    stage.textContent = "03 / Colour";
+    bar.style.width = "76%";
+    ctx.putImageData(outline, 0, 0);
+    const step = Math.max(1, Math.round(w / 36));
+    for (let x = 0; x < w; x += step) {
+        ctx.putImageData(original, 0, 0, x, 0, Math.min(step, w-x), h);
+        await wait(12);
+    }
+    await drawStage("04 / Finished", 100, original);
+    await wait(350);
+    box.innerHTML = "";
+}
 function imageResult(box, prompt, img, url, used) {
     box.classList.remove("thinking-bubble"); box.innerHTML = "";
     const cap = el("div", "", "✨ " + prompt); cap.style.marginBottom = "8px"; box.append(cap);
@@ -2139,7 +2206,7 @@ window.handleImageGeneration = async function (prompt, box) {
         if (!img) return finalizeAiBubble(box, "⚠️ Image generation failed. The image services may be busy or blocked by your network or an ad blocker. Try again in a minute.");
         const id = src.startsWith("data:") ? nid() : "";
         if (id) await idbPut(id, src);
-        imageResult(box, prompt, img, src, used); addImage(prompt, id ? "" : src, id);
+        clearInterval(tick);\n        await showImageBuildPreview(box, img);\n        imageResult(box, prompt, img, src, used); addImage(prompt, id ? "" : src, id);
         chat.push({ text: `🖼️ [Generated Image]: ${prompt}`, alignment: "ai-align", type: "aiBox", isImage: false, imgData: "", genUrl: id ? "" : src, imgId: id, prompt });
         try { store(KEY); } catch (e) {}
         scrollToLatestMessage();
