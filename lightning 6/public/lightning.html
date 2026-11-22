@@ -1000,6 +1000,7 @@ body.img-mode .img-opts { display: flex; }
     <!-- Main execution driver logic script link -->
     <!-- Add ?v=2 to force Live Server to grab the brand new file -->
 <script src="/lightning-avatars.js"></script>
+<script src="/lightning-local-ai.js"></script>
 
 <script>
 // Add this alongside INITIAL_CREDITS, chat, etc.
@@ -2414,8 +2415,30 @@ async function groqCoderOverview(apiKey, source) {
     return data.choices?.[0]?.message?.content?.trim() || "";
 }
 
+async function runLightningLocalReply(messages, box, apiText, images, startedAt, modelId) {
+    if (images && images.length) throw new Error("Lightning Local currently supports text chats only. Switch to an online vision model to analyse images.");
+    if (!window.LightningLocalAI) throw new Error("The local AI engine did not load. Refresh Lightning and try again.");
+    live(box, "", "Checking this computer for WebGPU…");
+    const reply = await window.LightningLocalAI.generate(messages, {
+        model: modelId || PRESETS.local.model,
+        onProgress: message => live(box, "", message),
+        onToken: partial => live(box, partial, "Lightning Local · generating on this computer…")
+    });
+    const full = String(reply || "").trim();
+    if (!full) throw new Error("The local model returned an empty reply. Try again.");
+    const art = renderRich(box, full);
+    const secs = ((performance.now() - startedAt) / 1000).toFixed(1);
+    box.append(el("div", "status-done", "✓ " + secs + "s · " + full.split(/\\s+/).length + " words · Local AI (" + (modelId || PRESETS.local.model) + ")"));
+    chat.push({ text: full, alignment: "ai-align", type: "aiBox", isImage: false, imgData: "" });
+    try { store(KEY); } catch (_) {}
+    if (art >= 0) openArtifact(art);
+    scrollToLatestMessage();
+    return full;
+}
 async function askAI(apiText, images, names, force, reuse, tried) {
-    if(!reuse && !await chargeLightningCredits("bubble")){busy=false;return;}
+    const initiallySelected = getCfg(force);
+    const useLocalDirectly = initiallySelected.id === "local";
+    if(!reuse && !useLocalDirectly && !await chargeLightningCredits("bubble")){busy=false;return;}
     busy = true; const t0 = performance.now();
     let dedicatedGroqCoder = false, dedicatedOpenRouterCoder = false, messages = [];
     const groqOverviewKey = (rawCfg().keys || {}).groq || "";
@@ -2443,6 +2466,11 @@ GAME BUILD QUALITY GATE (apply to this request):
 - The first visible screen must show an inviting playable game scene, not a blank page or a lone rectangle.
 ` : "";
         messages = [{ role: "system", content: SYSTEM() + gameBuildRules }, ...hist, { role: "user", content: withHint(content, apiText) }];
+        if (cfg.id === "local") {
+            await runLightningLocalReply(messages, box, apiText, images, t0, cfg.model);
+            busy = false;
+            return;
+        }
         const trialNoKey = !cfg.key && !(SERVER.on && SERVER[cfg.id] && cfg.id !== "custom") && cfg.id !== "custom";
         if (cfg.id === "custom" && !cfg.key) { finalizeAiBubble(box, "Add your custom API key in Model settings, or switch to Lightning Free Trial."); busy = false; return; }
         const hdr = { "Content-Type": "application/json", ...(cfg.key ? { "Authorization": `Bearer ${cfg.key}` } : {}) };
@@ -2556,6 +2584,15 @@ GAME BUILD QUALITY GATE (apply to this request):
         }
     } catch (err) {
         console.error(err);
+        if (getCfg(force).id !== "local" && !images.length && window.LightningLocalAI && window.LightningLocalAI.isReady() && !(tried || []).includes("local")) {
+            try {
+                live(box, "", "Online AI failed — switching to your private local AI on this computer…");
+                await runLightningLocalReply(messages, box, apiText, [], t0, rawCfg().models?.local || PRESETS.local.model);
+                box.append(el("div", "status-done", "✓ Local fallback · your prompt was processed on this computer."));
+                busy = false;
+                return;
+            } catch (localError) { console.warn("Lightning local fallback failed:", localError); }
+        }
         if (dedicatedOpenRouterCoder && groqOverviewKey && !(tried || []).includes("groq")) {
             busy = false;
             live(box, "", "OpenRouter coding models failed — switching to Groq Coder…");
@@ -3607,14 +3644,15 @@ const PRESETS = {
     openrouter: { name: "OpenRouter (free models, auto-rotate)", endpoint: AI_API_ENDPOINT, model: "", note: "Free models share small quotas, so 429s are common. Lightning now rotates through the live list of free models automatically." },
     groq: { name: "Groq (fast, free key)", endpoint: "https://api.groq.com/openai/v1/chat/completions", model: "llama-3.3-70b-versatile", fallback: ["llama-3.1-8b-instant"], vision: "meta-llama/llama-4-scout-17b-16e-instruct", note: "Get a free key at console.groq.com/keys. Much faster, with far higher free limits than OpenRouter's free models." },
     google: { name: "Google Gemini (free key)", endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", model: "gemini-2.5-flash", fallback: ["gemini-2.5-flash-lite", "gemini-3.5-flash"], vision: "gemini-2.5-flash", note: "Free key at aistudio.google.com/apikey. Great as a backup: when OpenRouter or Groq is rate-limited, lightning switches to Gemini automatically." },
-    custom: { name: "Custom (OpenAI-compatible)", endpoint: "", model: "", note: "Any OpenAI-compatible chat completions URL, e.g. https://api.cerebras.ai/v1/chat/completions. A model name is required." }
+    custom: { name: "Custom (OpenAI-compatible)", endpoint: "", model: "", note: "Any OpenAI-compatible chat completions URL, e.g. https://api.cerebras.ai/v1/chat/completions. A model name is required." },
+    local: { name: "Lightning Local (runs on this computer)", endpoint: "", model: "Qwen3-0.6B-q4f16_1-MLC", note: "Runs privately in this browser using your computer GPU. First use downloads the model; no API key or cloud inference." }
 };
 const provAvail = p => (rawCfg().keys || {})[p] || (SERVER.on && SERVER[p]);
 const rawCfg = () => { try { return JSON.parse(localStorage.getItem("lt_cfg") || "{}"); } catch (e) { return {}; } };
 function getCfg(force) {
     const s = rawCfg(), keys = s.keys || {};
     let id = PRESETS[force] ? force : PRESETS[s.provider] ? s.provider : "lightning";
-    const has = k => keys[k] || (SERVER.on && SERVER[k] && k !== "custom");
+    const has = k => k === "local" || keys[k] || (SERVER.on && SERVER[k] && k !== "custom");
     if (!has(id) && !force) { const alt = ["qwen", "openrouter", "groq", "google", "custom"].find(k => has(k)); id = alt || "lightning"; }
     const p = PRESETS[id];
     return { id, p, name: p.name.split(" (")[0], endpoint: id === "custom" ? (s.endpoint || "") : p.endpoint, key: (s.keys && s.keys[id]) || "", model: (s.models && s.models[id]) || p.model };
@@ -3967,6 +4005,7 @@ async function fillModels() {
     const sel = $("#model-pick"), cur = getCfg(), s = rawCfg(); sel.innerHTML = "";
     const grp = (label, opts) => { const g = document.createElement("optgroup"); g.label = label; opts.forEach(([v, t]) => g.append(new Option(t, v))); sel.append(g); };
     grp("Lightning (free, no key)", [["lightning|lightning-free", "Auto-connect — no API key"]]);
+    grp("On this computer (local AI · no API)", [["local|Qwen3-0.6B-q4f16_1-MLC", "Qwen3 0.6B · about 1.4 GB GPU memory"], ["local|Qwen3-1.7B-q4f16_1-MLC", "Qwen3 1.7B · about 2.0 GB GPU memory"], ["local|Qwen3-4B-q4f16_1-MLC", "Qwen3 4B · about 3.4 GB GPU memory"]]);
     if (SERVER.on && SERVER.qwen) grp("Qwen (Lightning API)", [["qwen|qwen3.7-plus", "Qwen 3.7 Plus"], ["qwen|qwen4-max", "Qwen 4 Max"]]);
     grp("OpenRouter (free)", [["openrouter|", "Auto — rotate free"], ["openrouter|" + CODE_MODEL, "Qwen3 Coder"], ...(await freeModels()).slice(0, 30).filter(m => m.id !== CODE_MODEL).map(m => ["openrouter|" + m.id, short(m.id)])]);
     grp("OpenRouter (paid — requires credits)", [["openrouter|anthropic/claude-sonnet-4.5", "Claude Sonnet 4.5"]]);
