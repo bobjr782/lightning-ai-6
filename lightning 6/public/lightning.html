@@ -2440,7 +2440,7 @@ async function askAI(apiText, images, names, force, reuse, tried) {
     const useLocalDirectly = initiallySelected.id === "local";
     if(!reuse && !useLocalDirectly && !await chargeLightningCredits("bubble")){busy=false;return;}
     busy = true; const t0 = performance.now();
-    let dedicatedGroqCoder = false, dedicatedOpenRouterCoder = false, messages = [];
+    let dedicatedGroqCoder = false, dedicatedOpenRouterCoder = false, messages = [], usedServerRoute = false;
     const groqOverviewKey = (rawCfg().keys || {}).groq || "";
     const box = reuse || injectThinkingPlaceholderBubble();
     live(box, "", names.length ? `Reading ${names.length} file${names.length > 1 ? "s" : ""}…` : "Thinking…");
@@ -2490,6 +2490,7 @@ GAME BUILD QUALITY GATE (apply to this request):
             cands = trialNoKey ? ["lightning-free"] : (await candidates(cfg, apiText, images)).slice(0, hasAlt ? 2 : 6);
         }
         const viaServer = !dedicatedGroqCoder && (trialNoKey || (SERVER.on && cfg.id !== "custom"));
+        usedServerRoute = viaServer;
         const attempt = (m, s) => fetch(viaServer ? "/api/chat" : cfg.endpoint, { method: "POST", headers: viaServer ? { "Content-Type": "application/json", "x-provider": cfg.id, ...(cfg.key ? { "x-user-key": cfg.key } : {}) } : hdr, body: JSON.stringify({ model: m, temperature: dedicatedGroqCoder ? 1.0 : (m === CODE_MODEL || currentSelectedMode === "coder" ? 0.2 : 0.7), max_tokens: currentSelectedMode === "coder" ? 8192 : 1800, ...(dedicatedGroqCoder ? { reasoning_effort: "default", reasoning_format: "hidden" } : {}), messages, ...(!viaServer && s && !trialNoKey ? { stream: true } : {}) }), signal: AbortSignal.timeout(90000) });
         let res = null, streaming = !trialNoKey, full = "", usedModel = "", status = 0, retryAfter = 5;
         for (let round = 0; round < 2; round++) {
@@ -2584,6 +2585,47 @@ GAME BUILD QUALITY GATE (apply to this request):
         }
     } catch (err) {
         console.error(err);
+        // Cloud Pair fallback: when a directly-called provider fails, hand the
+        // same conversation to Lightning's server-side AI route. The Worker
+        // tries JarvisClaw first and Cloudflare Workers AI second; credentials
+        // remain server-side. Do not repeat this if the original request already
+        // went through that server route.
+        if (!usedServerRoute && initiallySelected.id !== "local" && !images.length && !(tried || []).includes("cloudpair")) {
+            try {
+                live(box, "", "Online model failed — switching to Cloud Pair…");
+                const cloudPairResponse = await fetch("/api/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "x-provider": "cloudpair" },
+                    body: JSON.stringify({
+                        model: "auto/free",
+                        messages,
+                        temperature: currentSelectedMode === "coder" ? 0.2 : 0.7,
+                        max_tokens: currentSelectedMode === "coder" ? 8192 : 1800,
+                        stream: false
+                    }),
+                    signal: AbortSignal.timeout(60000)
+                });
+                const cloudPairData = await cloudPairResponse.json().catch(() => ({}));
+                const cloudPairText = cloudPairData?.choices?.[0]?.message?.content;
+                if (!cloudPairResponse.ok || typeof cloudPairText !== "string" || !cloudPairText.trim()) {
+                    throw new Error(cloudPairData?.error?.message || "Cloud Pair did not return a reply.");
+                }
+                if (/%@GRID/i.test(cloudPairText)) {
+                    finalizeAiBubble(box, cloudPairText);
+                } else {
+                    const cloudPairArt = renderRich(box, cloudPairText);
+                    chat.push({ text: cloudPairText, alignment: "ai-align", type: "aiBox", isImage: false, imgData: "" });
+                    try { store(KEY); } catch (_) {}
+                    if (cloudPairArt >= 0) openArtifact(cloudPairArt);
+                }
+                box.append(el("div", "status-done", "✓ Cloud Pair fallback · " + (cloudPairData.model || cloudPairData.provider || "Lightning server AI")));
+                scrollToLatestMessage();
+                busy = false;
+                return;
+            } catch (cloudPairError) {
+                console.warn("Lightning Cloud Pair fallback failed:", cloudPairError);
+            }
+        }
         if (getCfg(force).id !== "local" && !images.length && window.LightningLocalAI && window.LightningLocalAI.isReady() && !(tried || []).includes("local")) {
             try {
                 live(box, "", "Online AI failed — switching to your private local AI on this computer…");
