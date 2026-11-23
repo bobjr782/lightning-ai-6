@@ -353,122 +353,33 @@ async function imageRoute(request, env) {
     }
   }
 
-  try {
-    // High-quality primary: FLUX.2 [dev]. Unlike Schnell/Klein, this
-    // uses a full 25-step inference pass and respects the requested dimensions.
-    // Cloudflare documents this model as its high-fidelity FLUX.2 option.
+  // Cloudflare Worker is the secure router only: Qwen first, Pollinations second.
+  // No Cloudflare FLUX/FLUX.2 model is called here.
+  if (env.POLLINATIONS_API_KEY) {
     try {
-      const form = new FormData();
-      form.append("prompt", prompt);
-      form.append("width", String(width));
-      form.append("height", String(height));
-      form.append("seed", String(seed));
-      form.append("steps", "25");
-      form.append("guidance", "4");
-      const encoded = new Response(form);
-      const result = await env.AI.run("@cf/black-forest-labs/flux-2-dev", {
-        multipart: { body: encoded.body, contentType: encoded.headers.get("content-type") }
-      });
-      if (typeof result?.image !== "string" || !result.image) {
-        throw new Error("FLUX.2 Dev returned no image.");
-      }
+      const image = await pollinationsImage(prompt, width, height, seed, env);
       return json({
-        image: "data:image/png;base64," + result.image,
-        entitlement: entitlement(await ensureUsage(account,env)),
+        image: "data:image/png;base64," + image,
+        entitlement: entitlement(await ensureUsage(account, env)),
         promptUsed: prompt,
-        model: "FLUX.2 Dev · 25 steps",
+        model: "Pollinations · FLUX.1 Schnell (backup)",
         width,
         height,
         seed
       });
-    } catch (qualityError) {
-      console.warn("Lightning FLUX.2 Dev failed:", qualityError?.message || qualityError);
-      // Lower-cost fallback if FLUX.2 Dev is unavailable.
-      try {
-        const form = new FormData();
-        form.append("prompt", prompt);
-        form.append("width", String(width));
-        form.append("height", String(height));
-        form.append("seed", String(seed));
-        form.append("guidance", "4");
-        const encoded = new Response(form);
-        const backup = await env.AI.run("@cf/black-forest-labs/flux-2-klein-9b", {
-          multipart: { body: encoded.body, contentType: encoded.headers.get("content-type") }
-        });
-        if (typeof backup?.image !== "string" || !backup.image) {
-          throw new Error("FLUX.2 Klein 9B returned no image.");
-        }
-        return json({
-          image: "data:image/png;base64," + backup.image,
-          entitlement: entitlement(await ensureUsage(account,env)),
-          promptUsed: prompt,
-          model: "FLUX.2 Klein 9B (backup)",
-          width,
-          height,
-          seed
-        });
-      } catch (backupError) {
-        console.warn("Lightning FLUX.2 Klein 9B failed:", backupError?.message || backupError);
-        // Last-resort compatibility fallback.
-        const form = new FormData();
-        form.append("prompt", prompt);
-        form.append("width", String(width));
-        form.append("height", String(height));
-        form.append("seed", String(seed));
-        form.append("guidance", "4");
-        const encoded = new Response(form);
-        const last = await env.AI.run("@cf/black-forest-labs/flux-2-klein-4b", {
-          multipart: { body: encoded.body, contentType: encoded.headers.get("content-type") }
-        });
-        if (typeof last?.image !== "string" || !last.image) {
-          throw new Error("All FLUX image models failed.");
-        }
-        return json({
-          image: "data:image/png;base64," + last.image,
-          entitlement: entitlement(await ensureUsage(account,env)),
-          promptUsed: prompt,
-          model: "FLUX.2 Klein 4B (last-resort backup)",
-          width,
-          height,
-          seed
-        });
-      }
+    } catch (pollinationsError) {
+      console.error("Lightning Pollinations image fallback failed:", pollinationsError?.message || pollinationsError);
     }
-
-  } catch (error) {
-    const detail = String(error?.message || error || "Unknown Workers AI error");
-    console.error("Lightning Workers AI image models failed:", detail);
-    // If Cloudflare is out of capacity/quota, use the separately configured provider.
-    if(env.POLLINATIONS_API_KEY) {
-      try {
-        const image=await pollinationsImage(prompt,width,height,seed,env);
-        return json({
-          image:"data:image/png;base64,"+image,
-          entitlement:entitlement(await ensureUsage(account,env)),
-          promptUsed:prompt,
-          model:"Pollinations · FLUX.1 Schnell (backup)",
-          width,height,seed
-        });
-      } catch(fallbackError) {
-        console.error("Lightning Pollinations image fallback failed:",fallbackError?.message||fallbackError);
-      }
-    }
-    // Neither provider produced an image: return the trial credit.
-    try { await refundImageCredits(account,env); }
-    catch (refundError) { console.error("Could not refund failed image trial use:", refundError?.message || refundError); }
-    const quota = /4006|quota|daily.*(limit|allocation)|limit.*(reached|exceeded)|neuron|billing|payment|paid plan/i.test(detail);
-    const capacity = /3040|capacity|overloaded|temporarily unavailable/i.test(detail);
-    const status = quota ? 429 : 502;
-    return json({
-      error: env.POLLINATIONS_API_KEY
-        ? "Cloudflare and the backup image provider both failed. Your Lightning image credit has been returned. Check Worker logs for details."
-        : quota
-          ? "Cloudflare Workers AI has reached its free daily allowance. Your Lightning image credit has been returned. Add a POLLINATIONS_API_KEY Worker secret to enable the backup image provider."
-          : capacity
-            ? "Cloudflare's image models are currently out of capacity. Your Lightning image credit has been returned. Add a POLLINATIONS_API_KEY Worker secret to enable backup generation."
-            : "Cloudflare's image models all failed. Your Lightning image credit has been returned. Check the Worker logs for the exact error."
-    }, status);
   }
+
+  // Neither provider produced an image: return the reserved trial credit.
+  try { await refundImageCredits(account, env); }
+  catch (refundError) { console.error("Could not refund failed image trial use:", refundError?.message || refundError); }
+  return json({
+    error: env.QWEN_IMAGE_API_KEY || env.POLLINATIONS_API_KEY
+      ? "Qwen and Pollinations could not generate this image. Your Lightning image credit has been returned. Check Worker logs for details."
+      : "Image generation is not configured. Add QWEN_IMAGE_API_KEY or POLLINATIONS_API_KEY as a Cloudflare Worker secret. Your image credit has been returned."
+  }, 502);
 }
 
 
