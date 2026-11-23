@@ -313,6 +313,48 @@ async function imageRoute(request, env) {
       // Prompt enhancement is optional; generation continues with the user's original prompt.
     }
   }
+  // Qwen Image 3.0 is Lightning's preferred image engine. The API key is
+  // stored only as a Cloudflare Worker secret; it is never sent to the browser.
+  if (env.QWEN_IMAGE_API_KEY) {
+    try {
+      const qwenResponse = await fetch("https://ap-southeast-1.maas.qwencloudapi.com/compatible-mode/v1/images/generations", {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + env.QWEN_IMAGE_API_KEY,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "qwen-image-3.0",
+          prompt,
+          size: width + "x" + height,
+          n: 1,
+          response_format: "b64_json",
+          prompt_extend: true
+        })
+      });
+      if (!qwenResponse.ok) {
+        const detail = await qwenResponse.text().catch(() => "");
+        throw new Error("Qwen Image 3.0 returned HTTP " + qwenResponse.status + ": " + detail.slice(0, 500));
+      }
+      const qwenData = await qwenResponse.json();
+      const qwenImage = qwenData?.data?.[0]?.b64_json;
+      if (typeof qwenImage !== "string" || !qwenImage) {
+        throw new Error("Qwen Image 3.0 returned no image data.");
+      }
+      return json({
+        image: "data:image/png;base64," + qwenImage,
+        entitlement: entitlement(await ensureUsage(account, env)),
+        promptUsed: prompt,
+        model: "Qwen Image 3.0",
+        width,
+        height,
+        seed
+      });
+    } catch (qwenError) {
+      console.warn("Lightning Qwen Image 3.0 failed; trying the next image engine:", qwenError?.message || qwenError);
+    }
+  }
+
   try {
     // High-quality primary: FLUX.2 [dev]. Unlike Schnell/Klein, this
     // uses a full 25-step inference pass and respects the requested dimensions.
