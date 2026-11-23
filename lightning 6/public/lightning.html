@@ -2095,6 +2095,60 @@ async function enhancePrompt(p) {
         return t ? t.trim().replace(/^["']|["']$/g, "") : null;
     } catch (e) { return null; }
 }
+function startImageCanvasProgress(box, initialStatus) {
+    box.classList.remove("thinking-bubble");
+    box.innerHTML = "";
+    const canvas = document.createElement("canvas");
+    canvas.className = "lightning-image-progress-canvas";
+    canvas.setAttribute("aria-hidden", "true");
+    canvas.style.cssText = "display:block;width:min(100%,460px);height:64px;border-radius:12px;margin:2px 0 8px;background:rgba(80,110,90,.08)";
+    const status = el("div", "status-line");
+    status.append(el("span", "pulse"));
+    const statusText = el("span", "", initialStatus);
+    status.append(statusText);
+    box.append(canvas, status);
+    const ctx = canvas.getContext("2d");
+    let frame = 0, running = true, lastWidth = 0, lastHeight = 0;
+    const dots = Array.from({length:22}, (_,i)=>({x:(i*47.3)%460,y:12+(i*19.7)%40,s:1+(i%3)*.65,p:i*.73}));
+    function draw(now) {
+        if (!running) return;
+        const width = Math.max(260, Math.floor(canvas.clientWidth || 460));
+        const height = 64, dpr = Math.min(2, window.devicePixelRatio || 1);
+        if (width !== lastWidth || height !== lastHeight || canvas.width !== Math.round(width*dpr)) {
+            lastWidth=width; lastHeight=height; canvas.width=Math.round(width*dpr); canvas.height=Math.round(height*dpr);
+        }
+        ctx.setTransform(dpr,0,0,dpr,0,0);
+        ctx.clearRect(0,0,width,height);
+        const t=now*.001;
+        const glow=ctx.createLinearGradient(0,0,width,0);
+        glow.addColorStop(0,"rgba(70,170,115,0)");
+        glow.addColorStop(.5,"rgba(70,170,115,.12)");
+        glow.addColorStop(1,"rgba(70,170,115,0)");
+        ctx.fillStyle=glow;ctx.fillRect(0,0,width,height);
+        ctx.strokeStyle="rgba(110,190,140,.10)";ctx.lineWidth=1;
+        for(let y=10;y<height;y+=14){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(width,y);ctx.stroke();}
+        const scan=((t*95)%(width+90))-45;
+        const beam=ctx.createLinearGradient(scan-45,0,scan+45,0);
+        beam.addColorStop(0,"rgba(95,220,150,0)");beam.addColorStop(.5,"rgba(95,220,150,.32)");beam.addColorStop(1,"rgba(95,220,150,0)");
+        ctx.fillStyle=beam;ctx.fillRect(scan-45,0,90,height);
+        for(const dot of dots){
+            const x=(dot.x/460*width+Math.sin(t*1.2+dot.p)*8+width)%width;
+            const y=dot.y+Math.sin(t*1.7+dot.p)*5;
+            const alpha=.18+.42*(.5+.5*Math.sin(t*2+dot.p));
+            ctx.beginPath();ctx.arc(x,y,dot.s,0,Math.PI*2);ctx.fillStyle="rgba(125,220,160,"+alpha+")";ctx.fill();
+        }
+        ctx.strokeStyle="rgba(120,205,150,.22)";ctx.beginPath();ctx.moveTo(12,52);ctx.lineTo(width-12,52);ctx.stroke();
+        const pulse=width*.12+(Math.sin(t*1.3)+1)*width*.08;
+        ctx.fillStyle="rgba(105,210,145,.62)";ctx.fillRect(12,51,Math.max(12,pulse),2);
+        frame=requestAnimationFrame(draw);
+    }
+    frame=requestAnimationFrame(draw);
+    return {
+        update(value){statusText.textContent=value;},
+        stop(){running=false;cancelAnimationFrame(frame);}
+    };
+}
+
 window.handleImageGeneration = async function (prompt, box) {
     prompt = (prompt || "").trim();
     if (!prompt) return finalizeAiBubble(box, "⚠️ Describe the image you want, e.g. /image a red fox in the snow");
@@ -2102,15 +2156,16 @@ window.handleImageGeneration = async function (prompt, box) {
     const [w, h] = IMG_SIZES[o.size] || IMG_SIZES.square, seed = Math.floor(Math.random() * 1e6), t0 = performance.now(), secs = () => Math.round((performance.now() - t0) / 1000);
     const captchaer200=await captchaer200Check();
     if(!captchaer200) return finalizeAiBubble(box,"CAPTCHAER200 not completed. Banana status remains suspicious.");
-    let label = "Generating image…"; live(box, "", label + " 0s");
-    const tick = setInterval(() => live(box, "", `${label} ${secs()}s`), 1000);
+    let label = "Preparing image with Lightning…";
+    const progress = startImageCanvasProgress(box, label + " 0s");
+    const tick = setInterval(() => progress.update(label + " " + secs() + "s"), 1000);
     try {
         let used = prompt;
         const full = prompt + (IMG_STYLES[o.style] || "");
         let img = null, src = "";
         try {
-            label = o.enhance ? "Improving your prompt and generating…" : "Generating with FLUX.2…";
-            live(box, "", label + " " + secs() + "s");
+            label = o.enhance ? "Enhancing prompt and preparing image…" : "Generating image…";
+            progress.update(label + " " + secs() + "s");
             const r = await fetch("/api/image", {
                 method: "POST",
                 credentials: "same-origin",
@@ -2121,29 +2176,27 @@ window.handleImageGeneration = async function (prompt, box) {
             if (!r.ok || !j.image) throw new Error(j.error || "Image service returned HTTP " + r.status);
             if (j.entitlement) { lightningEntitlement = j.entitlement; drawAcct(); }
             used = j.promptUsed || prompt;
+            label = "Rendering preview" + (j.model ? " · " + j.model : "") + "…";
+            progress.update(label + " " + secs() + "s");
             src = j.image;
             img = new Image();
             await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = src; });
         } catch (e) {
-            console.warn("Cloudflare image generation failed:", e);
+            console.warn("Lightning image generation failed:", e);
             img = null; src = "";
-            if (/not enabled|binding named AI/i.test(String(e.message || e))) {
-                return finalizeAiBubble(box, "⚠️ The image model is not connected yet. In Cloudflare, enable Workers AI and add the AI binding. Then redeploy.");
-            }
             if (/free image-generation allowance|daily reset|not enough credits/i.test(String(e.message || e))) {
                 return finalizeAiBubble(box, "⚠️ " + e.message);
             }
-            live(box, "", "FLUX model unavailable. Waiting for the service to respond… " + secs() + "s");
+            return finalizeAiBubble(box, "⚠️ " + (e.message || "The image services are busy. Please try again in a minute."));
         }
-        if (!img) return finalizeAiBubble(box, "⚠️ Cloudflare Workers AI image generation failed. Please try again later.");
-        if (!img) return finalizeAiBubble(box, "⚠️ Image generation failed. The image services may be busy or blocked by your network or an ad blocker. Try again in a minute.");
+        if (!img) return finalizeAiBubble(box, "⚠️ Image generation failed. Please try again.");
         const id = src.startsWith("data:") ? nid() : "";
         if (id) await idbPut(id, src);
         imageResult(box, prompt, img, src, used); addImage(prompt, id ? "" : src, id);
         chat.push({ text: `🖼️ [Generated Image]: ${prompt}`, alignment: "ai-align", type: "aiBox", isImage: false, imgData: "", genUrl: id ? "" : src, imgId: id, prompt });
         try { store(KEY); } catch (e) {}
         scrollToLatestMessage();
-    } finally { clearInterval(tick); }
+    } finally { clearInterval(tick); progress.stop(); }
 };
 
 /* ---------- Welcome screen, new chat, composer autosize ---------- */
