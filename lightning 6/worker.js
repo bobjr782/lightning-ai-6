@@ -281,9 +281,7 @@ async function imageRoute(request, env) {
   const account=await userFor(request,env);
   if(!account) return json({error:"Sign in to a Lightning account to use your free image trial."},401);
 
-  if (!env.AI || typeof env.AI.run !== "function") {
-    return json({ error: "Image generation is not enabled. Add the Workers AI binding named AI in Cloudflare." }, 503);
-  }
+  // Qwen and Pollinations are direct HTTPS providers; Workers AI is an optional fallback.
   const limit = imageRateLimit(account.id);
   if (!limit.ok) return json({ error: "Too many images requested. Please wait a minute and try again.", retryAfter: limit.retryAfter }, 429, { "retry-after": String(limit.retryAfter) });
   let input;
