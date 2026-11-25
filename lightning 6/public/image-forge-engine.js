@@ -230,10 +230,125 @@
     return { canvas: output, stats: result.stats, bounds: result.bounds, sampleSize: sw + "×" + sh, outputSize: output.width + "×" + output.height };
   }
 
+
+  function composeScene(crops, options) {
+    options = options || {};
+    if (!Array.isArray(crops) || !crops.length) throw new Error("Analyse at least one reference image before composing");
+    if (crops.length > 20) throw new Error("Image Forge accepts no more than 20 cut-outs at once");
+
+    var width = Math.max(256, Math.min(1536, Math.round(Number(options.width) || 1024)));
+    var height = Math.max(256, Math.min(1536, Math.round(Number(options.height) || 1024)));
+    var maxObjects = Math.max(1, Math.min(8, Math.round(Number(options.maxObjects) || 6)));
+    var candidates = crops.map(function (item, index) {
+      var canvas = item && item.canvas;
+      if (!canvas || !Number.isFinite(canvas.width) || !Number.isFinite(canvas.height) || canvas.width < 1 || canvas.height < 1) return null;
+      var stats = item.stats || {};
+      var area = Number.isFinite(stats.foregroundPercent) ? Math.max(0, Math.min(100, stats.foregroundPercent)) / 100 : 0.3;
+      var edge = Number.isFinite(stats.edgeDensity) ? Math.max(0, Math.min(100, stats.edgeDensity)) / 100 : 0.15;
+      var components = Number.isFinite(stats.componentCount) ? Math.max(1, stats.componentCount) : 1;
+      var areaScore = 1 - Math.min(1, Math.abs(area - 0.32) / 0.68);
+      var edgeScore = 1 - Math.min(1, Math.abs(edge - 0.18) / 0.82);
+      var componentScore = Math.max(0.25, 1 - (components - 1) * 0.12);
+      return {
+        canvas: canvas,
+        stats: stats,
+        title: String(item.title || ("Reference " + (index + 1))).slice(0, 180),
+        url: String(item.url || ""),
+        score: areaScore * 0.55 + edgeScore * 0.25 + componentScore * 0.2,
+        index: index
+      };
+    }).filter(Boolean);
+    if (!candidates.length) throw new Error("No valid extracted cut-outs are available");
+
+    candidates.sort(function (a, b) { return b.score - a.score; });
+    var selected = candidates.slice(0, maxObjects);
+    var hueSin = 0, hueCos = 0, hueWeight = 0;
+    selected.forEach(function (item) {
+      var hue = Number(item.stats.dominantHue);
+      if (!Number.isFinite(hue)) return;
+      var weight = Math.max(0.1, item.score);
+      var radians = hue * Math.PI / 180;
+      hueSin += Math.sin(radians) * weight;
+      hueCos += Math.cos(radians) * weight;
+      hueWeight += weight;
+    });
+    var hue = hueWeight ? (Math.atan2(hueSin, hueCos) * 180 / Math.PI + 360) % 360 : 210;
+
+    var output = document.createElement("canvas");
+    output.width = width;
+    output.height = height;
+    var context = output.getContext("2d");
+    if (!context) throw new Error("Canvas composition is unavailable");
+    context.clearRect(0, 0, width, height);
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+
+    if (options.background !== "transparent") {
+      var background = context.createLinearGradient(0, 0, width, height);
+      background.addColorStop(0, "hsl(" + hue + ", 34%, 19%)");
+      background.addColorStop(0.55, "hsl(" + ((hue + 24) % 360) + ", 30%, 12%)");
+      background.addColorStop(1, "hsl(" + ((hue + 58) % 360) + ", 26%, 8%)");
+      context.fillStyle = background;
+      context.fillRect(0, 0, width, height);
+      var glow = context.createRadialGradient(width * 0.5, height * 0.46, 0, width * 0.5, height * 0.46, Math.max(width, height) * 0.68);
+      glow.addColorStop(0, "hsla(" + hue + ", 70%, 58%, 0.22)");
+      glow.addColorStop(1, "hsla(" + hue + ", 55%, 18%, 0)");
+      context.fillStyle = glow;
+      context.fillRect(0, 0, width, height);
+    }
+
+    var satellites = [
+      { x: 0.18, y: 0.31, size: 0.29, angle: -0.10 },
+      { x: 0.82, y: 0.30, size: 0.29, angle: 0.10 },
+      { x: 0.19, y: 0.80, size: 0.25, angle: 0.07 },
+      { x: 0.82, y: 0.80, size: 0.25, angle: -0.07 },
+      { x: 0.50, y: 0.14, size: 0.21, angle: 0.035 },
+      { x: 0.08, y: 0.57, size: 0.18, angle: -0.04 },
+      { x: 0.92, y: 0.57, size: 0.18, angle: 0.04 }
+    ];
+
+    function drawEntry(entry, slot, hero) {
+      var source = entry.canvas;
+      var maxWidth = width * slot.size;
+      var maxHeight = height * slot.size;
+      var scale = Math.min(maxWidth / source.width, maxHeight / source.height);
+      var drawWidth = source.width * scale;
+      var drawHeight = source.height * scale;
+      context.save();
+      context.translate(width * slot.x, height * slot.y);
+      context.rotate(slot.angle || 0);
+      context.globalAlpha = hero ? 1 : 0.92;
+      context.shadowColor = "rgba(0,0,0," + (hero ? "0.42" : "0.30") + ")";
+      context.shadowBlur = hero ? 30 : 18;
+      context.shadowOffsetY = hero ? 16 : 9;
+      context.drawImage(source, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+      context.restore();
+    }
+
+    // Draw supporting pieces first so the strongest cut-out remains the focal point.
+    for (var i = 1; i < selected.length; i++) {
+      drawEntry(selected[i], satellites[(i - 1) % satellites.length], false);
+    }
+    drawEntry(selected[0], { x: 0.5, y: 0.57, size: 0.66, angle: 0 }, true);
+
+    return {
+      canvas: output,
+      width: width,
+      height: height,
+      availableCount: candidates.length,
+      selectedCount: selected.length,
+      background: options.background === "transparent" ? "transparent" : "gradient",
+      selected: selected.map(function (item) {
+        return { title: item.title, url: item.url, score: Math.round(item.score * 100) / 100 };
+      })
+    };
+  }
+
   global.ImageForgeEngine = Object.freeze({
     version: "0.2.0-hsv-sobel",
     rgbToHsv: rgbToHsv,
     segmentPixels: segmentPixels,
-    analyzeImageElement: analyzeImageElement
+    analyzeImageElement: analyzeImageElement,
+    composeScene: composeScene
   });
 })(window);
