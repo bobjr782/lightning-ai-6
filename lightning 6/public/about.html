@@ -200,6 +200,16 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
 .dev-test-card-detail{padding:0 9px 10px;color:var(--mute);font-size:10px;line-height:1.4;overflow-wrap:anywhere}
 .dev-test-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:16px;color:var(--mute);font-size:11px}
 .dev-test-footer .btn{flex:none}
+
+.dev-compose-panel{margin-top:15px;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.dev-compose-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.dev-compose-controls label{font-size:12px;font-weight:700}
+.dev-compose-controls select{min-width:190px;border:1px solid var(--line);border-radius:9px;padding:10px 12px;background:var(--bg);color:var(--text);font:inherit}
+.dev-compose-preview{margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--panel,rgba(127,127,127,.055))}
+.dev-compose-preview[hidden],.dev-compose-panel[hidden]{display:none!important}
+.dev-compose-preview img{display:block;width:min(100%,720px);max-height:720px;object-fit:contain;margin:0 auto;background:repeating-conic-gradient(#8882 0% 25%,transparent 0% 50%) 50%/18px 18px}
+.dev-compose-preview-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:12px}
+
 .dev-section{padding-bottom:90px}
 @media(max-width:760px){.dev-test-form{grid-template-columns:1fr}.dev-test-footer{align-items:flex-start;flex-direction:column}.dev-test-heading{flex-direction:column}}
 
@@ -369,16 +379,16 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
           <div class="dev-kicker">Experimental project</div>
           <h3 class="serif">Image Forge</h3>
         </div>
-        <span class="dev-status">HSV analysis prototype</span>
+        <span class="dev-status">HSV + Canvas compositor</span>
       </div>
-      <p class="dev-description">The browser prototype finds 8–20 reference images, groups their colours in HSV, detects strong edges and connected regions, then extracts candidate cut-outs. Scene composition and prompt-accuracy ranking are still being developed.</p>
+      <p class="dev-description">The browser prototype finds 8–20 reference images, groups colours in HSV, detects edges and connected regions, extracts candidate cut-outs, then arranges up to six cut-outs into a downloadable layered composition. This is a lightweight collage compositor, not semantic scene generation.</p>
       <div class="dev-pipeline" aria-label="Image Forge planned workflow">
         <div><b>01</b><span>Find 8–20 reference images</span></div>
         <div><b>02</b><span>Group HSV colours and map strong edges</span></div>
         <div><b>03</b><span>Separate connected subject regions from the background</span></div>
         <div><b>04</b><span>Extract useful regions as transparent cut-outs</span></div>
-        <div><b>05</b><span>Generate two different candidate images</span></div>
-        <div><b>06</b><span>Compare both candidates and keep the most accurate one</span></div>
+        <div><b>05</b><span>Arrange selected cut-outs into one layered composite</span></div>
+        <div><b>06</b><span>Score prompt accuracy and compare alternative layouts (planned)</span></div>
       </div>
       <div class="dev-accuracy-control"><label for="image-forge-accuracy">Accuracy</label><output id="image-forge-accuracy-value" for="image-forge-accuracy">70%</output><input id="image-forge-accuracy" type="range" min="10" max="100" step="5" value="70"><div class="dev-accuracy-help">Planned setting only. The current prototype uses fixed 256px analysis and does not yet use this slider.</div><div class="dev-eta">Planning estimate only; generation time is not measured: <strong id="image-forge-eta">about 1 min 30 sec</strong></div></div>
       <div class="dev-test-panel" id="image-forge-mount">
@@ -392,6 +402,19 @@ footer { border-top: 1px solid var(--line); padding: 64px 0 48px; background: va
         </form>
         <div id="image-forge-test-status" class="dev-test-status" role="status" aria-live="polite">Sign in to Lightning, then run a search to test the reference finder.</div>
         <div id="image-forge-test-results" class="dev-test-results"></div>
+        <div class="dev-compose-panel" id="image-forge-compose-panel" hidden>
+          <div class="dev-test-heading"><div><h4>Layered composition</h4><p>Arrange the strongest extracted cut-outs into one browser-generated PNG. No AI model or paid GPU is used for this step.</p></div><span class="dev-test-count">Canvas compositor</span></div>
+          <div class="dev-compose-controls">
+            <label for="image-forge-background">Background</label>
+            <select id="image-forge-background"><option value="gradient">Colour-matched gradient</option><option value="transparent">Transparent</option></select>
+            <button type="button" class="btn" id="image-forge-compose" disabled>Compose image</button>
+          </div>
+          <div id="image-forge-compose-status" class="dev-test-status" role="status" aria-live="polite">Waiting for extracted cut-outs.</div>
+          <div class="dev-compose-preview" id="image-forge-compose-preview" hidden>
+            <img id="image-forge-compose-image" alt="Image Forge layered composition preview">
+            <div class="dev-compose-preview-actions"><a class="btn" id="image-forge-download" download="image-forge-composite.png" hidden>Download PNG</a></div>
+          </div>
+        </div>
         <div class="dev-test-footer"><span>Google Images is searched first, with Openverse as a backup. Browser analysis requires image hosts to allow CORS. Check each original source and its usage rights before reuse.</span><button type="button" class="btn ghost" id="image-forge-copy-urls" disabled>Copy image URLs</button></div>
       </div>
 
@@ -574,12 +597,23 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
   const results=document.getElementById("image-forge-test-results");
   const search=document.getElementById("image-forge-search");
   const copy=document.getElementById("image-forge-copy-urls");
-  let latest=[];
+  const composePanel=document.getElementById("image-forge-compose-panel");
+  const composeButton=document.getElementById("image-forge-compose");
+  const composeBackground=document.getElementById("image-forge-background");
+  const composeStatus=document.getElementById("image-forge-compose-status");
+  const composePreview=document.getElementById("image-forge-compose-preview");
+  const composeImage=document.getElementById("image-forge-compose-image");
+  const composeDownload=document.getElementById("image-forge-download");
+  let latest=[],extracted=[],compositionUrl=null;
   form.addEventListener("submit",async function(event){
     event.preventDefault();
     const query=prompt.value.trim();
     if(query.length<2){status.textContent="Please enter a more detailed image description.";return;}
     search.disabled=true;search.textContent="Searching…";copy.disabled=true;
+    extracted=[];composeButton.disabled=true;composePanel.hidden=true;composePreview.hidden=true;composeDownload.hidden=true;
+    composeStatus.textContent="Waiting for extracted cut-outs.";
+    if(compositionUrl){URL.revokeObjectURL(compositionUrl);compositionUrl=null;}
+    composeImage.removeAttribute("src");composeDownload.removeAttribute("href");
     status.textContent=query.toLowerCase().endsWith("#no-background")?"Searching for transparent images…":"Searching Google Images first, then Openverse if needed…";results.replaceChildren();latest=[];
     try{
       const response=await fetch("/api/image-references",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:query,count:Number(count.value)})});
@@ -620,6 +654,7 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
           if(!window.ImageForgeEngine||typeof window.ImageForgeEngine.analyzeImageElement!=="function")throw new Error("The Image Forge analysis engine did not load");
           const analysis=window.ImageForgeEngine.analyzeImageElement(img,{sampleSize:256});
           out=analysis.canvas;analysisStats=analysis.stats;
+          extracted.push({canvas:out,stats:analysisStats,title:item.title||("Reference "+(index+1)),url:item.url});
           analysisSummaries.push({url:item.url,stats:analysisStats,sampleSize:analysis.sampleSize,outputSize:analysis.outputSize});
           const card=document.createElement("article");card.className="dev-test-card";
           const preview=document.createElement("img");preview.src=out.toDataURL("image/png");preview.alt="HSV and edge-extracted foreground object "+(cropped+1);
@@ -633,11 +668,35 @@ document.querySelectorAll("a.app-link").forEach(function (a) {
         status.textContent=(transparentOnly?"Transparency check: ":"HSV and edge analysis: ")+(index+1)+" / "+latest.length;
       }
       const reasons=Object.keys(rejectionReasons).map(function(reason){return reason+" ("+rejectionReasons[reason]+")";}).join("; ");
+      composePanel.hidden=transparentOnly||!extracted.length;
+      composeButton.disabled=!extracted.length||transparentOnly;
+      composeStatus.textContent=extracted.length?"Ready to compose from "+extracted.length+" extracted cut-out"+(extracted.length===1?"":"s")+".":"No usable cut-outs were extracted.";
       if(!latest.length)status.textContent="No images found. Try a broader description.";else if(transparentOnly)status.textContent="Verified "+cropped+" transparent image"+(cropped===1?"":"s")+". Rejected "+failed+" image"+(failed===1?"":"s")+". "+(reasons?"Reasons: "+reasons:"");else status.textContent="Created "+cropped+" cut-out"+(cropped===1?"":"s")+" with HSV and edge analysis. Rejected "+failed+" image"+(failed===1?"":"s")+". "+(reasons?"Reasons: "+reasons:"");
                         copy.disabled=!latest.length;
       try{localStorage.setItem("image_forge_references",JSON.stringify({query:data.query,savedAt:Date.now(),results:latest}));localStorage.setItem("image_forge_analysis",JSON.stringify({query:data.query,analyzedAt:Date.now(),items:analysisSummaries}));}catch(_){}
     }catch(error){status.textContent="Image Forge test failed: "+error.message;}
     finally{search.disabled=false;search.textContent="Find reference images";}
+  });
+  composeButton.addEventListener("click",async function(){
+    if(!extracted.length)return;
+    composeButton.disabled=true;composeButton.textContent="Composing…";
+    composeStatus.textContent="Arranging cut-outs and matching the background palette…";
+    try{
+      if(!window.ImageForgeEngine||typeof window.ImageForgeEngine.composeScene!=="function")throw new Error("The Image Forge compositor did not load");
+      const composition=window.ImageForgeEngine.composeScene(extracted,{width:1024,height:1024,maxObjects:6,background:composeBackground.value});
+      if(typeof composition.canvas.toBlob!=="function")throw new Error("PNG export is unavailable in this browser");
+      const blob=await new Promise(function(resolve){composition.canvas.toBlob(resolve,"image/png");});
+      if(!blob)throw new Error("The browser could not encode the composite as PNG");
+      if(compositionUrl)URL.revokeObjectURL(compositionUrl);
+      compositionUrl=URL.createObjectURL(blob);
+      composeImage.src=compositionUrl;composePreview.hidden=false;
+      composeDownload.href=compositionUrl;composeDownload.hidden=false;
+      composeStatus.textContent="Composed "+composition.selectedCount+" of "+composition.availableCount+" cut-outs into a "+composition.width+" × "+composition.height+" PNG. This is a layered visual collage, not semantic scene generation.";
+    }catch(error){
+      composeStatus.textContent="Composition failed: "+(error&&error.message?error.message:"Unknown error");
+    }finally{
+      composeButton.disabled=!extracted.length;composeButton.textContent="Compose image";
+    }
   });
   copy.addEventListener("click",async function(){
     if(!latest.length)return;
