@@ -264,7 +264,9 @@
     var selected = candidates.slice(0, maxObjects);
     var hueSin = 0, hueCos = 0, hueWeight = 0;
     selected.forEach(function (item) {
-      var hue = Number(item.stats.dominantHue);
+      var hueValue = item.stats.dominantHue;
+      if (hueValue === null || hueValue === undefined) return;
+      var hue = Number(hueValue);
       if (!Number.isFinite(hue)) return;
       var weight = Math.max(0.1, item.score);
       var radians = hue * Math.PI / 180;
@@ -345,7 +347,7 @@
   }
 
   global.ImageForgeEngine = Object.freeze({
-    version: "0.2.0-hsv-sobel",
+    version: "0.3.0-hsv-sobel-canvas",
     rgbToHsv: rgbToHsv,
     segmentPixels: segmentPixels,
     analyzeImageElement: analyzeImageElement,
